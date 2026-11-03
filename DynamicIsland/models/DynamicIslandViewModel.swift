@@ -30,6 +30,7 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
 
     @Published var contentType: ContentType = .normal
     @Published private(set) var notchState: NotchState = .closed
+    @Published private(set) var dvInteraction = DVInteractionState()
 
     @Published var dragDetectorTargeting: Bool = false
     @Published var dropZoneTargeting: Bool = false
@@ -133,6 +134,7 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
         self.screen = screen
         notchSize = getClosedNotchSize(screen: screen)
         closedNotchSize = notchSize
+        if DVCustomization.isEnabled { notchSize = dvNotchSize }
 
         Publishers.CombineLatest($dropZoneTargeting, $dragDetectorTargeting)
             .map { value1, value2 in
@@ -365,7 +367,41 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
         return false
     }
 
+    func sendDVEvent(_ event: DVInteractionEvent) {
+        var next = dvInteraction
+        next.send(event)
+        guard next != dvInteraction else { return }
+        let wasOpen = dvPresentation != .idle
+        dvInteraction = next
+        let target = dvNotchSize
+        let isOpening = next.presentation != .idle
+        // Grow the hosting window before its animated content needs more room.
+        if isOpening {
+            AppDelegate.shared?.ensureWindowSize(
+                addShadowPadding(to: target, isMinimalistic: false), animated: false, force: true)
+        }
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.88)) {
+            notchSize = target
+            notchState = isOpening ? .open : .closed
+        }
+        if isOpening && !wasOpen { MusicManager.shared.forceUpdate() }
+        if !isOpening {
+            let expected = next
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .milliseconds(320))
+                guard let self, self.dvInteraction == expected else { return }
+                AppDelegate.shared?.ensureWindowSize(
+                    addShadowPadding(to: self.dvNotchSize, isMinimalistic: false),
+                    animated: false, force: true)
+            }
+        }
+    }
+
     func open() {
+        if DVCustomization.isEnabled {
+            sendDVEvent(.clicked)
+            return
+        }
         let targetSize = calculateDynamicNotchSize()
 
         let applyWindowResize: () -> Void = {
@@ -392,6 +428,7 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
     }
     
     private func calculateDynamicNotchSize() -> CGSize {
+        if DVCustomization.isEnabled { return dvNotchSize }
         let baseSize = Defaults[.enableMinimalisticUI] ? minimalisticOpenNotchSize(isDynamicIslandMode: shouldUseDynamicIslandMode(for: screen)) : openNotchSize
         var adjustedSize = baseSize
 
@@ -409,6 +446,12 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
     }
 
     func close() {
+        if DVCustomization.isEnabled {
+            sendDVEvent(.cancelled)
+            resetScrollGestureSuppression()
+            resetAutoCloseSuppression()
+            return
+        }
         let targetSize = getClosedNotchSize(screen: screen)
         notchSize = targetSize
         closedNotchSize = targetSize
@@ -426,6 +469,12 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
     }
 
     func closeForLockScreen() {
+        if DVCustomization.isEnabled {
+            sendDVEvent(.cancelled)
+            resetScrollGestureSuppression()
+            resetAutoCloseSuppression()
+            return
+        }
         let targetSize = getClosedNotchSize(screen: screen)
         withAnimation(.none) {
             notchSize = targetSize

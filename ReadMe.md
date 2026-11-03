@@ -1,169 +1,75 @@
-<p align="center">
-  <img src=".github/assets/atoll-logo.png" alt="Atoll logo" width="120">
-</p>
-<h1 align="center">Atoll - DynamicIsland for macOS</h1>
-<p align="center">
-<a href="https://trendshift.io/repositories/15291" target="_blank"><img src="https://trendshift.io/api/badge/repositories/15291" alt="Ebullioscopic%2FAtoll | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
-</p>
-<p align="center">
-  <a href="https://github.com/Ebullioscopic/Atoll/stargazers">
-    <img src="https://img.shields.io/github/stars/Ebullioscopic/Atoll?style=social" alt="GitHub stars"/>
-  </a>
-  <a href="https://github.com/Ebullioscopic/Atoll/network/members">
-    <img src="https://img.shields.io/github/forks/Ebullioscopic/Atoll?style=social" alt="GitHub forks"/>
-  </a>
-  <a href="https://github.com/Ebullioscopic/Atoll/releases">
-    <img src="https://img.shields.io/github/downloads/Ebullioscopic/Atoll/total?label=Downloads" alt="GitHub downloads"/>
-  </a>
-  <a href="https://discord.gg/PaqFkRTDF8">
-    <img src="https://dcbadge.limes.pink/api/server/https://discord.gg/PaqFkRTDF8?style=flat" alt="Discord server"/>
-  </a>
-</p>
+# NotchFlow
 
-<p align="center">
-  <a href="https://github.com/sponsors/Ebullioscopic">
-    <img src="https://img.shields.io/badge/Sponsor-Ebullioscopic-ff69b4?style=for-the-badge&logo=github" alt="Sponsor Ebullioscopic"/>
-  </a>
-  <a href="https://github.com/Ebullioscopic/Atoll/releases/latest">
-    <img src="https://img.shields.io/badge/Download-Atoll%20for%20macOS-0A84FF?style=for-the-badge&logo=apple" alt="Download Atoll for macOS"/>
-  </a>
-  <a href="https://www.buymeacoffee.com/kryoscopic">
-    <img src="https://img.shields.io/badge/Buy%20Me%20A%20Coffee-kryoscopic-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=000000" alt="Buy Me a Coffee for kryoscopic"/>
-  </a>
-</p>
+A personal macOS notch app based on [Atoll](https://github.com/Ebullioscopic/Atoll), with a compact music preview, Pomodoro timer and custom idle GIF.
 
-<p align="center">
-  <a href="https://discord.gg/PaqFkRTDF8">Join our Discord community</a>
-</p>
+This is an independent customization, not an official Atoll release. The application name is NotchFlow; some inherited settings, icon artwork and internal types still use Atoll branding. Original copyrights, LICENSE, NOTICE, TRADEMARKS and COPYRIGHT_ASSETS remain applicable.
 
-Atoll turns the MacBook notch into a focused command surface for media, system insight, and quick utilities. It stays out of the way until needed, then expands with responsive, native SwiftUI animations.
+## Which branch to use
 
-<p align="center">
-  <img src="https://i.postimg.cc/t49mW5yN/Screenshot-2026-03-02-at-6-00-22-PM.png" alt="Atoll lock screen" width="920">
-</p>
+Use **`notchflow`** for the customized app. The fork's `dev` branch is the upstream reference and does not contain this interface. Do not sync upstream directly onto the custom branch without reviewing conflicts.
 
+The initial custom branch is based on Atoll **v2.3.3-beta.3**, commit `c7305ecd1522ae8eb15b20d64c11d2105c62aa31`. It is not a promise of feature parity with later Atoll releases.
 
+## Install on your Mac
 
-
-
-## Highlights
-- Media controls for Apple Music, Spotify, Cider, and more with inline previews.
-- Live Activities for media playback, Focus, screen recording, privacy indicators, downloads (beta), and battery/charging.
-- Lock screen widgets for media, timers, charging, Bluetooth devices, and weather.
-- Lightweight system insight for CPU, GPU, memory, network, and disk usage.
-- Productivity tools including timers, clipboard history, color picker, and calendar previews.
-- Customization for layouts, animations, hover behavior, and shortcut remapping.
-
-## Other Features
-- Gesture controls for opening/closing the notch and media navigation.
-- Parallax hover interactions with smooth transitions.
-- Lock screen appearance and positioning controls for panels and widgets.
-
-<p align="center">
-  <img src="https://i.postimg.cc/HkLGn6yH/846F86A4_A2F9_4CD6_BC84_1D720D377728_1_201_a.jpg" alt="Atoll preview" width="920">
-</p>
-
-## Requirements
-- macOS 14.0 or later (optimised for macOS 15+).
-- MacBook with a notch (14/16‑inch MBP across Apple silicon generations).
-- Xcode 15+ to build from source.
-- Permissions as needed: Accessibility, Camera, Calendar, Screen Recording, Music.
-
-## Installation
-1) Download the latest DMG [here](https://github.com/Ebullioscopic/Atoll/releases/latest).
-2) Open the DMG and drag Atoll into Applications.
-3) Launch Atoll and grant the requested permissions.
-
-## Quick Start
-- Hover near the notch to expand; click to enter controls.
-- Use tabs for Media, Stats, Timers, Clipboard, and more.
-- Adjust layout, appearance, and shortcuts from Settings.
-- Add files to Shelf from Terminal: `open -a Atoll /path/to/file`.
-
-## Settings
-- Choose appearance, animation style, and per‑feature toggles.
-- Remap global shortcuts and adjust hover behaviour.
-- Enable lock screen widgets and select data sources.
-
-## Gesture Controls
-- Two-finger swipe down to open the notch when hover-to-open is disabled; swipe up to close.
-- Enable horizontal media gestures in **Settings → General → Gesture control** to turn the music pane into a trackpad for previous/next or ±10 second seeks.
-- Pick the gesture skip behaviour (track vs ±10s) independently from the skip button configuration so swipes can scrub while buttons change tracks—or vice versa.
-- Horizontal swipes trigger the same haptics and button animations you see in the notch, keeping visual feedback consistent with tap interactions.
-
-## Troubleshooting (Basics)
-- After granting Accessibility or Screen Recording, quit and relaunch the app.
-- If metrics are empty, enable categories in Settings → Stats.
-- Media not responding: verify player is active and Music permission is granted.
-
-## License
-Atoll is released under the GPL v3 License. Refer to [LICENSE](LICENSE) for the full terms.
-
-## Acknowledgments
-
-Atoll builds upon the work of several open-source projects and draws inspiration from innovative macOS applications:
-
-- [**Boring.Notch**](https://github.com/TheBoredTeam/boring.notch) - foundational codebase that provided the initial media player integration, AirDrop surface implementation, file dock functionality, and calendar event display. Major architectural patterns and notch interaction models were adapted from this project.
-
-- [**Alcove**](https://tryalcove.com) - primary inspiration for the Minimalistic Mode interface design and the conceptual framework for lock screen widget integration that informed Atoll's compact layout strategy.
-
-- [**Stats**](https://github.com/exelban/stats) - source implementation for CPU temperature monitoring via SMC (System Management Controller) access, frequency sampling through IOReport bindings, and per-core CPU utilisation tracking. The system metrics collection architecture derives from Stats project readers.
-
-- [**Open Meteo**](https://open-meteo.com) - weather apis for the lock screen widgets
-
-- [**SkyLightWindow**](https://github.com/Lakr233/SkyLightWindow) - window rendering for Lock Screen Widgets
-
-- [**rtaudio**](https://github.com/ZephyrCodesStuff/rtaudio) - Live music visualizer using C++ was adapted from this project
-
-- [**SwiftTerm**](https://github.com/migueldeicaza/SwiftTerm) - Terminal tab implementation in the standard mode was adapted from this project
-
-- [**DynamicNotch**](https://github.com/jackson-storm/DynamicNotch) - thanks DynamicNotch for letting us use their battery huds
-
-- Wick - Thanks Nate for allowing us to replicate the iOS like Timer design for the Lock Screen Widget
-
-- [**OpenUsage**](https://github.com/robinebers/openusage) - LLM Usage Tracking features
-
-- [**OpenRouter**](https://openrouter.ai) - API for getting automated model pricing
-
-## Contributors
-
-<a href="https://github.com/Ebullioscopic/Atoll/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=Ebullioscopic/Atoll" />
-</a>
-
-## Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=Ebullioscopic/Atoll&type=timeline&legend=top-left)](https://www.star-history.com/#Ebullioscopic/Atoll&type=timeline&legend=top-left)
-
-## Updating Existing Clones
-If you previously cloned DynamicIsland, update the remote to track the Atoll repository:
+Requires full Xcode 26 or newer and an internet connection. Open Xcode once and finish component installation. In Terminal:
 
 ```bash
-git remote set-url origin https://github.com/Ebullioscopic/Atoll.git
+sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer
+sudo xcodebuild -runFirstLaunch
+xcodebuild -version
 ```
 
-A heartfelt thanks to [TheBoredTeam](https://github.com/TheBoredTeam) for being supportive and being totally awesome, Atoll would not have been possible without Boring.Notch
+Download this branch with **Code > Download ZIP**, extract it, then type `bash ` in Terminal, drag **Build.command** into Terminal and press Return. Keep all extracted files together. You may run the script from any directory.
 
----
+Alternatively, clone once:
 
-<p align="center">
-  <img src=".github/assets/iosdevcentre.jpeg" alt="iOS Development Centre exterior" width="420">
-  <br>
-  <sub>Backed by</sub>
-  <br>
-  <strong>iOS Development Centre</strong>
-  <br>
-  Powered by Apple and Infosys
-  <br>
-  SRM Institute of Science and Technology, Chennai, India
-</p>
+```bash
+GIT_LFS_SKIP_SMUDGE=1 git clone --branch notchflow --single-branch https://github.com/dhruvv620/notchflow.git
+cd notchflow
+bash Build.command
+```
 
-<p align="center">
-  <a href="https://buymeacoffee.com/kryoscopic">
-    <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" width="200" />
-  </a>
-</p>
+The build runs standalone interaction/timer checks, resolves the recorded Swift dependencies, compiles, locally signs and installs **`~/Applications/NotchFlow.app`**. No paid developer account is needed. Build.log appears beside Build.command. Dependencies and intermediate build files are reused under `~/Library/Caches/NotchFlow` to speed later builds; the first build still downloads dependencies.
 
-<p align="center">
-  Your support helps fund teaching children software development.
-</p>
+Quit original Atoll and any other notch overlays, then open NotchFlow. Allow Accessibility and player Automation permissions when requested. If macOS blocks launch, use the app-specific Open Anyway action in Privacy & Security.
+
+Original upstream LFS video assets are not used by the custom panel, which uses static album art and your imported GIF. Cloning with LFS smudging skipped avoids downloading those videos.
+
+## Interaction
+
+| Action | Behavior |
+| --- | --- |
+| Idle | Small notch with chosen GIF or default sparkle |
+| Hover | Compact artwork, title, artist and playback controls; no calendar |
+| Click | Expanded Music and Pomodoro tabs |
+| Leave hover preview | Preview closes |
+| Leave clicked panel | Panel stays open |
+| Click outside or Close | Expanded panel closes |
+
+Click the sliders icon beside the tabs to import a GIF or change Pomodoro settings. GIF limits: 20 MB, 2048 x 2048 pixels and 300 frames. Focus defaults to 25 minutes, short break 5, long break 15, with a long break after four completed focus sessions. Phases advance automatically; pause/resume, skip and reset are included. Editing durations resets the cycle.
+
+## Get future NotchFlow changes
+
+For a Git clone, from its folder:
+
+```bash
+git pull --ff-only origin notchflow
+bash Build.command
+```
+
+This retrieves changes already committed to **your custom branch**. It does not automatically integrate new Atoll releases. For a ZIP installation, download and extract a fresh custom-branch ZIP, then run its Build.command.
+
+See [NotchFlow/UPDATING.md](NotchFlow/UPDATING.md) for upstream integration and testing.
+
+## Validation status
+
+The source customization was checked for patch applicability and Swift syntax relative to its upstream baseline; shell syntax was checked. The preparation environment is Linux, so a full Xcode compile, signing and runtime validation have **not** been completed. Build.command runs the included logic checks on your Mac before attempting the native build. Report failures with Build.log.
+
+Test hover/click/outside-close behavior, music playback, GIF import, Pomodoro transitions, sleep/wake and external displays after the first build. Rebuilding backs up an existing NotchFlow app; it does not replace original Atoll or Atoll DV. Settings/imported GIFs use NotchFlow's own identity and do not automatically migrate from Atoll DV.
+
+## License and credits
+
+Based on Atoll / DynamicIsland by the Atoll contributors, with its existing third-party dependencies and acknowledgments. Source is distributed under the accompanying GPL v3 license; added customization files use GPL-3.0-or-later. Preserve all existing license and asset notices when redistributing. No claim is made that inherited artwork is original NotchFlow artwork.
+
+Upstream project documentation and credits: [Atoll](https://github.com/Ebullioscopic/Atoll/tree/c7305ecd1522ae8eb15b20d64c11d2105c62aa31).

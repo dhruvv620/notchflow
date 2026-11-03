@@ -36,15 +36,18 @@ struct DynamicNotchApp: App {
     private let updaterDelegate = AtollUpdaterDelegate()
 
     init() {
+        DVCustomization.configureDefaultsIfNeeded()
         // Skip Sparkle's launch-time update check during UI testing.
         // The AtollUpdaterDelegate overrides the feed URL at runtime
         // based on the user's selected update channel.
         updaterController = SPUStandardUpdaterController(
-            startingUpdater: !AppRuntimeEnvironment.isUITesting,
+            startingUpdater: !DVCustomization.isEnabled && !AppRuntimeEnvironment.isUITesting,
             updaterDelegate: updaterDelegate, userDriverDelegate: nil)
 
         // Initialize the settings window controller with the updater controller
-        SettingsWindowController.shared.setUpdaterController(updaterController)
+        if !DVCustomization.isEnabled {
+            SettingsWindowController.shared.setUpdaterController(updaterController)
+        }
     }
 
     var body: some Scene {
@@ -52,9 +55,13 @@ struct DynamicNotchApp: App {
             Button("Settings") {
                 SettingsWindowController.shared.showWindow()
             }
-            CheckForUpdatesView(updater: updaterController.updater)
+            if DVCustomization.isEnabled {
+                Text("NotchFlow custom build")
+            } else {
+                CheckForUpdatesView(updater: updaterController.updater)
+            }
             Divider()
-            Button("Restart Atoll") {
+            Button("Restart NotchFlow") {
                 guard let bundleIdentifier = Bundle.main.bundleIdentifier else { return }
 
                 let workspace = NSWorkspace.shared
@@ -395,6 +402,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func createDynamicIslandWindow(for screen: NSScreen, with viewModel: DynamicIslandViewModel)
         -> NSWindow
     {
+        if DVCustomization.isEnabled { viewModel.screen = screen.localizedName }
         // Use the current required size instead of always using openNotchSize
         let baseSize = calculateRequiredNotchSize()
         let requiredSize = adjustedSizeForScreen(baseSize, screen: screen)
@@ -469,6 +477,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func calculateRequiredNotchSize() -> CGSize {
+        if DVCustomization.isEnabled {
+            return addShadowPadding(to: vm.dvNotchSize, isMinimalistic: false)
+        }
         // Check if inline sneak peek is showing and notch is closed
         let airPodsListeningModeSneakActive = vm.notchState == .closed &&
                                       coordinator.sneakPeek.show &&
@@ -635,8 +646,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         LockScreenLiveActivityWindowManager.shared.configure(viewModel: vm)
         LockScreenManager.shared.configure(viewModel: vm)
-        extensionXPCServiceHost.start()
-        extensionRPCServer.start()
+        // This personal build uses native custom panels. Keep the older
+        // extension servers off; the pinned release lacks the loopback-only fix.
+        if !DVCustomization.isEnabled {
+            extensionXPCServiceHost.start()
+            extensionRPCServer.start()
+        }
         
         // Migrate legacy progress bar settings
         Defaults.Keys.migrateProgressBarStyle()
