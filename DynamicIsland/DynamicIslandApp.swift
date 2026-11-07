@@ -36,18 +36,15 @@ struct DynamicNotchApp: App {
     private let updaterDelegate = AtollUpdaterDelegate()
 
     init() {
-        DVCustomization.configureDefaultsIfNeeded()
         // Skip Sparkle's launch-time update check during UI testing.
         // The AtollUpdaterDelegate overrides the feed URL at runtime
         // based on the user's selected update channel.
         updaterController = SPUStandardUpdaterController(
-            startingUpdater: !DVCustomization.isEnabled && !AppRuntimeEnvironment.isUITesting,
+            startingUpdater: false,
             updaterDelegate: updaterDelegate, userDriverDelegate: nil)
 
         // Initialize the settings window controller with the updater controller
-        if !DVCustomization.isEnabled {
-            SettingsWindowController.shared.setUpdaterController(updaterController)
-        }
+        // NotchFlow must not install official Atoll updates.
     }
 
     var body: some Scene {
@@ -55,11 +52,7 @@ struct DynamicNotchApp: App {
             Button("Settings") {
                 SettingsWindowController.shared.showWindow()
             }
-            if DVCustomization.isEnabled {
-                Text("NotchFlow custom build")
-            } else {
-                CheckForUpdatesView(updater: updaterController.updater)
-            }
+            Text("NotchFlow custom build")
             Divider()
             Button("Restart NotchFlow") {
                 guard let bundleIdentifier = Bundle.main.bundleIdentifier else { return }
@@ -402,7 +395,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func createDynamicIslandWindow(for screen: NSScreen, with viewModel: DynamicIslandViewModel)
         -> NSWindow
     {
-        if DVCustomization.isEnabled { viewModel.screen = screen.localizedName }
         // Use the current required size instead of always using openNotchSize
         let baseSize = calculateRequiredNotchSize()
         let requiredSize = adjustedSizeForScreen(baseSize, screen: screen)
@@ -477,9 +469,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func calculateRequiredNotchSize() -> CGSize {
-        if DVCustomization.isEnabled {
-            return addShadowPadding(to: vm.dvNotchSize, isMinimalistic: false)
-        }
         // Check if inline sneak peek is showing and notch is closed
         let airPodsListeningModeSneakActive = vm.notchState == .closed &&
                                       coordinator.sneakPeek.show &&
@@ -544,7 +533,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         var baseSize = Defaults[.enableMinimalisticUI] ? minimalisticOpenNotchSize(isDynamicIslandMode: shouldUseDynamicIslandMode(for: vm.screen)) : openNotchSize
         
         // Use a consistent height for different view types
-        if coordinator.currentView == .timer {
+        if coordinator.currentView == .cuely || coordinator.currentView == .askAI {
+            baseSize = CGSize(width: min(max(baseSize.width, 720), maxAllowedNotchWidth()), height: 420)
+        } else if coordinator.currentView == .focus {
+            baseSize = CGSize(width: min(max(baseSize.width, 600), maxAllowedNotchWidth()), height: 310)
+        } else if coordinator.currentView == .timer {
             baseSize.height = 250 // Extra space for timer presets
         } else if coordinator.currentView == .notes {
             let preferredHeight = coordinator.notesLayoutState.preferredHeight
@@ -646,12 +639,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         LockScreenLiveActivityWindowManager.shared.configure(viewModel: vm)
         LockScreenManager.shared.configure(viewModel: vm)
-        // This personal build uses native custom panels. Keep the older
-        // extension servers off; the pinned release lacks the loopback-only fix.
-        if !DVCustomization.isEnabled {
-            extensionXPCServiceHost.start()
-            extensionRPCServer.start()
-        }
+        // Keep legacy extension servers disabled in this pinned build.
         
         // Migrate legacy progress bar settings
         Defaults.Keys.migrateProgressBarStyle()

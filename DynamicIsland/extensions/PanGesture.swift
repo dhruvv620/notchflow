@@ -120,9 +120,7 @@ private struct ScrollMonitor: NSViewRepresentable {
         private func handleScroll(_ event: NSEvent) {
             guard lastEventTimestamp != event.timestamp else { return }
             lastEventTimestamp = event.timestamp
-            guard isCursorNearObservedView(using: event) else { return }
-
-            if event.phase == .ended || event.momentumPhase == .ended {
+            if event.phase == .ended || event.phase == .cancelled {
                 if active {
                     action(accumulated.magnitude, .ended)
                 } else {
@@ -133,6 +131,17 @@ private struct ScrollMonitor: NSViewRepresentable {
                 return
             }
 
+            // Ignore the coast after fingers lift: one swipe changes one tab.
+            guard event.momentumPhase.isEmpty else { return }
+            guard isCursorNearObservedView(using: event) else { return }
+            if event.phase == .began {
+                accumulated = 0
+                active = false
+            }
+            if direction.isHorizontal {
+                guard event.hasPreciseScrollingDeltas,
+                      abs(event.scrollingDeltaX) > abs(event.scrollingDeltaY) else { return }
+            }
             let s = direction.signed(deltaX: event.scrollingDeltaX, deltaY: event.scrollingDeltaY)
             guard s.magnitude > noiseThreshold else { return }
             accumulated = s > 0 ? accumulated + s : 0

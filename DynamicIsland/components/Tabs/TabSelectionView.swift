@@ -62,10 +62,12 @@ struct TabSelectionView: View {
     @Default(.enableMinimalisticUI) private var enableMinimalisticUI
     @Namespace var animation
     
-    private var tabs: [TabModel] {
+    private var tabs: [TabModel] { Self.availableTabs }
+
+    static var availableTabs: [TabModel] {
         var tabsArray: [TabModel] = []
 
-        if homeTabVisible {
+        if Defaults[.enableMinimalisticUI] || Defaults[.showStandardMediaControls] || Defaults[.showCalendar] || Defaults[.showMirror] {
             tabsArray.append(TabModel(label: "Home", icon: "house.fill", view: .home))
         }
 
@@ -73,7 +75,7 @@ struct TabSelectionView: View {
             tabsArray.append(TabModel(label: "Shelf", icon: "tray.fill", view: .shelf))
         }
         
-        if enableTimerFeature && timerDisplayMode == .tab {
+        if Defaults[.enableTimerFeature] && Defaults[.timerDisplayMode] == .tab {
             tabsArray.append(TabModel(label: "Timer", icon: "timer", view: .timer))
         }
 
@@ -95,8 +97,11 @@ struct TabSelectionView: View {
         if Defaults[.enableTerminalFeature] {
             tabsArray.append(TabModel(label: "Terminal", icon: "apple.terminal", view: .terminal))
         }
-        if extensionTabsEnabled {
-            for payload in extensionTabPayloads {
+        tabsArray.append(TabModel(label: "Cuely", icon: "text.bubble.fill", view: .cuely))
+        tabsArray.append(TabModel(label: "Ask AI", icon: "sparkles", view: .askAI))
+        tabsArray.append(TabModel(label: "Focus", icon: "target", view: .focus))
+        if Defaults[.enableThirdPartyExtensions] && Defaults[.enableExtensionNotchExperiences] && Defaults[.enableExtensionNotchTabs] {
+            for payload in ExtensionNotchExperienceManager.shared.activeExperiences.filter({ $0.descriptor.tab != nil }) {
                 guard let tab = payload.descriptor.tab else { continue }
                 let accent = payload.descriptor.accentColor.swiftUIColor
                 let iconName = tab.iconSymbolName ?? "puzzlepiece.extension"
@@ -113,7 +118,43 @@ struct TabSelectionView: View {
         }
         return tabsArray
     }
+    static func advanceTab(forward: Bool) {
+        let coordinator = DynamicIslandViewCoordinator.shared
+        let tabs = availableTabs
+        guard !tabs.isEmpty else { return }
+        let index = tabs.firstIndex {
+            $0.view == coordinator.currentView && ($0.view != .extensionExperience || $0.experienceID == coordinator.selectedExtensionExperienceID)
+        } ?? 0
+        let target = tabs[(index + (forward ? 1 : tabs.count - 1)) % tabs.count]
+        withAnimation(.easeInOut(duration: 0.2)) {
+            coordinator.selectedExtensionExperienceID = target.experienceID
+            coordinator.currentView = target.view
+        }
+    }
+
     var body: some View {
+        ViewThatFits(in: .horizontal) {
+            tabButtons
+            Menu {
+                ForEach(tabs) { tab in
+                    Button {
+                        coordinator.selectedExtensionExperienceID = tab.experienceID
+                        coordinator.currentView = tab.view
+                    } label: {
+                        Label(tab.label, systemImage: tab.icon)
+                    }
+                }
+            } label: {
+                Label(tabs.first(where: { isSelected($0) })?.label ?? "Tabs",
+                      systemImage: tabs.first(where: { isSelected($0) })?.icon ?? "square.grid.2x2")
+            }
+            .menuStyle(.borderlessButton)
+            .fixedSize()
+        }
+        .onAppear { ensureValidSelection(with: tabs) }
+    }
+
+    private var tabButtons: some View {
         HStack(spacing: 24) {
             ForEach(Array(tabs.enumerated()), id: \.element.id) { idx, tab in
                 let isSelected = isSelected(tab)
@@ -126,6 +167,8 @@ struct TabSelectionView: View {
                     }
                     coordinator.currentView = tab.view
                 }
+                .help(tab.label)
+                .accessibilityLabel(tab.label)
                 .frame(height: 26)
                 .foregroundStyle(isSelected ? activeAccent : .gray)
                 .background {
@@ -145,10 +188,8 @@ struct TabSelectionView: View {
                 
             }
         }
+        .fixedSize(horizontal: true, vertical: false)
         .clipShape(Capsule())
-        .onAppear {
-            ensureValidSelection(with: tabs)
-        }
     }
 
     private var extensionTabsEnabled: Bool {
