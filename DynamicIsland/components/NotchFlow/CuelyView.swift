@@ -156,9 +156,10 @@ private struct ScrollingScriptView: NSViewRepresentable {
     }
     func updateNSView(_ scroll: NSScrollView, context: Context) {
         guard let view = scroll.documentView as? NSTextView else { return }
-        if view.string != text || view.font?.pointSize != fontSize {
+        let pointSize = CGFloat(fontSize)
+        if view.string != text || view.font?.pointSize != pointSize {
             view.string = text
-            view.font = .systemFont(ofSize: fontSize, weight: .medium)
+            view.font = .systemFont(ofSize: pointSize, weight: .medium)
             let style = NSMutableParagraphStyle()
             style.lineSpacing = 12
             view.textStorage?.addAttribute(.paragraphStyle, value: style, range: NSRange(location: 0, length: (text as NSString).length))
@@ -183,7 +184,7 @@ private struct ScrollingScriptView: NSViewRepresentable {
         func tick() {
             guard playing, let scroll, let document = scroll.documentView else { return }
             let maxY = max(0, document.bounds.height - scroll.contentSize.height)
-            let y = min(maxY, scroll.contentView.bounds.origin.y + speed / 30)
+            let y = min(maxY, scroll.contentView.bounds.origin.y + CGFloat(speed / 30))
             scroll.contentView.scroll(to: NSPoint(x: 0, y: y))
             scroll.reflectScrolledClipView(scroll.contentView)
         }
