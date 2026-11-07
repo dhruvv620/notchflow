@@ -80,6 +80,9 @@ public enum NotchViews {
     case notes
     case clipboard
     case terminal
+    case cuely
+    case askAI
+    case focus
     case extensionExperience
 }
 

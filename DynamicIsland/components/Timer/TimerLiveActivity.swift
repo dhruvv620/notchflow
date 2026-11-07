@@ -29,6 +29,7 @@ typealias PlatformFont = UIFont
 
 struct TimerLiveActivity: View {
     @EnvironmentObject var vm: DynamicIslandViewModel
+    @ObservedObject private var focusCompanion = FocusCompanionModel.shared
     @ObservedObject var timerManager = TimerManager.shared
     @ObservedObject var lockScreenManager = LockScreenManager.shared
     @State private var isHovering: Bool = false
@@ -339,10 +340,14 @@ struct TimerLiveActivity: View {
                     .frame(width: ringDiameter, height: ringDiameter)
             }
 
-            Image(systemName: "timer")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(glyphColor)
-                .frame(width: iconSize, height: iconSize)
+            if focusCompanion.isFocusSession {
+                FocusCompanionView(size: iconSize)
+            } else {
+                Image(systemName: "timer")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(glyphColor)
+                    .frame(width: iconSize, height: iconSize)
+            }
         }
         .frame(width: ringWrapsIcon ? ringDiameter : iconWidth,
                height: notchContentHeight,

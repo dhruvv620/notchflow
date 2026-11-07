@@ -157,6 +157,13 @@ struct ContentView: View {
             }
         }
         
+        if coordinator.currentView == .cuely || coordinator.currentView == .askAI {
+            return CGSize(width: min(max(baseSize.width, 720), maxAllowedNotchWidth()), height: 420)
+        }
+        if coordinator.currentView == .focus {
+            return CGSize(width: min(max(baseSize.width, 600), maxAllowedNotchWidth()), height: 310)
+        }
+
         if coordinator.currentView == .timer {
             return CGSize(width: baseSize.width, height: 250) // Extra height for timer presets
         }
@@ -810,6 +817,7 @@ struct ContentView: View {
             }
             .onChange(of: lockScreenManager.isLocked) { _, locked in
                 if locked {
+                    CuelyModel.shared.stopRecording()
                     suppressMusicControlWindowUpdates()
                     cancelMusicControlWindowSync()
                     hideMusicControlWindow()
@@ -1106,6 +1114,12 @@ struct ContentView: View {
                                 NotchClipboardView()
                             case .terminal:
                                 NotchTerminalView()
+                            case .cuely:
+                                CuelyView()
+                            case .askAI:
+                                NotchAIView()
+                            case .focus:
+                                FocusNotchView()
                             case .extensionExperience:
                                 if let payload = currentExtensionTabPayload() {
                                     ExtensionNotchExperienceTabView(payload: payload)
@@ -1950,6 +1964,7 @@ struct ContentView: View {
     /// Cancels every long-lived task / event monitor this view owns. Called from
     /// `.onDisappear` and from `vm.onViewTeardown` on window close. Idempotent.
     private func performViewTeardown() {
+        if coordinator.currentView == .cuely { CuelyModel.shared.stopRecording() }
         hoverTask?.cancel()
         stopHoverClickMonitor()
         removeStickyTerminalClickMonitor()

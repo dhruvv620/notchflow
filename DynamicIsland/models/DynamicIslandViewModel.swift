@@ -395,6 +395,12 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
         let baseSize = Defaults[.enableMinimalisticUI] ? minimalisticOpenNotchSize(isDynamicIslandMode: shouldUseDynamicIslandMode(for: screen)) : openNotchSize
         var adjustedSize = baseSize
 
+        if coordinator.currentView == .cuely || coordinator.currentView == .askAI {
+            return CGSize(width: min(max(baseSize.width, 720), maxAllowedNotchWidth()), height: 420)
+        }
+        if coordinator.currentView == .focus {
+            return CGSize(width: min(max(baseSize.width, 600), maxAllowedNotchWidth()), height: 310)
+        }
         if coordinator.currentView == .notes || coordinator.currentView == .clipboard {
             let preferred = coordinator.notesLayoutState.preferredHeight
             adjustedSize.height = max(adjustedSize.height, preferred)

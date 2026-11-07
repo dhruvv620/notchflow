@@ -26,6 +26,8 @@ Inspect these integration points carefully:
 - DynamicIsland/DynamicIslandApp.swift: app lifecycle, updater and extension-server behavior.
 - DynamicIsland/components/Notch/NotchFlowSurface.swift: expanded surface themes.
 - DynamicIsland/components/Tabs/TabSelectionView.swift: shared visible-tab ordering and navigation.
+- DynamicIsland/components/NotchFlow/ and managers/NotchFlow/: Cuely, local CLI chat and Focus companion.
+- NotchFlow/Tests/NotchCLIRunnerTests.swift: standalone process regression checks run by Build.command.
 - DynamicIsland/extensions/PanGesture.swift: horizontal trackpad filtering and momentum handling.
 - DynamicIsland.xcodeproj/project.pbxproj and shared scheme: NotchFlow app identity and product paths.
 - Package.resolved, privacy settings, entitlements and inherited workflow changes.

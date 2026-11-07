@@ -27,6 +27,12 @@ DERIVED_DIR="$BUILD_ROOT/DerivedData"
 /bin/mkdir -p "$BUILD_ROOT"
 printf 'Building source: %s\nBuild cache: %s\n' "$SOURCE_DIR" "$BUILD_ROOT"
 
+printf '\nChecking AI process handling...\n'
+/usr/bin/xcrun swiftc -swift-version 5 -parse-as-library \
+    "$SOURCE_DIR/DynamicIsland/managers/NotchFlow/NotchCLIRunner.swift" \
+    "$SOURCE_DIR/NotchFlow/Tests/NotchCLIRunnerTests.swift" -o "$BUILD_ROOT/NotchCLITests"
+"$BUILD_ROOT/NotchCLITests"
+
 printf '\nResolving the pinned Swift packages...\n'
 /usr/bin/xcodebuild -resolvePackageDependencies \
     -project "$SOURCE_DIR/DynamicIsland.xcodeproj" -scheme DynamicIsland \

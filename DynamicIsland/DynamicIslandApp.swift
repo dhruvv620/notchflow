@@ -533,7 +533,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         var baseSize = Defaults[.enableMinimalisticUI] ? minimalisticOpenNotchSize(isDynamicIslandMode: shouldUseDynamicIslandMode(for: vm.screen)) : openNotchSize
         
         // Use a consistent height for different view types
-        if coordinator.currentView == .timer {
+        if coordinator.currentView == .cuely || coordinator.currentView == .askAI {
+            baseSize = CGSize(width: min(max(baseSize.width, 720), maxAllowedNotchWidth()), height: 420)
+        } else if coordinator.currentView == .focus {
+            baseSize = CGSize(width: min(max(baseSize.width, 600), maxAllowedNotchWidth()), height: 310)
+        } else if coordinator.currentView == .timer {
             baseSize.height = 250 // Extra space for timer presets
         } else if coordinator.currentView == .notes {
             let preferredHeight = coordinator.notesLayoutState.preferredHeight
