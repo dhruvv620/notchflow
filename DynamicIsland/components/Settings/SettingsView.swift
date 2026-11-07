@@ -4339,6 +4339,7 @@ struct LiveActivitiesSettings: View {
 }
 
 struct Appearance: View {
+    @AppStorage("notchflowTheme") private var notchflowTheme = "graphite"
     @ObservedObject var coordinator = DynamicIslandViewCoordinator.shared
     @ObservedObject var webcamManager = WebcamManager.shared
     @Default(.mirrorShape) var mirrorShape
@@ -4436,6 +4437,16 @@ struct Appearance: View {
                     Text("Enable window shadow")
                 }
                 .settingsHighlight(id: highlightID("Enable window shadow"))
+                Picker("Notch color theme", selection: $notchflowTheme) {
+                    Text("Classic black").tag("classic")
+                    Text("Liquid graphite").tag("graphite")
+                    Text("Aurora").tag("aurora")
+                    Text("Sunset").tag("sunset")
+                }
+                Text("Two-finger horizontal swipes switch tabs while the notch is open.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
                 Defaults.Toggle(key: .cornerRadiusScaling) {
                     Text("Corner radius scaling")
                 }

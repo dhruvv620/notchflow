@@ -1,6 +1,6 @@
 # NotchFlow
 
-A personal macOS notch app based on [Atoll](https://github.com/Ebullioscopic/Atoll), with a compact music preview, Pomodoro timer and custom idle GIF.
+A personal macOS notch app based on [Atoll](https://github.com/Ebullioscopic/Atoll), with the original Atoll interface, two-finger tab navigation and gradient notch themes.
 
 This is an independent customization, not an official Atoll release. The application name is NotchFlow; some inherited settings, icon artwork and internal types still use Atoll branding. Original copyrights, LICENSE, NOTICE, TRADEMARKS and COPYRIGHT_ASSETS remain applicable.
 
@@ -30,24 +30,21 @@ cd notchflow
 bash Build.command
 ```
 
-The build runs standalone interaction/timer checks, resolves the recorded Swift dependencies, compiles, locally signs and installs **`~/Applications/NotchFlow.app`**. No paid developer account is needed. Build.log appears beside Build.command. Dependencies and intermediate build files are reused under `~/Library/Caches/NotchFlow` to speed later builds; the first build still downloads dependencies.
+The build resolves the recorded Swift dependencies, compiles, locally signs and installs **`~/Applications/NotchFlow.app`**. No paid developer account is needed. Build.log appears beside Build.command. Dependencies and intermediate build files are reused under `~/Library/Caches/NotchFlow` to speed later builds; the first build still downloads dependencies.
 
 Quit original Atoll and any other notch overlays, then open NotchFlow. Allow Accessibility and player Automation permissions when requested. If macOS blocks launch, use the app-specific Open Anyway action in Privacy & Security.
 
-Original upstream LFS video assets are not used by the custom panel, which uses static album art and your imported GIF. Cloning with LFS smudging skipped avoids downloading those videos.
+## Interaction and appearance
 
-## Interaction
+The original Atoll layout, tabs, music controls and hover behavior are restored. The previous custom music/Pomodoro/GIF panel has been removed.
 
-| Action | Behavior |
-| --- | --- |
-| Idle | Small notch with chosen GIF or default sparkle |
-| Hover | Compact artwork, title, artist and playback controls; no calendar |
-| Click | Expanded Music and Pomodoro tabs |
-| Leave hover preview | Preview closes |
-| Leave clicked panel | Panel stays open |
-| Click outside or Close | Expanded panel closes |
+With gestures enabled in settings, place the pointer over the expanded notch and swipe with two fingers: left selects the next visible tab, right selects the previous one. Navigation wraps at either end and skips disabled tabs. Reverse swipe gestures reverses the direction. Closed-notch music gestures retain their existing behavior. Horizontal swipes within the expanded notch now navigate tabs instead of skipping songs; use the music buttons to skip songs there.
 
-Click the sliders icon beside the tabs to import a GIF or change Pomodoro settings. GIF limits: 20 MB, 2048 x 2048 pixels and 300 frames. Focus defaults to 25 minutes, short break 5, long break 15, with a long break after four completed focus sessions. Phases advance automatically; pause/resume, skip and reset are included. Editing durations resets the cycle.
+In **Settings > Appearance > Notch color theme**, choose **Liquid graphite** (default), **Aurora**, **Sunset**, or **Classic black**. The expanded surface fades from black into the selected gradient, inspired by the supplied reference. The closed notch and camera area remain black.
+
+## Validation
+
+Run `bash Build.command` on macOS with Xcode 26+. On the Mac, verify left/right swipes, one tab change per flick (including momentum), disabled tabs, wraparound, reverse direction, scrolling lists, music buttons, open/close transitions, and all four themes. Native build and visual checks require macOS; they cannot run in the Linux editing environment.
 
 ## Get future NotchFlow changes
 
@@ -66,7 +63,7 @@ See [NotchFlow/UPDATING.md](NotchFlow/UPDATING.md) for upstream integration and 
 
 The source customization was checked for patch applicability and Swift syntax relative to its upstream baseline; shell syntax was checked. The preparation environment is Linux, so a full Xcode compile, signing and runtime validation have **not** been completed. Build.command runs the included logic checks on your Mac before attempting the native build. Report failures with Build.log.
 
-Test hover/click/outside-close behavior, music playback, GIF import, Pomodoro transitions, sleep/wake and external displays after the first build. Rebuilding backs up an existing NotchFlow app; it does not replace original Atoll or Atoll DV. Settings/imported GIFs use NotchFlow's own identity and do not automatically migrate from Atoll DV.
+Test tab swipes, themes, music playback, sleep/wake and external displays after the first build. Rebuilding backs up an existing NotchFlow app. Settings use NotchFlow's own app identity.
 
 ## License and credits
 

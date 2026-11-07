@@ -21,15 +21,17 @@ Add the upstream remote only once. Select a specific release tag after reviewing
 
 Inspect these integration points carefully:
 
-- DynamicIsland/ContentView.swift: custom panel, hover and outside-click handling.
+- DynamicIsland/ContentView.swift: gradient surface and expanded tab swipe routing.
 - DynamicIsland/models/DynamicIslandViewModel.swift: interaction state and window dimensions.
 - DynamicIsland/DynamicIslandApp.swift: app lifecycle, updater and extension-server behavior.
-- DynamicIsland/DVCustomization/: GIF, music, timer and appearance code.
+- DynamicIsland/components/Notch/NotchFlowSurface.swift: expanded surface themes.
+- DynamicIsland/components/Tabs/TabSelectionView.swift: shared visible-tab ordering and navigation.
+- DynamicIsland/extensions/PanGesture.swift: horizontal trackpad filtering and momentum handling.
 - DynamicIsland.xcodeproj/project.pbxproj and shared scheme: NotchFlow app identity and product paths.
 - Package.resolved, privacy settings, entitlements and inherited workflow changes.
 
-Run `bash Build.command` on a Mac. Confirm interaction/timer checks pass and the full build/sign/install succeeds. Test music controls, hover vs click, pointer exit, outside click, GIF import, phase transitions, pause/resume, sleep/wake and displays. Then commit, push the review branch and open a pull request into `notchflow`. Update the baseline recorded here once integration is accepted.
+Run `bash Build.command` on a Mac, then follow the interaction and theme validation checklist in ReadMe.md. Confirm the full build/sign/install succeeds before merging. Update the baseline recorded here once integration is accepted.
 
 Do not blindly merge `dev` or enable the official Atoll updater: either can replace custom behavior or app identity. Automatic upstream updates are disabled. The inherited release, mirror and nightly-merge workflow files are absent from the custom branch; no replacement updater or publishing pipeline is configured.
 
-The pinned legacy RPC/XPC extension servers are disabled in the initial custom build. Keep that decision until updated upstream implementations have been reviewed; the native Music, GIF and Pomodoro interface does not need them.
+The pinned legacy RPC/XPC extension servers are disabled in the initial custom build. Keep that decision until updated upstream implementations have been reviewed; the restored built-in interface does not need them.

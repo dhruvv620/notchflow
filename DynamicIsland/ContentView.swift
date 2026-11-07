@@ -37,8 +37,6 @@ import UIKit
 @MainActor
 struct ContentView: View {
     @EnvironmentObject var vm: DynamicIslandViewModel
-    @State private var dvGlobalClickMonitor: Any?
-    @State private var dvLocalClickMonitor: Any?
     @EnvironmentObject var webcamManager: WebcamManager
 
     @ObservedObject var coordinator = DynamicIslandViewCoordinator.shared
@@ -98,7 +96,6 @@ struct ContentView: View {
     
     // Dynamic sizing based on view type and graph count with smooth transitions
     var dynamicNotchSize: CGSize {
-        if DVCustomization.isEnabled { return vm.dvNotchSize }
         let baseSize = Defaults[.enableMinimalisticUI] ? minimalisticOpenNotchSize(isDynamicIslandMode: isDynamicIslandMode) : openNotchSize
         
         // When inline sneak peek is active in closed notch, use the wider inline width
@@ -315,7 +312,6 @@ struct ContentView: View {
     }
 
     private var notchHorizontalPadding: CGFloat {
-        if DVCustomization.isEnabled { return 0 }
         guard vm.notchState == .open else {
             return activeCornerRadiusInsets.closed.bottom
         }
@@ -528,6 +524,8 @@ struct ContentView: View {
         return AnyShape(currentNotchShape)
     }
 
+    @AppStorage("notchflowTheme") private var notchflowTheme = "graphite"
+
     var body: some View {
         installRootLifecycleHandlers(on: rootBodyView)
     }
@@ -536,9 +534,11 @@ struct ContentView: View {
         NotchLayout()
             .frame(alignment: .top)
             .padding(.horizontal, notchHorizontalPadding)
-            .padding([.horizontal, .bottom], !DVCustomization.isEnabled && vm.notchState == .open ? 12 : 0)
+            .padding([.horizontal, .bottom], vm.notchState == .open ? 12 : 0)
             .padding(.top, isIslandMode ? 0 : notchTopScreenBleedAmount)
-            .background(.black)
+            .background {
+                NotchFlowSurface(theme: notchflowTheme, expanded: vm.notchState == .open)
+            }
             .clipShape(resolvedClipShape)
             .compositingGroup()
             .shadow(
@@ -583,10 +583,6 @@ struct ContentView: View {
                         handleHover(hovering)
                     }
                     .onTapGesture {
-                        if DVCustomization.isEnabled {
-                            if vm.dvPresentation != .expanded { vm.sendDVEvent(.clicked) }
-                            return
-                        }
                         if handleClosedMusicWaveformTapIfNeeded() {
                             return
                         }
@@ -692,11 +688,7 @@ struct ContentView: View {
                 if !sneakPeekShowing {
                     runAfter(0.2) {
                         if isHovering && vm.notchState == .closed && !coordinator.isHoverOpenSuppressed {
-                            if DVCustomization.isEnabled {
-                                vm.sendDVEvent(.hoverEntered)
-                            } else {
-                                openNotch()
-                            }
+                            openNotch()
                         }
                     }
                 }
@@ -769,9 +761,6 @@ struct ContentView: View {
                 // Deterministic teardown for borderless panels (`.onDisappear` is
                 // unreliable); the window-cleanup path calls this before closing.
                 vm.onViewTeardown = { performViewTeardown() }
-            }
-            .onChange(of: vm.dvPresentation) { _, _ in
-                syncDVOutsideClickMonitors()
             }
             .onChange(of: terminalStickyMode) { _, _ in
                 syncStickyTerminalOutsideClickMonitor()
@@ -882,9 +871,6 @@ struct ContentView: View {
 
     @ViewBuilder
       func NotchLayout() -> some View {
-          if DVCustomization.isEnabled {
-              DVNotchyPanel(vm: vm)
-          } else {
           VStack(alignment: .leading) {
               VStack(alignment: .leading) {
                   if coordinator.firstLaunch {
@@ -1137,7 +1123,6 @@ struct ContentView: View {
               .blur(radius: abs(gestureProgress) > 0.3 ? min(abs(gestureProgress), 8) : 0)
               .opacity(abs(gestureProgress) > 0.3 ? min(abs(gestureProgress * 2), 0.8) : 1)
               .animation(.smooth(duration: 0.3), value: coordinator.currentView)
-          }
           }
       }
 
@@ -1965,7 +1950,6 @@ struct ContentView: View {
     /// Cancels every long-lived task / event monitor this view owns. Called from
     /// `.onDisappear` and from `vm.onViewTeardown` on window close. Idempotent.
     private func performViewTeardown() {
-        removeDVOutsideClickMonitors()
         hoverTask?.cancel()
         stopHoverClickMonitor()
         removeStickyTerminalClickMonitor()
@@ -2022,7 +2006,6 @@ struct ContentView: View {
     }
 
     private func startHoverClickMonitor() {
-        guard !DVCustomization.isEnabled else { return }
         guard Defaults[.openNotchOnHover] else { return }
         guard hoverClickMonitor == nil else { return }
 
@@ -2108,82 +2091,10 @@ struct ContentView: View {
         }
     }
 
-    private func handleDVHover(_ hovering: Bool) {
-        hoverTask?.cancel()
-        isHovering = hovering
-        if hovering {
-            guard vm.dvPresentation == .idle, !lockScreenManager.isLocked else { return }
-            hoverTask = Task { @MainActor in
-                let delay = min(0.6, max(0.1, Defaults[.minimumHoverDuration]))
-                try? await Task.sleep(for: .seconds(delay))
-                guard !Task.isCancelled, self.isHovering,
-                      self.vm.dvPresentation == .idle, !self.lockScreenManager.isLocked else { return }
-                self.vm.sendDVEvent(.hoverEntered)
-            }
-        } else {
-            hoverTask = Task { @MainActor in
-                try? await Task.sleep(for: .milliseconds(160))
-                guard !Task.isCancelled else { return }
-                // Ignore a synthetic exit caused by the panel growing under the cursor.
-                if self.isPointInsideDVPanel() {
-                    self.isHovering = true
-                    return
-                }
-                self.vm.sendDVEvent(.hoverExited)
-            }
-        }
-    }
-
-    private func isPointInsideDVPanel() -> Bool {
-        let screen = NSScreen.screens.first { $0.localizedName == vm.screen }
-            ?? NSScreen.main ?? NSScreen.screens.first
-        guard let screen else { return false }
-        let size = vm.dvNotchSize
-        let top = screen.frame.maxY
-            - (shouldUseDynamicIslandMode(for: vm.screen) ? dynamicIslandTopOffset : 0)
-        return NSRect(x: screen.frame.midX - size.width / 2,
-                      y: top - size.height, width: size.width, height: size.height)
-            .contains(NSEvent.mouseLocation)
-    }
-
-    private func syncDVOutsideClickMonitors() {
-        removeDVOutsideClickMonitors()
-        guard DVCustomization.isEnabled, vm.dvPresentation == .expanded else { return }
-        let closeOutside: @MainActor () -> Void = {
-            guard self.vm.dvPresentation == .expanded,
-                  !self.vm.isAutoCloseSuppressed, !self.isPointInsideDVPanel() else { return }
-            self.vm.sendDVEvent(.outsideClicked)
-        }
-        dvGlobalClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { _ in
-            Task { @MainActor in closeOutside() }
-        }
-        dvLocalClickMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .keyDown]) { event in
-            if event.type == .keyDown && event.keyCode == 53 {
-                Task { @MainActor in
-                    if !self.vm.isAutoCloseSuppressed { self.vm.sendDVEvent(.cancelled) }
-                }
-                return nil
-            }
-            if event.type != .keyDown { Task { @MainActor in closeOutside() } }
-            return event
-        }
-    }
-
-    private func removeDVOutsideClickMonitors() {
-        if let monitor = dvGlobalClickMonitor { NSEvent.removeMonitor(monitor) }
-        if let monitor = dvLocalClickMonitor { NSEvent.removeMonitor(monitor) }
-        dvGlobalClickMonitor = nil
-        dvLocalClickMonitor = nil
-    }
-
     // MARK: - Hover Management
     
     /// Handle hover state changes with debouncing
     private func handleHover(_ hovering: Bool) {
-        if DVCustomization.isEnabled {
-            handleDVHover(hovering)
-            return
-        }
         // Ignore false hover-exit when the cursor is parked on the screen's top pixel.
         if !hovering, shouldRetainHoverAtScreenTopEdge() {
             return
@@ -2252,11 +2163,6 @@ struct ContentView: View {
     }
 
     private func finishHoverExit() {
-        if DVCustomization.isEnabled {
-            isHovering = false
-            vm.sendDVEvent(.hoverExited)
-            return
-        }
         withAnimation(.bouncy.speed(1.2)) {
             isHovering = false
         }
@@ -2330,14 +2236,11 @@ struct ContentView: View {
     }
 
     private func shouldPreventAutoClose() -> Bool {
-        if DVCustomization.isEnabled {
-            return vm.dvPresentation == .expanded || vm.isAutoCloseSuppressed
-        }
         // Dragging a shelf item out necessarily takes the cursor off the notch.
         // Without this, the hover-exit timer closes the panel mid-drag, tearing
         // down the NSView that is acting as the drag source and cancelling the
         // session — an independent second cause of "drag-out doesn't work".
-        return coordinator.firstLaunch || hasAnyActivePopovers() || vm.isAutoCloseSuppressed || ShelfSelectionModel.shared.isDragging || ClipboardManager.shared.isDraggingItem || SharingStateManager.shared.preventNotchClose || (Defaults[.terminalStickyMode] && coordinator.currentView == .terminal)
+        coordinator.firstLaunch || hasAnyActivePopovers() || vm.isAutoCloseSuppressed || ShelfSelectionModel.shared.isDragging || ClipboardManager.shared.isDraggingItem || SharingStateManager.shared.preventNotchClose || (Defaults[.terminalStickyMode] && coordinator.currentView == .terminal)
     }
     
     // Helper to prevent rapid haptic feedback
@@ -2507,6 +2410,18 @@ struct ContentView: View {
     private func handleSkipGesture(direction: MusicManager.SkipDirection, translation: CGFloat, phase: NSEvent.Phase) {
         if phase == .ended {
             skipGestureActiveDirection = nil
+            return
+        }
+
+        if vm.notchState == .open {
+            guard !lockScreenManager.isLocked, !hasAnyActivePopovers(),
+                  !vm.isHoveringCalendar, !vm.isScrollGestureActive else { return }
+            if skipGestureActiveDirection == nil && translation > Defaults[.gestureSensitivity] {
+                skipGestureActiveDirection = direction
+                let forward = (direction == .forward) != Defaults[.reverseSwipeGestures]
+                TabSelectionView.advanceTab(forward: forward)
+                if Defaults[.enableHaptics] { triggerHapticIfAllowed() }
+            }
             return
         }
 

@@ -62,10 +62,12 @@ struct TabSelectionView: View {
     @Default(.enableMinimalisticUI) private var enableMinimalisticUI
     @Namespace var animation
     
-    private var tabs: [TabModel] {
+    private var tabs: [TabModel] { Self.availableTabs }
+
+    static var availableTabs: [TabModel] {
         var tabsArray: [TabModel] = []
 
-        if homeTabVisible {
+        if Defaults[.enableMinimalisticUI] || Defaults[.showStandardMediaControls] || Defaults[.showCalendar] || Defaults[.showMirror] {
             tabsArray.append(TabModel(label: "Home", icon: "house.fill", view: .home))
         }
 
@@ -73,7 +75,7 @@ struct TabSelectionView: View {
             tabsArray.append(TabModel(label: "Shelf", icon: "tray.fill", view: .shelf))
         }
         
-        if enableTimerFeature && timerDisplayMode == .tab {
+        if Defaults[.enableTimerFeature] && Defaults[.timerDisplayMode] == .tab {
             tabsArray.append(TabModel(label: "Timer", icon: "timer", view: .timer))
         }
 
@@ -95,8 +97,8 @@ struct TabSelectionView: View {
         if Defaults[.enableTerminalFeature] {
             tabsArray.append(TabModel(label: "Terminal", icon: "apple.terminal", view: .terminal))
         }
-        if extensionTabsEnabled {
-            for payload in extensionTabPayloads {
+        if Defaults[.enableThirdPartyExtensions] && Defaults[.enableExtensionNotchExperiences] && Defaults[.enableExtensionNotchTabs] {
+            for payload in ExtensionNotchExperienceManager.shared.activeExperiences.filter({ $0.descriptor.tab != nil }) {
                 guard let tab = payload.descriptor.tab else { continue }
                 let accent = payload.descriptor.accentColor.swiftUIColor
                 let iconName = tab.iconSymbolName ?? "puzzlepiece.extension"
@@ -113,6 +115,20 @@ struct TabSelectionView: View {
         }
         return tabsArray
     }
+    static func advanceTab(forward: Bool) {
+        let coordinator = DynamicIslandViewCoordinator.shared
+        let tabs = availableTabs
+        guard !tabs.isEmpty else { return }
+        let index = tabs.firstIndex {
+            $0.view == coordinator.currentView && ($0.view != .extensionExperience || $0.experienceID == coordinator.selectedExtensionExperienceID)
+        } ?? 0
+        let target = tabs[(index + (forward ? 1 : tabs.count - 1)) % tabs.count]
+        withAnimation(.easeInOut(duration: 0.2)) {
+            coordinator.selectedExtensionExperienceID = target.experienceID
+            coordinator.currentView = target.view
+        }
+    }
+
     var body: some View {
         HStack(spacing: 24) {
             ForEach(Array(tabs.enumerated()), id: \.element.id) { idx, tab in

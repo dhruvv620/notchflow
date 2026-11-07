@@ -27,12 +27,6 @@ DERIVED_DIR="$BUILD_ROOT/DerivedData"
 /bin/mkdir -p "$BUILD_ROOT"
 printf 'Building source: %s\nBuild cache: %s\n' "$SOURCE_DIR" "$BUILD_ROOT"
 
-printf '\nRunning interaction and timer checks...\n'
-/usr/bin/xcrun swiftc -swift-version 5 -parse-as-library \
-    "$SOURCE_DIR/DynamicIsland/DVCustomization/DVCore.swift" \
-    "$SOURCE_DIR/NotchFlow/Tests/CoreTests.swift" -o "$BUILD_ROOT/DVCoreTests"
-"$BUILD_ROOT/DVCoreTests"
-
 printf '\nResolving the pinned Swift packages...\n'
 /usr/bin/xcodebuild -resolvePackageDependencies \
     -project "$SOURCE_DIR/DynamicIsland.xcodeproj" -scheme DynamicIsland \
@@ -86,5 +80,5 @@ fi
 /usr/bin/ditto "$BUILT_APP" "$INSTALL_APP"
 printf '\nInstalled: %s\n' "$INSTALL_APP"
 printf 'Quit your original Atoll, then open NotchFlow from the Finder window.\n'
-printf 'Click the notch, select Customize, and choose your GIF.\n'
+printf 'Open Settings > Appearance to choose a notch color theme.\n'
 /usr/bin/open -R "$INSTALL_APP"
