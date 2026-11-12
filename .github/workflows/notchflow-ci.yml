@@ -4,9 +4,6 @@ on:
   push:
     branches:
       - fresh/reminders-liquid-glass
-  pull_request:
-    branches:
-      - baseline/atoll-v2.3.3
 
 permissions:
   contents: read
@@ -25,7 +22,7 @@ jobs:
       matrix:
         include:
           - configuration: Debug
-            os: macos-15
+            os: macos-15-intel
           - configuration: Release
             os: macos-26
 

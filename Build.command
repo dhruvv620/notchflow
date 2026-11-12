@@ -19,6 +19,10 @@ if ! git lfs version >/dev/null 2>&1; then
     exit 1
 fi
 git -C "$SOURCE_DIR" lfs pull
+if ! /usr/bin/xcrun -f metal >/dev/null 2>&1; then
+    printf 'Downloading the Metal toolchain required by the original animation/shader dependencies...\n'
+    /usr/bin/xcodebuild -downloadComponent MetalToolchain
+fi
 
 CONFIGURATION="${NOTCHFLOW_CONFIGURATION:-Debug}"
 case "$CONFIGURATION" in Debug|Release) ;; *) printf 'NOTCHFLOW_CONFIGURATION must be Debug or Release.\n'; exit 1 ;; esac
@@ -57,6 +61,9 @@ LOCAL_ENTITLEMENTS="$(mktemp "$BUILD_ROOT/local-entitlements.XXXXXX")"
 trap 'rm -f "$LOCAL_ENTITLEMENTS"' EXIT
 cp "$SOURCE_DIR/DynamicIsland/DynamicIsland.entitlements" "$LOCAL_ENTITLEMENTS"
 /usr/libexec/PlistBuddy -c 'Delete :com.apple.security.mach-services' "$LOCAL_ENTITLEMENTS"
+BUNDLE_ID="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$BUILT_APP/Contents/Info.plist")"
+/usr/libexec/PlistBuddy -c "Set :com.apple.security.temporary-exception.mach-lookup.global-name:0 $BUNDLE_ID-spks" "$LOCAL_ENTITLEMENTS"
+/usr/libexec/PlistBuddy -c "Set :com.apple.security.temporary-exception.mach-lookup.global-name:1 $BUNDLE_ID-spki" "$LOCAL_ENTITLEMENTS"
 
 while IFS= read -r -d '' item; do
     if /usr/bin/file -b "$item" | /usr/bin/grep -q 'Mach-O'; then
