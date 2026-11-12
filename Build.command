@@ -56,7 +56,7 @@ BUILT_APP="$DERIVED_DIR/Build/Products/$CONFIGURATION/NotchFlow.app"
 LOCAL_ENTITLEMENTS="$(mktemp "$BUILD_ROOT/local-entitlements.XXXXXX")"
 trap 'rm -f "$LOCAL_ENTITLEMENTS"' EXIT
 cp "$SOURCE_DIR/DynamicIsland/DynamicIsland.entitlements" "$LOCAL_ENTITLEMENTS"
-/usr/bin/plutil -remove com.apple.security.mach-services "$LOCAL_ENTITLEMENTS"
+/usr/libexec/PlistBuddy -c 'Delete :com.apple.security.mach-services' "$LOCAL_ENTITLEMENTS"
 
 while IFS= read -r -d '' item; do
     if /usr/bin/file -b "$item" | /usr/bin/grep -q 'Mach-O'; then

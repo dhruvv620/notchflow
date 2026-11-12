@@ -50,7 +50,7 @@ The option defaults off to preserve the original appearance. Turn it off at any 
 
 ## Verification
 
-GitHub's **NotchFlow Native Build** workflow compiles Debug and Release on macOS with pinned packages, checks privacy declarations, and runs the isolated Reminders regression executable. Build logs and Xcode result bundles are retained as workflow artifacts. These are compile and logic checks, not a claim of visual or account-sync validation.
+GitHub's **NotchFlow Native Build** workflow compiles Debug on macOS 15 and Release on macOS 26 with Xcode 26+ and pinned packages, checks privacy declarations, and runs the isolated Reminders regression executable. Build logs and Xcode result bundles are retained as workflow artifacts. These are compile and logic checks, not a claim of visual or account-sync validation.
 
 The regression checks use a fake service and never request access to real reminder data. To run them manually on a Mac:
 

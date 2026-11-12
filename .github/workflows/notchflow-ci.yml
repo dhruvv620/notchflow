@@ -18,12 +18,16 @@ concurrency:
 jobs:
   build:
     name: macOS — ${{ matrix.configuration }}
-    runs-on: macos-26
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
-        configuration: [Debug, Release]
+        include:
+          - configuration: Debug
+            os: macos-15
+          - configuration: Release
+            os: macos-26
 
     steps:
       - name: Checkout source and upstream artwork

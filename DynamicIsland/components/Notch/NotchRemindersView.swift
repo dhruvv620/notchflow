@@ -37,6 +37,7 @@ struct NotchRemindersView: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .environment(\.colorScheme, .dark)
         .task { await manager.refresh() }
         .onReceive(NotificationCenter.default.publisher(for: .EKEventStoreChanged)
             .debounce(for: .milliseconds(250), scheduler: RunLoop.main)) { _ in

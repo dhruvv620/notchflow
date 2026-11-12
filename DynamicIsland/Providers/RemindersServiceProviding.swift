@@ -52,7 +52,7 @@ final class EventKitRemindersService: RemindersServiceProviding {
         guard access == .authorized else { throw ReminderServiceError.accessRequired }
         let calendars = store.calendars(for: .reminder)
         let lists = calendars.map { calendar -> ReminderListItem in
-            let color = calendar.color.usingColorSpace(.deviceRGB) ?? NSColor.systemBlue
+            let color = calendar.color.usingColorSpace(.deviceRGB) ?? NSColor(deviceRed: 0.2, green: 0.45, blue: 0.95, alpha: 1)
             return ReminderListItem(
                 id: calendar.calendarIdentifier, title: calendar.title,
                 account: calendar.source.title,
