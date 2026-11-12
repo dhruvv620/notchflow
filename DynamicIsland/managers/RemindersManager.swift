@@ -65,6 +65,7 @@ final class RemindersManager: ObservableObject {
             return
         }
         isLoading = true
+        errorMessage = nil
         do {
             let snapshot = try await service.snapshot(includeCompleted: showCompleted)
             guard id == refreshID else { return }

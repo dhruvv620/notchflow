@@ -1,3 +1,5 @@
+> **NotchFlow fresh branch:** clean Atoll v2.3.3 plus Apple Reminders and optional Liquid Glass. [Build instructions and validation](NotchFlow/README.md).
+
 <p align="center">
   <img src=".github/assets/atoll-logo.png" alt="Atoll logo" width="120">
 </p>

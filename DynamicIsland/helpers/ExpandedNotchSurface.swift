@@ -50,8 +50,6 @@ struct ExpandedNotchSurface<Surface: Shape>: View {
     VStack(spacing: 24) {
         previewSurface(glass: false)
         previewSurface(glass: true)
-        previewSurface(glass: true)
-            .environment(\.accessibilityReduceTransparency, true)
     }
     .padding(32)
     .background(Color.gray)

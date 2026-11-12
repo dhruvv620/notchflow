@@ -51,14 +51,26 @@ jobs:
           fi
           echo "cache-key=$(xcodebuild -version | shasum -a 256 | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
 
-      - name: Cache pinned Swift packages
-        uses: actions/cache@v4
+      - name: Restore pinned Swift packages
+        id: packages
+        uses: actions/cache/restore@v4
         with:
           path: .build-ci/SourcePackages
           key: ${{ runner.os }}-notchflow-swiftpm-${{ steps.toolchain.outputs.cache-key }}-${{ hashFiles('DynamicIsland.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
 
       - name: Validate privacy configuration
         run: python3 -m unittest tests.test_privacy_configuration
+
+      - name: Check Reminders with fake service
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcrun swiftc -swift-version 5 -parse-as-library \
+            DynamicIsland/models/ReminderItem.swift \
+            DynamicIsland/Providers/RemindersServiceProviding.swift \
+            DynamicIsland/managers/RemindersManager.swift \
+            tests/RemindersRegression.swift -o "$RUNNER_TEMP/RemindersRegression"
+          "$RUNNER_TEMP/RemindersRegression"
 
       - name: Prepare Metal toolchain
         shell: bash
@@ -78,6 +90,7 @@ jobs:
           exit 1
 
       - name: Resolve recorded dependencies
+        id: resolve
         shell: bash
         run: |
           set -euo pipefail
@@ -117,6 +130,13 @@ jobs:
           if [ -f '.build-ci/build-${{ matrix.configuration }}.log' ]; then
             grep -n -B 3 -A 6 'error:' '.build-ci/build-${{ matrix.configuration }}.log' | head -160 || true
           fi
+
+      - name: Save resolved packages even if compilation fails
+        if: always() && steps.resolve.outcome == 'success' && steps.packages.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: .build-ci/SourcePackages
+          key: ${{ steps.packages.outputs.cache-primary-key }}
 
       - name: Upload build evidence
         if: always()

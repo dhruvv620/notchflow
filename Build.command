@@ -27,6 +27,14 @@ DERIVED_DIR="$BUILD_ROOT/DerivedData"
 mkdir -p "$BUILD_ROOT"
 printf 'Building %s with cached dependencies in %s\n' "$CONFIGURATION" "$BUILD_ROOT"
 
+printf '\nChecking Reminders behavior without accessing your reminders...\n'
+/usr/bin/xcrun swiftc -swift-version 5 -parse-as-library \
+    "$SOURCE_DIR/DynamicIsland/models/ReminderItem.swift" \
+    "$SOURCE_DIR/DynamicIsland/Providers/RemindersServiceProviding.swift" \
+    "$SOURCE_DIR/DynamicIsland/managers/RemindersManager.swift" \
+    "$SOURCE_DIR/tests/RemindersRegression.swift" -o "$BUILD_ROOT/RemindersRegression"
+"$BUILD_ROOT/RemindersRegression"
+
 /usr/bin/xcodebuild -resolvePackageDependencies \
     -project "$SOURCE_DIR/DynamicIsland.xcodeproj" -scheme DynamicIsland \
     -clonedSourcePackagesDirPath "$BUILD_ROOT/Packages" \

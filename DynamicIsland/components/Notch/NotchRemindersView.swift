@@ -73,8 +73,9 @@ struct NotchRemindersView: View {
                         .lineLimit(1)
                 }
                 .menuStyle(.borderlessButton)
-                .fixedSize()
-                .help("Choose reminder list")
+                .frame(maxWidth: 160)
+                .layoutPriority(-1)
+                .help(manager.lists.first(where: { $0.id == manager.selectedListID })?.title ?? String(localized: "Choose reminder list"))
                 Menu {
                     Toggle("Show completed", isOn: $manager.showCompleted)
                     Button("Open Apple Reminders") { openReminders() }
@@ -184,20 +185,25 @@ struct NotchRemindersView: View {
                 Spacer()
                 Button("Cancel") { isComposing = false }.disabled(manager.isSaving)
             }
-            TextField("What do you need to do?", text: $title)
-                .textFieldStyle(.roundedBorder).focused($titleFocused).onSubmit(saveReminder)
-            Picker("List", selection: $creationListID) {
-                ForEach(manager.writableLists) { list in Text("\(list.title) — \(list.account)").tag(list.id) }
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    TextField("What do you need to do?", text: $title)
+                        .textFieldStyle(.roundedBorder).focused($titleFocused).onSubmit(saveReminder)
+                    Picker("List", selection: $creationListID) {
+                        ForEach(manager.writableLists) { list in Text("\(list.title) — \(list.account)").tag(list.id) }
+                    }
+                    HStack {
+                        Toggle("Due date", isOn: $hasDueDate)
+                        if hasDueDate { Toggle("Include time", isOn: $includesTime) }
+                        Spacer()
+                    }.toggleStyle(.checkbox)
+                    if hasDueDate {
+                        DatePicker("Due", selection: $dueDate, displayedComponents: includesTime ? [.date, .hourAndMinute] : [.date])
+                    }
+                }
+                .padding(.vertical, 2)
             }
-            HStack {
-                Toggle("Due date", isOn: $hasDueDate)
-                if hasDueDate { Toggle("Include time", isOn: $includesTime) }
-                Spacer()
-            }.toggleStyle(.checkbox)
-            if hasDueDate {
-                DatePicker("Due", selection: $dueDate, displayedComponents: includesTime ? [.date, .hourAndMinute] : [.date])
-            }
-            Spacer(minLength: 0)
+            .onHover { hovering in vm.setScrollGestureSuppression(hovering, token: interactionToken) }
             HStack {
                 Text("Saved to Apple Reminders").font(.caption).foregroundStyle(.secondary)
                 Spacer()
