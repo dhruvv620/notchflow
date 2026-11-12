@@ -1165,16 +1165,16 @@ struct ContentView: View {
         case .timer: NotchTimerView()
         case .reminders: NotchRemindersView()
         case .calendar:
-            ScrollView { StandaloneCalendarView().padding(.horizontal, 12) }
-        case .stats: ScrollView { NotchStatsView() }
-        case .llmUsage: ScrollView { NotchLLMUsageView() }
+            NotchScrollableContent { StandaloneCalendarView().padding(.horizontal, 12) }
+        case .stats: NotchScrollableContent { NotchStatsView() }
+        case .llmUsage: NotchScrollableContent { NotchLLMUsageView() }
         case .colorPicker: NotchColorPickerView()
         case .notes: NotchNotesView()
         case .clipboard: CompactClipboardView()
         case .terminal: NotchTerminalView()
         case .extensionExperience:
             if let payload = currentExtensionTabPayload() {
-                ScrollView { ExtensionNotchExperienceTabView(payload: payload) }
+                NotchScrollableContent { ExtensionNotchExperienceTabView(payload: payload) }
             } else { NotchHomeView(albumArtNamespace: albumArtNamespace) }
         }
     }
