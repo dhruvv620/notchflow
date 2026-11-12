@@ -367,7 +367,7 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
         var adjustedSize = baseSize
 
         if coordinator.currentView == .timer {
-            return CGSize(width: baseSize.width, height: max(baseSize.height, 250))
+            return CGSize(width: baseSize.width, height: max(baseSize.height, 224))
         }
 
         if coordinator.currentView == .reminders {
@@ -376,7 +376,12 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
 
         if coordinator.currentView == .notes {
             let preferred = coordinator.notesLayoutState.preferredHeight
-            adjustedSize.height = max(adjustedSize.height, preferred)
+            adjustedSize.height = min(max(adjustedSize.height, preferred), baseSize.height + 40)
+            return adjustedSize
+        }
+
+        if coordinator.currentView == .terminal {
+            adjustedSize.height = baseSize.height + 40
             return adjustedSize
         }
 

@@ -34,7 +34,7 @@ struct TabModel: Identifiable {
     let accentColor: Color?
 
     init(label: String, icon: String, view: NotchViews, experienceID: String? = nil, accentColor: Color? = nil) {
-        self.id = experienceID.map { "extension-\($0)" } ?? "system-\(view)-\(label)"
+        self.id = experienceID.map { "extension-\($0)" } ?? NotchBuiltinTab.identifier(for: view)
         self.label = label
         self.icon = icon
         self.view = view
@@ -44,6 +44,7 @@ struct TabModel: Identifiable {
 }
 
 struct TabSelectionView: View {
+    @ObservedObject private var preferences = NotchTabPreferences.shared
     @ObservedObject private var appearance = NotchAppearanceModel.shared
     @ObservedObject var coordinator = DynamicIslandViewCoordinator.shared
     @ObservedObject private var extensionNotchExperienceManager = ExtensionNotchExperienceManager.shared
@@ -67,19 +68,17 @@ struct TabSelectionView: View {
     
     private var tabs: [TabModel] { Self.availableTabs }
 
-    static var availableTabs: [TabModel] {
+    static var candidateTabs: [TabModel] {
         var tabsArray: [TabModel] = []
 
-        if Defaults[.enableMinimalisticUI] || Defaults[.showStandardMediaControls] || Defaults[.showCalendar] || Defaults[.showMirror] {
-            tabsArray.append(TabModel(label: "Home", icon: "house.fill", view: .home))
-        }
+        tabsArray.append(TabModel(label: "Music", icon: "music.note", view: .home))
 
         if Defaults[.dynamicShelf] {
             tabsArray.append(TabModel(label: "Shelf", icon: "tray.fill", view: .shelf))
         }
         
         if Defaults[.enableTimerFeature] && Defaults[.timerDisplayMode] == .tab {
-            tabsArray.append(TabModel(label: "Timer", icon: "timer", view: .timer))
+            tabsArray.append(TabModel(label: "Timers", icon: "timer", view: .timer))
         }
 
         // Stats tab only shown when stats feature is enabled
@@ -102,7 +101,10 @@ struct TabSelectionView: View {
             tabsArray.append(TabModel(label: "Terminal", icon: "apple.terminal", view: .terminal))
         }
         if Defaults[.enableRemindersFeature] {
-            tabsArray.append(TabModel(label: "Reminders", icon: "checklist", view: .reminders))
+            tabsArray.append(TabModel(label: "Todos", icon: "checklist", view: .reminders))
+        }
+        if Defaults[.showCalendar] {
+            tabsArray.append(TabModel(label: "Calendar", icon: "calendar", view: .calendar))
         }
         if Defaults[.enableThirdPartyExtensions] && Defaults[.enableExtensionNotchExperiences] && Defaults[.enableExtensionNotchTabs] {
             for payload in ExtensionNotchExperienceManager.shared.activeExperiences.filter({ $0.descriptor.tab != nil }) {
@@ -122,6 +124,24 @@ struct TabSelectionView: View {
         }
         return tabsArray
     }
+    static var availableTabs: [TabModel] {
+        let candidates = candidateTabs
+        if Defaults[.enableMinimalisticUI] { return Array(candidates.filter { $0.view == .home }.prefix(1)) }
+        let ids = NotchTabOrderPolicy.visibleIDs(order: Defaults[.notchTabOrder], hidden: Defaults[.notchHiddenTabs],
+                                               available: candidates.map(\.id), fallback: NotchBuiltinTab.music.rawValue)
+        let lookup = Dictionary(uniqueKeysWithValues: candidates.map { ($0.id, $0) })
+        return ids.compactMap { lookup[$0] }
+    }
+
+    static func validateCurrentSelection() {
+        let tabs = availableTabs
+        let coordinator = DynamicIslandViewCoordinator.shared
+        let selected = tabs.contains { $0.view == coordinator.currentView && ($0.view != .extensionExperience || $0.experienceID == coordinator.selectedExtensionExperienceID) }
+        guard !selected, let first = tabs.first else { return }
+        coordinator.selectedExtensionExperienceID = first.experienceID
+        coordinator.currentView = first.view
+    }
+
     static func advanceTab(forward: Bool) {
         let coordinator = DynamicIslandViewCoordinator.shared
         let tabs = availableTabs
@@ -156,6 +176,7 @@ struct TabSelectionView: View {
             .fixedSize()
         }
         .onAppear { ensureValidSelection(with: tabs) }
+        .onReceive(NotificationCenter.default.publisher(for: .notchTabsDidChange)) { _ in Self.validateCurrentSelection() }
         .onChange(of: enableRemindersFeature) { _, _ in ensureValidSelection(with: tabs) }
         .onChange(of: enableClipboardManager) { _, _ in ensureValidSelection(with: tabs) }
     }

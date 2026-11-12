@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   foundation-policy:
-    name: Date parsing and clipboard policy
+    name: Foundation regression checks
     runs-on: ubuntu-latest
     timeout-minutes: 15
     container: swift:6.2
@@ -30,6 +30,12 @@ jobs:
         run: |
           swiftc -swift-version 5 -parse-as-library DynamicIsland/helpers/CompactClipboardPolicy.swift tests/CompactClipboardRegression.swift -o /tmp/clipboard-policy-tests
           /tmp/clipboard-policy-tests
+      - name: Check timer lifecycle and tab order
+        run: |
+          swiftc -swift-version 5 -parse-as-library DynamicIsland/helpers/TimerModeLifecycle.swift tests/TimerModeRegression.swift -o /tmp/timer-mode-tests
+          /tmp/timer-mode-tests
+          swiftc -swift-version 5 -parse-as-library DynamicIsland/helpers/NotchTabOrderPolicy.swift tests/NotchTabOrderRegression.swift -o /tmp/tab-order-tests
+          /tmp/tab-order-tests
 
   build:
     name: macOS — ${{ matrix.configuration }}
@@ -97,6 +103,21 @@ jobs:
             DynamicIsland/helpers/CompactClipboardPolicy.swift \
             tests/CompactClipboardRegression.swift -o "$RUNNER_TEMP/CompactClipboardRegression"
           "$RUNNER_TEMP/CompactClipboardRegression"
+
+      - name: Check timer modes, tab ordering and visible input regions
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcrun swiftc -swift-version 5 -parse-as-library \
+            DynamicIsland/helpers/TimerModeLifecycle.swift tests/TimerModeRegression.swift -o "$RUNNER_TEMP/TimerModeRegression"
+          "$RUNNER_TEMP/TimerModeRegression"
+          xcrun swiftc -swift-version 5 -parse-as-library \
+            DynamicIsland/helpers/NotchTabOrderPolicy.swift tests/NotchTabOrderRegression.swift -o "$RUNNER_TEMP/NotchTabOrderRegression"
+          "$RUNNER_TEMP/NotchTabOrderRegression"
+          xcrun swiftc -swift-version 5 -parse-as-library \
+            DynamicIsland/helpers/NotchInputRegionPolicy.swift DynamicIsland/components/Notch/NotchShape.swift \
+            tests/NotchInputRegionRegression.swift -o "$RUNNER_TEMP/NotchInputRegionRegression"
+          "$RUNNER_TEMP/NotchInputRegionRegression"
 
       - name: Check Reminders with fake service
         shell: bash

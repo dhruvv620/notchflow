@@ -47,6 +47,7 @@ private enum SettingsTabGroup: String, CaseIterable, Identifiable {
 
 private enum SettingsTab: String, CaseIterable, Identifiable {
     case general
+    case tabsAndFeatures
     case liveActivities
     case appearance
     case lockScreen
@@ -73,7 +74,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
     /// Which sidebar group this tab belongs to.
     var group: SettingsTabGroup {
         switch self {
-        case .general, .appearance:                                          return .core
+        case .general, .appearance, .tabsAndFeatures:                                          return .core
         case .media, .liveActivities, .lockScreen, .devices:                 return .mediaAndDisplay
         case .hudAndOSD, .battery:                                           return .system
         case .timer, .calendar, .notes:                                      return .productivity
@@ -88,6 +89,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .general: return String(localized: "General")
+        case .tabsAndFeatures: return String(localized: "Tabs & Features")
         case .liveActivities: return String(localized: "Live Activities")
         case .appearance: return String(localized: "Appearance")
         case .lockScreen: return String(localized: "Lock Screen")
@@ -114,6 +116,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
     var systemImage: String {
         switch self {
         case .general: return "gear"
+        case .tabsAndFeatures: return "rectangle.3.group"
         case .liveActivities: return "waveform.path.ecg"
         case .appearance: return "paintpalette"
         case .lockScreen: return "lock.laptopcomputer"
@@ -140,6 +143,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
     var tint: Color {
         switch self {
         case .general: return .blue
+        case .tabsAndFeatures: return .indigo
         case .liveActivities: return .pink
         case .appearance: return .purple
         case .lockScreen: return .orange
@@ -484,6 +488,7 @@ struct SettingsView: View {
         let ordered: [SettingsTab] = [
             // Core
             .general,
+            .tabsAndFeatures,
             .appearance,
             // Media & Display
             .media,
@@ -695,6 +700,9 @@ struct SettingsView: View {
 
     private var settingsSearchIndex: [SettingsSearchEntry] {
         [
+            SettingsSearchEntry(tab: .tabsAndFeatures, title: "Tabs & Features", keywords: ["tabs", "features", "notch", "applications", "options"], highlightID: SettingsTab.tabsAndFeatures.highlightID(for: "Tabs & Features")),
+            SettingsSearchEntry(tab: .tabsAndFeatures, title: "Tab visibility and order", keywords: ["reorder", "drag", "drop", "hide", "show", "music", "timers", "todos", "calendar"], highlightID: SettingsTab.tabsAndFeatures.highlightID(for: "Tab visibility and order")),
+            SettingsSearchEntry(tab: .tabsAndFeatures, title: "Notch feature controls", keywords: ["enable", "disable", "clipboard", "stats", "notes", "terminal"], highlightID: SettingsTab.tabsAndFeatures.highlightID(for: "Notch feature controls")),
             // General
             SettingsSearchEntry(tab: .general, title: "Enable Minimalistic UI", keywords: ["minimalistic", "ui mode", "general"], highlightID: SettingsTab.general.highlightID(for: "Enable Minimalistic UI")),
             SettingsSearchEntry(tab: .general, title: "Menubar icon", keywords: ["menu bar", "status bar", "icon"], highlightID: SettingsTab.general.highlightID(for: "Menubar icon")),
@@ -957,6 +965,14 @@ struct SettingsView: View {
         case .general:
             SettingsForm(tab: .general) {
                 GeneralSettings()
+            }
+        case .tabsAndFeatures:
+            SettingsForm(tab: .tabsAndFeatures) {
+                NotchTabsSettingsView { destination in
+                    if let target = SettingsTab(rawValue: destination), availableTabs.contains(target) {
+                        selectedTab = target
+                    }
+                }
             }
         case .liveActivities:
             SettingsForm(tab: .liveActivities) {

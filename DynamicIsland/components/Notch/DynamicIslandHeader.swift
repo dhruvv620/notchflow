@@ -31,6 +31,7 @@ struct DynamicIslandHeader: View {
     @State private var showClipboardPopover = false
     @State private var showColorPickerPopover = false
     @State private var showTimerPopover = false
+    @State private var cameraPopoverToken = UUID()
     @Default(.enableTimerFeature) var enableTimerFeature
     @Default(.timerDisplayMode) var timerDisplayMode
     @Default(.showClipboardIcon) var showClipboardIcon
@@ -40,6 +41,7 @@ struct DynamicIslandHeader: View {
     @Default(.showBatteryPercentInside) var showBatteryPercentInside
     @Default(.showMinimalisticBatteryIndicator) var showMinimalisticBatteryIndicator
     @Default(.enableMinimalisticUI) var enableMinimalisticUI
+    @Default(.showMirror) private var showMirror
     
     var body: some View {
         HStack(spacing: 0) {
@@ -71,7 +73,7 @@ struct DynamicIslandHeader: View {
 
             HStack(spacing: 4) {
                 if vm.notchState == .open && !enableMinimalisticUI {
-                    if Defaults[.showMirror] {
+                    if showMirror {
                         Button(action: {
                             vm.toggleCameraPreview()
                         }) {
@@ -86,6 +88,25 @@ struct DynamicIslandHeader: View {
                                 }
                         }
                         .buttonStyle(PlainButtonStyle())
+                        .help("Mirror")
+                        .popover(isPresented: $vm.isCameraExpanded, arrowEdge: .bottom) {
+                            VStack(spacing: 10) {
+                                HStack {
+                                    Text("Mirror").font(.headline)
+                                    Spacer()
+                                    Button { vm.isCameraExpanded = false } label: {
+                                        Image(systemName: "xmark.circle.fill")
+                                    }
+                                    .buttonStyle(.plain)
+                                    .accessibilityLabel("Close mirror")
+                                }
+                                CameraPreviewView(webcamManager: webcamManager)
+                                    .frame(width: 220, height: 220)
+                                    .environmentObject(vm)
+                            }
+                            .padding(12)
+                            .frame(width: 244)
+                        }
                     }
                     
                     if Defaults[.enableClipboardManager]
@@ -273,6 +294,20 @@ struct DynamicIslandHeader: View {
         }
         .foregroundColor(.gray)
         .environmentObject(vm)
+        .onChange(of: vm.isCameraExpanded) { _, visible in
+            vm.setAutoCloseSuppression(visible, token: cameraPopoverToken)
+            if !visible {
+                webcamManager.stopSession()
+                vm.shouldRecheckHover.toggle()
+            }
+        }
+        .onChange(of: vm.notchState) { _, state in
+            if state == .closed { dismissCameraPreview() }
+        }
+        .onChange(of: showMirror) { _, enabled in
+            if !enabled { dismissCameraPreview() }
+        }
+        .onDisappear { dismissCameraPreview() }
         .onChange(of: coordinator.shouldToggleClipboardPopover) { _ in
             // Only toggle if clipboard is enabled
             if Defaults[.enableClipboardManager] {
@@ -312,6 +347,16 @@ struct DynamicIslandHeader: View {
 }
 
 private extension DynamicIslandHeader {
+    func dismissCameraPreview() {
+        guard vm.isCameraExpanded else {
+            vm.setAutoCloseSuppression(false, token: cameraPopoverToken)
+            return
+        }
+        vm.isCameraExpanded = false
+        vm.setAutoCloseSuppression(false, token: cameraPopoverToken)
+        webcamManager.stopSession()
+    }
+
     var shouldSuppressStatusIndicators: Bool {
         Defaults[.settingsIconInNotch]
             && Defaults[.enableClipboardManager]

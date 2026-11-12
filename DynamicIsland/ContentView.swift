@@ -165,26 +165,23 @@ struct ContentView: View {
         }
 
         if coordinator.currentView == .timer {
-            return CGSize(width: baseSize.width, height: max(baseSize.height, 250)) // Preserve custom height while reserving room for presets
+            return CGSize(width: baseSize.width, height: max(baseSize.height, 224))
         }
         
         if coordinator.currentView == .notes {
             let preferredHeight = coordinator.notesLayoutState.preferredHeight
-            let resolvedHeight = max(baseSize.height, preferredHeight)
+            let resolvedHeight = min(max(baseSize.height, preferredHeight), baseSize.height + 40)
             return CGSize(width: baseSize.width, height: resolvedHeight)
         }
 
         if coordinator.currentView == .terminal {
-            // Dynamic height: up to terminalMaxHeightFraction of screen, min 300pt
-            let screenHeight = NSScreen.main?.visibleFrame.height ?? 800
-            let maxFraction = Defaults[.terminalMaxHeightFraction]
-            let terminalHeight = min(screenHeight * maxFraction, max(300, screenHeight * maxFraction))
+            let terminalHeight = baseSize.height + 40
             return CGSize(width: baseSize.width, height: terminalHeight)
         }
 
         if coordinator.currentView == .extensionExperience {
             if let preferredHeight = extensionTabPreferredHeight(baseSize: baseSize) {
-                return CGSize(width: baseSize.width, height: preferredHeight)
+                return CGSize(width: baseSize.width, height: min(max(baseSize.height, preferredHeight), baseSize.height + 40))
             }
             return baseSize
         }
@@ -192,7 +189,7 @@ struct ContentView: View {
         if enableMinimalisticUI,
            coordinator.currentView == .home,
            let preferredHeight = extensionMinimalisticPreferredHeight(baseSize: baseSize) {
-            return CGSize(width: baseSize.width, height: preferredHeight)
+            return CGSize(width: baseSize.width, height: min(max(baseSize.height, preferredHeight), baseSize.height + 40))
         }
         
         guard coordinator.currentView == .stats else {
@@ -206,7 +203,7 @@ struct ContentView: View {
         
         let additionalRows = max(rows - 1, 0)
         let extraHeight = CGFloat(additionalRows) * statsAdditionalRowHeight
-        return CGSize(width: baseSize.width, height: baseSize.height + extraHeight)
+        return CGSize(width: baseSize.width, height: baseSize.height + min(extraHeight, 40))
     }
     
 
@@ -545,6 +542,16 @@ struct ContentView: View {
                     isExpanded: vm.notchState == .open,
                     cameraBandHeight: isDynamicIslandMode ? 0 : vm.effectiveClosedNotchHeight
                 )
+                NotchInputRegionBridge(
+                    shape: resolvedClipShape,
+                    isExpanded: vm.notchState == .open,
+                    enabled: interactionsEnabled,
+                    collapsedSize: CGSize(
+                        width: vm.closedNotchSize.width + vm.effectiveClosedNotchHeight * 2 + 28,
+                        height: vm.effectiveClosedNotchHeight
+                    ),
+                    onHover: handleHover
+                )
             }
             .overlay(alignment: .bottom) {
                 if vm.notchState == .open && !enableMinimalisticUI {
@@ -591,9 +598,6 @@ struct ContentView: View {
             .conditionalModifier(interactionsEnabled) { view in
                 view
                     .contentShape(resolvedClipShape)
-                    .onHover { hovering in
-                        handleHover(hovering)
-                    }
                     .onTapGesture {
                         guard vm.notchState == .closed else { return }
                         if handleClosedMusicWaveformTapIfNeeded() {
@@ -712,6 +716,9 @@ struct ContentView: View {
                         }
                     }
                 }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .notchTabsDidChange)) { _ in
+                TabSelectionView.validateCurrentSelection()
             }
             .onChange(of: coordinator.currentView) { _, newValue in
                 if enableStatsFeature {
@@ -1103,49 +1110,50 @@ struct ContentView: View {
               }
               .zIndex(2)
               
-              ZStack {
-                  if vm.notchState == .open {
-                      Group {
-                          switch coordinator.currentView {
-                              case .home:
-                                  NotchHomeView(albumArtNamespace: albumArtNamespace)
-                              case .shelf:
-                                  NotchShelfView()
-                              case .timer:
-                                  NotchTimerView()
-                              case .reminders:
-                                  NotchRemindersView()
-                              case .stats:
-                                  NotchStatsView()
-                              case .llmUsage:
-                                  NotchLLMUsageView()
-                              case .colorPicker:
-                                  NotchColorPickerView()
-                            case .notes:
-                                NotchNotesView()
-                            case .clipboard:
-                                CompactClipboardView()
-                            case .terminal:
-                                NotchTerminalView()
-                            case .extensionExperience:
-                                if let payload = currentExtensionTabPayload() {
-                                    ExtensionNotchExperienceTabView(payload: payload)
-                                } else {
-                                    NotchHomeView(albumArtNamespace: albumArtNamespace)
-                                }
-                          }
+              if vm.notchState == .open {
+                  // Both pages receive the same viewport during a slide. Geometry
+                  // changes cannot reflow thumbnail columns while they are moving.
+                  GeometryReader { geometry in
+                      ZStack(alignment: .top) {
+                          expandedTabContent
+                              .frame(width: geometry.size.width, height: geometry.size.height, alignment: .top)
+                              .id(coordinator.currentView)
+                              .transition(tabSwitchTransition)
                       }
-                      .id(coordinator.currentView)
-                      .transition(tabSwitchTransition)
+                      .frame(width: geometry.size.width, height: geometry.size.height, alignment: .top)
+                      .clipped()
                   }
+                  .frame(height: max(0, dynamicNotchSize.height - expandedHeaderHeight - 8))
+                  .zIndex(1)
+                  .animation(.smooth(duration: 0.28), value: coordinator.currentView)
               }
-              .zIndex(1)
-              .allowsHitTesting(vm.notchState == .open)
-              .blur(radius: abs(gestureProgress) > 0.3 ? min(abs(gestureProgress), 8) : 0)
-              .opacity(abs(gestureProgress) > 0.3 ? min(abs(gestureProgress * 2), 0.8) : 1)
-              .animation(.smooth(duration: 0.3), value: coordinator.currentView)
           }
       }
+
+    private var expandedHeaderHeight: CGFloat {
+        enableMinimalisticUI && isDynamicIslandMode ? 0 : max(24, vm.effectiveClosedNotchHeight)
+    }
+
+    @ViewBuilder private var expandedTabContent: some View {
+        switch coordinator.currentView {
+        case .home: NotchHomeView(albumArtNamespace: albumArtNamespace)
+        case .shelf: NotchShelfView()
+        case .timer: NotchTimerView()
+        case .reminders: NotchRemindersView()
+        case .calendar:
+            ScrollView { StandaloneCalendarView().padding(.horizontal, 12) }
+        case .stats: ScrollView { NotchStatsView() }
+        case .llmUsage: ScrollView { NotchLLMUsageView() }
+        case .colorPicker: NotchColorPickerView()
+        case .notes: NotchNotesView()
+        case .clipboard: CompactClipboardView()
+        case .terminal: NotchTerminalView()
+        case .extensionExperience:
+            if let payload = currentExtensionTabPayload() {
+                ScrollView { ExtensionNotchExperienceTabView(payload: payload) }
+            } else { NotchHomeView(albumArtNamespace: albumArtNamespace) }
+        }
+    }
 
     private func reminderColor(for reminder: ReminderLiveActivityManager.ReminderEntry, now: Date) -> Color {
         if isReminderCritical(reminder, now: now) {
@@ -2164,14 +2172,14 @@ struct ContentView: View {
     private func isPointInsideNotchWindow(_ point: CGPoint) -> Bool {
         if let appDelegate = AppDelegate.shared {
             if Defaults[.showOnAllDisplays] {
-                return appDelegate.windows.values.contains(where: { $0.frame.contains(point) })
+                return appDelegate.windows.values.contains { ($0 as? DynamicIslandWindow)?.containsInteractivePoint(point) == true }
             }
-            if let window = appDelegate.window {
-                return window.frame.contains(point)
+            if let window = appDelegate.window as? DynamicIslandWindow {
+                return window.containsInteractivePoint(point)
             }
         }
 
-        return NSApp.windows.contains(where: { $0.frame.contains(point) })
+        return NSApp.windows.compactMap { $0 as? DynamicIslandWindow }.contains { $0.containsInteractivePoint(point) }
     }
     
     // Helper function to check if any popovers are active

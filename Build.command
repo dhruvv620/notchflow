@@ -51,6 +51,21 @@ printf '\nChecking Reminders behavior without accessing your reminders...\n'
     "$SOURCE_DIR/tests/RemindersRegression.swift" -o "$BUILD_ROOT/RemindersRegression"
 "$BUILD_ROOT/RemindersRegression"
 
+printf '\nChecking timer modes, tab ordering and visible input regions...\n'
+/usr/bin/xcrun swiftc -swift-version 5 -parse-as-library \
+    "$SOURCE_DIR/DynamicIsland/helpers/TimerModeLifecycle.swift" \
+    "$SOURCE_DIR/tests/TimerModeRegression.swift" -o "$BUILD_ROOT/TimerModeRegression"
+"$BUILD_ROOT/TimerModeRegression"
+/usr/bin/xcrun swiftc -swift-version 5 -parse-as-library \
+    "$SOURCE_DIR/DynamicIsland/helpers/NotchTabOrderPolicy.swift" \
+    "$SOURCE_DIR/tests/NotchTabOrderRegression.swift" -o "$BUILD_ROOT/NotchTabOrderRegression"
+"$BUILD_ROOT/NotchTabOrderRegression"
+/usr/bin/xcrun swiftc -swift-version 5 -parse-as-library \
+    "$SOURCE_DIR/DynamicIsland/helpers/NotchInputRegionPolicy.swift" \
+    "$SOURCE_DIR/DynamicIsland/components/Notch/NotchShape.swift" \
+    "$SOURCE_DIR/tests/NotchInputRegionRegression.swift" -o "$BUILD_ROOT/NotchInputRegionRegression"
+"$BUILD_ROOT/NotchInputRegionRegression"
+
 /usr/bin/xcodebuild -resolvePackageDependencies \
     -project "$SOURCE_DIR/DynamicIsland.xcodeproj" -scheme DynamicIsland \
     -clonedSourcePackagesDirPath "$BUILD_ROOT/Packages" \

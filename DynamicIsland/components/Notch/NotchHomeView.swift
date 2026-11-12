@@ -320,7 +320,7 @@ struct MusicControlsView: View {
                     .zIndex(0)
             }
         }
-        .padding(.top, 10)
+        .padding(.top, 3)
         .padding(.leading, 5)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -692,13 +692,12 @@ struct MusicControlsView: View {
 
 struct NotchHomeView: View {
     @EnvironmentObject var vm: DynamicIslandViewModel
-    @ObservedObject var webcamManager = WebcamManager.shared
-    @ObservedObject var batteryModel = BatteryStatusViewModel.shared
     @ObservedObject var coordinator = DynamicIslandViewCoordinator.shared
     @ObservedObject private var extensionNotchExperienceManager = ExtensionNotchExperienceManager.shared
     @ObservedObject private var musicManager = MusicManager.shared
     @Default(.showStandardMediaControls) private var showStandardMediaControls
     @Default(.autoHideInactiveNotchMediaPlayer) private var autoHideInactiveNotchMediaPlayer
+    @State private var playbackAppName: String?
     let albumArtNamespace: Namespace.ID
 
     /// Whether the music player should actively display (enabled AND has real content).
@@ -712,11 +711,13 @@ struct NotchHomeView: View {
                 mainContent
             }
         }
-        .transition(.opacity.combined(with: .blurReplace))
+        .onChange(of: musicManager.bundleIdentifier, initial: true) { _, identifier in
+            playbackAppName = displayName(for: identifier)
+        }
     }
 
     private var mainContent: some View {
-        HStack(alignment: .top, spacing: 20) {
+        Group {
             if Defaults[.enableMinimalisticUI] {
                 if let overridePayload = minimalisticOverridePayload {
                     ExtensionMinimalisticExperienceView(
@@ -727,42 +728,58 @@ struct NotchHomeView: View {
                     MinimalisticMusicPlayerView(albumArtNamespace: albumArtNamespace)
                 }
             } else {
-                // Normal mode: Show full music player with optional calendar and webcam
-                if shouldShowMusicPlayer {
-                    MusicPlayerView(albumArtNamespace: albumArtNamespace)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                
-                if Defaults[.showCalendar] {
-                    Group {
-                        if shouldShowMusicPlayer {
-                            CalendarView()
-                        } else {
-                            StandaloneCalendarView()
+                VStack(alignment: .leading, spacing: 6) {
+                    nowPlayingHeader
+                    if shouldShowMusicPlayer {
+                        MusicPlayerView(albumArtNamespace: albumArtNamespace)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    } else {
+                        VStack(spacing: 5) {
+                            Image(systemName: "music.note")
+                            Text(showStandardMediaControls ? "Play audio to see it here" : "Music controls are off")
+                                .font(.system(size: 12, weight: .medium))
                         }
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .onHover { isHovering in
-                        vm.isHoveringCalendar = isHovering
-                    }
-                    .environmentObject(vm)
                 }
-                
-                if Defaults[.showMirror],
-                   webcamManager.cameraAvailable,
-                   vm.notchState == .open {
-                    CameraPreviewView(webcamManager: webcamManager)
-                        .scaledToFit()
-                        .opacity(vm.notchState == .closed ? 0 : 1)
-                        .blur(radius: vm.notchState == .closed ? 20 : 0)
-                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
             }
         }
-        .transition(.opacity.animation(.smooth.speed(0.9))
-            .combined(with: .blurReplace.animation(.smooth.speed(0.9)))
-            .combined(with: .move(edge: .top)))
-        .blur(radius: vm.notchState == .closed ? 30 : 0)
-        .padding(Defaults[.enableMinimalisticUI] ? 0 : 8) //Putting the main padding for home view here for consistency
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private var nowPlayingHeader: some View {
+        HStack {
+            Text("Now Playing")
+                .font(.system(size: 12, weight: .semibold))
+            Spacer(minLength: 8)
+            if let appName = playbackAppName {
+                Button { musicManager.openMusicApp() } label: {
+                    Label(appName, systemImage: "arrow.up.right")
+                        .labelStyle(.titleAndIcon)
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Open \(appName)")
+            }
+        }
+        .frame(height: 14)
+    }
+
+    private func displayName(for identifier: String?) -> String? {
+        guard let identifier else { return nil }
+        if let app = NSRunningApplication.runningApplications(withBundleIdentifier: identifier).first,
+           let name = app.localizedName {
+            return name
+        }
+        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: identifier) else { return nil }
+        let bundle = Bundle(url: url)
+        return bundle?.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String
+            ?? bundle?.object(forInfoDictionaryKey: "CFBundleName") as? String
+            ?? url.deletingPathExtension().lastPathComponent
     }
 
     private var minimalisticOverridePayload: ExtensionNotchExperiencePayload? {

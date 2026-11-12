@@ -5,6 +5,7 @@ import SwiftUI
 
 /// Reuses the existing bottom inset; it never enlarges the expanded panel.
 struct NotchPageIndicators: View {
+    @ObservedObject private var preferences = NotchTabPreferences.shared
     @ObservedObject private var coordinator = DynamicIslandViewCoordinator.shared
     @ObservedObject private var appearance = NotchAppearanceModel.shared
     @Default(.notchActivityIndicators) private var enabled

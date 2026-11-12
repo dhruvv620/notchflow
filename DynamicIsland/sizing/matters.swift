@@ -37,8 +37,8 @@ var openNotchSize: CGSize {
         desiredWidth = minWidth
         height = 200
     case .spacious:
-        desiredWidth = max(minWidth, 780)
-        height = 280
+        desiredWidth = max(minWidth, 720)
+        height = 240
     case .custom:
         desiredWidth = Defaults[.openNotchWidth]
         height = CGFloat(min(max(Defaults[.notchCustomHeight], 200), 420))
@@ -118,10 +118,11 @@ func recommendedMinimumNotchWidth(forTabCount count: Int) -> CGFloat {
 
 /// Returns the recommended minimum notch width for the current tab configuration.
 func currentRecommendedMinimumNotchWidth() -> CGFloat {
-    recommendedMinimumNotchWidth(forTabCount: enabledStandardTabCount())
+    // Header overflow and the tab chooser handle extra tabs without widening content.
+    640
 }
 
-/// Enforces the minimum notch width based on current tab count.
+/// Enforces the selected preset’s minimum width independently of tab count.
 /// Also clamps to screen width so the notch never exceeds the display.
 /// Only adjusts when not in minimalistic mode.
 func enforceMinimumNotchWidth() {
@@ -159,8 +160,8 @@ func minimalisticOpenNotchSize(isDynamicIslandMode: Bool) -> CGSize {
     case .compact:
         break // Keep the upstream compact dimensions for each display style.
     case .spacious:
-        size.width = min(size.width + 140, maxWidth)
-        size.height += 80
+        size.width = min(size.width + 80, maxWidth)
+        size.height += 40
     case .custom:
         size.width = min(max(Defaults[.openNotchWidth], min(480, maxWidth)), maxWidth)
         size.height = CGFloat(min(max(Defaults[.notchCustomHeight], 200), 420))
@@ -255,7 +256,7 @@ func statsAdjustedNotchSize(
 
     var adjustedSize = baseSize
     let extraHeight = (statsSecondRowContentHeight + statsGridSpacingHeight) * clampedProgress
-    adjustedSize.height += extraHeight
+    adjustedSize.height += min(extraHeight, 40)
     return adjustedSize
 }
 

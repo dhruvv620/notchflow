@@ -134,6 +134,7 @@ struct CompactClipboardView: View {
     private func card(_ item: ClipboardItem) -> some View {
         let type = kind(of: item)
         let color = cardColor(type)
+        let shape = RoundedRectangle(cornerRadius: 10, style: .continuous)
         return Button {
             copyFailed = !manager.copyToClipboard(item)
             copiedID = copyFailed ? nil : item.id
@@ -151,14 +152,14 @@ struct CompactClipboardView: View {
                 .background(.black.opacity(0.3))
             }
             .background(NotchElementSurface(cornerRadius: 10))
-            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .clipShape(shape, style: FillStyle(antialiased: true))
             .overlay {
-                RoundedRectangle(cornerRadius: 10)
-                    .stroke(copiedID == item.id ? Color.green : Color.white.opacity(0.12), lineWidth: 1)
+                shape.strokeBorder(copiedID == item.id ? Color.green : Color.white.opacity(0.12), lineWidth: 1)
             }
-            .contentShape(RoundedRectangle(cornerRadius: 10))
+            .contentShape(shape)
         }
         .buttonStyle(.plain)
+        .background(PointingHandCursorArea())
         .help("Copy \(item.preview)")
         .accessibilityLabel("Copy \(type.footer.lowercased()): \(item.preview)")
     }
@@ -212,12 +213,13 @@ struct CompactClipboardView: View {
 private struct ClipboardImagePreview: View {
     let fileName: String?
     @State private var image: NSImage?
+    @State private var loadedFileName: String?
     @State private var loading = false
 
     var body: some View {
         GeometryReader { geometry in
             if let image {
-                Image(nsImage: image).resizable().scaledToFill()
+                Image(nsImage: image).resizable().interpolation(.high).scaledToFill()
                     .frame(width: geometry.size.width, height: geometry.size.height)
                     .clipped()
             } else {
@@ -230,13 +232,18 @@ private struct ClipboardImagePreview: View {
             }
         }
         .task(id: fileName) {
-            image = nil
+            if loadedFileName != fileName { image = nil }
             guard let fileName else { loading = false; return }
             loading = true
             let thumbnail = await ClipboardThumbnailStore.shared.image(for: fileName)
             guard !Task.isCancelled else { return }
-            image = thumbnail
-            loading = false
+            // A completed decode should replace its placeholder without inheriting
+            // the enclosing tab's slide animation or resizing the preview bounds.
+            withTransaction(Transaction(animation: nil)) {
+                image = thumbnail
+                loadedFileName = fileName
+                loading = false
+            }
         }
     }
 }

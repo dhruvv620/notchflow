@@ -496,14 +496,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // Use a consistent height for different view types
         if coordinator.currentView == .timer {
-            baseSize.height = max(baseSize.height, 250) // Preserve custom height while reserving room for presets
+            baseSize.height = max(baseSize.height, 224)
         } else if coordinator.currentView == .notes {
             let preferredHeight = coordinator.notesLayoutState.preferredHeight
-            baseSize.height = max(baseSize.height, preferredHeight)
+            baseSize.height = min(max(baseSize.height, preferredHeight), baseSize.height + 40)
         } else if coordinator.currentView == .terminal {
-            let screenHeight = NSScreen.main?.visibleFrame.height ?? 800
-            let maxFraction = Defaults[.terminalMaxHeightFraction]
-            baseSize.height = min(screenHeight * maxFraction, max(300, screenHeight * maxFraction))
+            baseSize.height += 40
         }
         
         let adjustedContentSize = statsAdjustedNotchSize(
