@@ -158,6 +158,16 @@ final class NotchTabPreferences: ObservableObject {
         let order = restoredOrder(knownIDs: knownIDs)
         Defaults[.notchTabOrder] = NotchTabOrderPolicy.moving(source, over: target, in: order)
     }
+    func moveRows(from offsets: IndexSet, to destination: Int, displayedIDs: [String]) {
+        let moved = NotchTabOrderPolicy.movingRows(from: offsets, to: destination, in: displayedIDs)
+        let displayed = Set(displayedIDs)
+        var iterator = moved.makeIterator()
+        // Disconnected extensions keep their slots instead of being discarded.
+        Defaults[.notchTabOrder] = restoredOrder(knownIDs: displayedIDs).map { id in
+            displayed.contains(id) ? (iterator.next() ?? id) : id
+        }
+    }
+
     func reset() {
         Defaults[.notchTabOrder] = NotchBuiltinTab.allCases.map(\.rawValue)
         Defaults[.notchHiddenTabs] = [NotchBuiltinTab.calendar.rawValue]

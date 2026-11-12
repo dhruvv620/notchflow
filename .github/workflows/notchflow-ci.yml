@@ -36,6 +36,10 @@ jobs:
           /tmp/timer-mode-tests
           swiftc -swift-version 5 -parse-as-library DynamicIsland/helpers/NotchTabOrderPolicy.swift tests/NotchTabOrderRegression.swift -o /tmp/tab-order-tests
           /tmp/tab-order-tests
+      - name: Check live system media snapshots and streams
+        run: |
+          swiftc -swift-version 5 -parse-as-library DynamicIsland/models/PlaybackState.swift DynamicIsland/helpers/SystemNowPlayingSnapshot.swift DynamicIsland/helpers/JSONLinesPipeHandler.swift tests/SystemMediaRegression.swift -o /tmp/system-media-tests
+          /tmp/system-media-tests
 
   build:
     name: macOS — ${{ matrix.configuration }}
@@ -129,6 +133,11 @@ jobs:
             DynamicIsland/managers/RemindersManager.swift \
             tests/RemindersRegression.swift -o "$RUNNER_TEMP/RemindersRegression"
           "$RUNNER_TEMP/RemindersRegression"
+
+      - name: Check live system media snapshots and streams
+        run: |
+          xcrun swiftc -swift-version 5 -parse-as-library DynamicIsland/models/PlaybackState.swift DynamicIsland/helpers/SystemNowPlayingSnapshot.swift DynamicIsland/helpers/JSONLinesPipeHandler.swift tests/SystemMediaRegression.swift -o "$RUNNER_TEMP/SystemMediaRegression"
+          "$RUNNER_TEMP/SystemMediaRegression"
 
       - name: Prepare Metal toolchain
         shell: bash

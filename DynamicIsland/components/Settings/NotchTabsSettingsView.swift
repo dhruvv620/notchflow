@@ -2,7 +2,6 @@
 
 import Defaults
 import SwiftUI
-import UniformTypeIdentifiers
 
 struct NotchTabsSettingsView: View {
     let openSettings: (String) -> Void
@@ -11,8 +10,6 @@ struct NotchTabsSettingsView: View {
     @EnvironmentObject private var highlightCoordinator: SettingsHighlightCoordinator
     @Default(.enableMinimalisticUI) private var minimalistic
     @State private var segment = Segment.tabs
-    @State private var draggingID: String?
-    @State private var dragOverID: String?
 
     private enum Segment: String, CaseIterable, Identifiable {
         case tabs = "Tabs", features = "Features"
@@ -44,20 +41,14 @@ struct NotchTabsSettingsView: View {
                     Button("Use Standard layout") { minimalistic = false }
                 }.padding(.horizontal, 20)
             }
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    switch segment {
-                    case .tabs: tabEditor
-                    case .features: featureControls
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .topLeading)
-                .padding(.horizontal, 20)
-                .padding(.bottom, 20)
+            switch segment {
+            case .tabs:
+                tabEditor
+            case .features:
+                ScrollView { featureControls.padding(.horizontal, 20).padding(.bottom, 20) }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .onDisappear { draggingID = nil; dragOverID = nil }
         .onReceive(highlightCoordinator.$activeHighlightID) { id in
             if id == "tabsAndFeatures-Notch feature controls" { segment = .features }
             if id == "tabsAndFeatures-Tab visibility and order" { segment = .tabs }
@@ -66,23 +57,22 @@ struct NotchTabsSettingsView: View {
 
     private var tabEditor: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Drag rows to change the order used by the tab bar, swipes and page indicators.")
-                .font(.caption).foregroundStyle(.secondary)
-            Text("Visibility does not start or stop a feature. Enable features in the Features section. Music stays available if every other tab is hidden.")
-                .font(.caption).foregroundStyle(.secondary)
-            VStack(spacing: 0) {
-                ForEach(descriptors) { tab in
-                    tabRow(tab)
-                    if tab.id != descriptors.last?.id { Divider().padding(.leading, 42) }
-                }
+            Text("Drag a row to reorder the icons, swipes and page indicators.")
+                .font(.caption).foregroundStyle(.secondary).padding(.horizontal, 20)
+            List {
+                ForEach(descriptors) { tab in tabRow(tab) }
+                    .onMove { offsets, destination in
+                        preferences.moveRows(from: offsets, to: destination, displayedIDs: descriptors.map(\.id))
+                    }
             }
-            .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 12))
+            .listStyle(.inset)
+            .scrollContentBackground(.hidden)
             HStack {
-                Text("Hidden tabs keep their saved order and return to the same place when shown again.")
+                Text("Hiding a tab keeps its position and leaves its feature running. Music is the fallback when all tabs are hidden.")
                     .font(.caption).foregroundStyle(.secondary)
                 Spacer()
                 Button("Reset tab layout") { preferences.reset() }
-            }
+            }.padding(.horizontal, 20).padding(.bottom, 20)
         }
         .settingsHighlight(id: "tabsAndFeatures-Tab visibility and order")
     }
@@ -104,17 +94,6 @@ struct NotchTabsSettingsView: View {
         }
         .padding(.horizontal, 12).padding(.vertical, 11)
         .contentShape(Rectangle())
-        .onDrag {
-            draggingID = tab.id
-            dragOverID = nil
-            let provider = NSItemProvider()
-            provider.registerDataRepresentation(forTypeIdentifier: NotchTabDrag.type.identifier, visibility: .ownProcess) { completion in
-                completion(Data(tab.id.utf8), nil)
-                return nil
-            }
-            return provider
-        }
-        .onDrop(of: [NotchTabDrag.type], delegate: NotchTabDropDelegate(targetID: tab.id, knownIDs: descriptors.map(\.id), draggingID: $draggingID, dragOverID: $dragOverID, preferences: preferences))
         .accessibilityLabel("\(tab.label), \(preferences.isShown(tab.id) ? "shown" : "hidden")")
         .accessibilityAction(named: Text("Move up")) { moveUp(tab.id) }
         .accessibilityAction(named: Text("Move down")) { moveDown(tab.id) }
@@ -193,27 +172,4 @@ struct NotchTabsSettingsView: View {
                 .buttonStyle(.borderless).help("Configure \(title)")
         }
     }
-}
-
-private enum NotchTabDrag {
-    static let type = UTType(exportedAs: "com.dhruvv620.notchflow.tab-layout")
-}
-
-@MainActor
-private struct NotchTabDropDelegate: DropDelegate {
-    let targetID: String
-    let knownIDs: [String]
-    @Binding var draggingID: String?
-    @Binding var dragOverID: String?
-    let preferences: NotchTabPreferences
-
-    func dropEntered(info: DropInfo) {
-        guard info.hasItemsConforming(to: [NotchTabDrag.type]),
-              let source = draggingID, source != targetID, dragOverID != targetID else { return }
-        dragOverID = targetID
-        withAnimation(.easeInOut(duration: 0.15)) { preferences.move(source, over: targetID, knownIDs: knownIDs) }
-    }
-    func dropUpdated(info: DropInfo) -> DropProposal? { DropProposal(operation: .move) }
-    func validateDrop(info: DropInfo) -> Bool { info.hasItemsConforming(to: [NotchTabDrag.type]) && draggingID != nil }
-    func performDrop(info: DropInfo) -> Bool { draggingID = nil; dragOverID = nil; return true }
 }

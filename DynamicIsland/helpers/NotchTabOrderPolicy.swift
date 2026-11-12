@@ -28,6 +28,18 @@ enum NotchTabOrderPolicy {
         return result
     }
 
+    /// Native List destinations refer to positions before removing the dragged rows.
+    static func movingRows(from offsets: IndexSet, to destination: Int, in order: [String]) -> [String] {
+        let valid = offsets.filter { order.indices.contains($0) }
+        guard !valid.isEmpty else { return order }
+        let moving = valid.map { order[$0] }
+        let selected = Set(valid)
+        var remaining = order.enumerated().filter { !selected.contains($0.offset) }.map(\.element)
+        let adjusted = destination - valid.filter { $0 < destination }.count
+        remaining.insert(contentsOf: moving, at: min(max(adjusted, 0), remaining.count))
+        return remaining
+    }
+
     /// Move before the target, preserving every other identifier's relative order.
     static func moving(_ source: String, before target: String, in order: [String]) -> [String] {
         guard source != target, order.contains(source), order.contains(target) else { return order }

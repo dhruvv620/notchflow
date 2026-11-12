@@ -22,6 +22,9 @@ struct NotchTabOrderRegression {
         try require(NotchTabOrderPolicy.moving("calendar", over: "todos", in: order) == ["calendar", "todos", "clipboard", "music", "timers"], "Upward drag could not reach first row")
         let extensions = NotchTabOrderPolicy.normalizedOrder(["extension-editor", "music"], known: ["music", "extension-editor", "extension-build"])
         try require(extensions == ["extension-editor", "music", "extension-build"], "Extension IDs lost stable ordering")
+        try require(NotchTabOrderPolicy.movingRows(from: IndexSet(integer: 0), to: 4, in: ["music", "timers", "clipboard", "todos"]) == ["timers", "clipboard", "todos", "music"], "Native drag destination did not account for removed rows")
+        try require(NotchTabOrderPolicy.movingRows(from: IndexSet([1, 3]), to: 0, in: ["music", "timers", "clipboard", "todos"]) == ["timers", "todos", "music", "clipboard"], "Native multi-row drag changed selection order")
+        try require(NotchTabOrderPolicy.movingRows(from: IndexSet(integer: 1), to: 2, in: known) == known, "Dropping a row into its own gap should keep its order")
         print("Notch tab order/visibility checks passed")
     }
 }

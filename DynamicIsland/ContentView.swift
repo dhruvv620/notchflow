@@ -566,8 +566,7 @@ struct ContentView: View {
             .background {
                 ExpandedNotchSurface(
                     shape: resolvedClipShape,
-                    isExpanded: vm.notchState == .open,
-                    cameraBandHeight: isDynamicIslandMode ? 0 : vm.effectiveClosedNotchHeight
+                    isExpanded: vm.notchState == .open
                 )
                 NotchInputRegionBridge(
                     shape: resolvedClipShape,
@@ -1037,7 +1036,7 @@ struct ContentView: View {
                           DynamicIslandFaceAnimation().animation(.interactiveSpring, value: musicManager.isPlayerIdle)
                       } else if vm.notchState == .open {
                           DynamicIslandHeader()
-                              .frame(height: (Defaults[.enableMinimalisticUI] && isDynamicIslandMode) ? nil : max(24, vm.effectiveClosedNotchHeight))
+                              .frame(height: expandedHeaderHeight)
                        } else {
                            Rectangle().fill(.clear).frame(width: vm.closedNotchSize.width - 20, height: vm.effectiveClosedNotchHeight)
                        }
@@ -1155,7 +1154,7 @@ struct ContentView: View {
       }
 
     private var expandedHeaderHeight: CGFloat {
-        enableMinimalisticUI && isDynamicIslandMode ? 0 : max(24, vm.effectiveClosedNotchHeight)
+        notchExpandedHeaderHeight(for: vm.screen, closedHeight: vm.effectiveClosedNotchHeight, minimalistic: enableMinimalisticUI)
     }
 
     @ViewBuilder private var expandedTabContent: some View {
@@ -2214,6 +2213,7 @@ struct ContentView: View {
          vm.isStatsPopoverActive ||
          vm.isTimerPopoverActive ||
          vm.isMediaOutputPopoverActive ||
+         vm.isMediaSourcePopoverActive ||
          vm.isReminderPopoverActive
     }
 

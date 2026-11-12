@@ -66,6 +66,14 @@ printf '\nChecking timer modes, tab ordering and visible input regions...\n'
     "$SOURCE_DIR/tests/NotchInputRegionRegression.swift" -o "$BUILD_ROOT/NotchInputRegionRegression"
 "$BUILD_ROOT/NotchInputRegionRegression"
 
+printf '\nChecking live system media updates...\n'
+/usr/bin/xcrun swiftc -swift-version 5 -parse-as-library \
+    "$SOURCE_DIR/DynamicIsland/models/PlaybackState.swift" \
+    "$SOURCE_DIR/DynamicIsland/helpers/SystemNowPlayingSnapshot.swift" \
+    "$SOURCE_DIR/DynamicIsland/helpers/JSONLinesPipeHandler.swift" \
+    "$SOURCE_DIR/tests/SystemMediaRegression.swift" -o "$BUILD_ROOT/SystemMediaRegression"
+"$BUILD_ROOT/SystemMediaRegression"
+
 /usr/bin/xcodebuild -resolvePackageDependencies \
     -project "$SOURCE_DIR/DynamicIsland.xcodeproj" -scheme DynamicIsland \
     -clonedSourcePackagesDirPath "$BUILD_ROOT/Packages" \

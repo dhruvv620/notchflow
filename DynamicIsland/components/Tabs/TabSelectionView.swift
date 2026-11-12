@@ -159,70 +159,54 @@ struct TabSelectionView: View {
     }
 
     var body: some View {
-        ViewThatFits(in: .horizontal) {
-            tabButtons
-            Menu {
-                ForEach(tabs) { tab in
-                    Button {
-                        coordinator.selectedExtensionExperienceID = tab.experienceID
-                        coordinator.currentView = tab.view
-                    } label: { Label(tab.label, systemImage: tab.icon) }
+        ScrollViewReader { reader in
+            ScrollView(.horizontal) {
+                HStack(spacing: 2) {
+                    ForEach(tabs) { tab in
+                        let selected = isSelected(tab)
+                        Button {
+                            coordinator.selectedExtensionExperienceID = tab.experienceID
+                            coordinator.currentView = tab.view
+                        } label: {
+                            Image(systemName: tab.icon)
+                                .font(.system(size: 13, weight: .medium))
+                                .symbolRenderingMode(.hierarchical)
+                                .foregroundStyle(selected ? (tab.accentColor ?? appearance.accentColor) : Color.white.opacity(0.62))
+                                .frame(width: 28, height: 28)
+                                .contentShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .background {
+                            if selected {
+                                Capsule().fill(Color.white.opacity(0.10))
+                                    .matchedGeometryEffect(id: "selection", in: animation)
+                            }
+                        }
+                        .id(tab.id)
+                        .help(tab.label).accessibilityLabel(tab.label)
+                        .accessibilityAddTraits(selected ? .isSelected : [])
+                    }
                 }
-            } label: {
-                Label(tabs.first(where: { isSelected($0) })?.label ?? "Tabs",
-                      systemImage: tabs.first(where: { isSelected($0) })?.icon ?? "square.grid.2x2")
+                .padding(.horizontal, 2)
             }
-            .menuStyle(.borderlessButton)
-            .fixedSize()
+            .scrollIndicators(.hidden)
+            .frame(height: 30)
+            .onChange(of: coordinator.currentView) { _, _ in
+                revealSelection(using: reader)
+            }
+            .onChange(of: coordinator.selectedExtensionExperienceID) { _, _ in
+                revealSelection(using: reader)
+            }
+            .onAppear { ensureValidSelection(with: tabs); revealSelection(using: reader) }
+            .onReceive(NotificationCenter.default.publisher(for: .notchTabsDidChange)) { _ in
+                Self.validateCurrentSelection(); revealSelection(using: reader)
+            }
         }
-        .onAppear { ensureValidSelection(with: tabs) }
-        .onReceive(NotificationCenter.default.publisher(for: .notchTabsDidChange)) { _ in Self.validateCurrentSelection() }
-        .onChange(of: enableRemindersFeature) { _, _ in ensureValidSelection(with: tabs) }
-        .onChange(of: enableClipboardManager) { _, _ in ensureValidSelection(with: tabs) }
     }
 
-    private var tabButtons: some View {
-        HStack(spacing: tabs.count > 4 ? 16 : 24) {
-            ForEach(Array(tabs.enumerated()), id: \.element.id) { idx, tab in
-                let isSelected = isSelected(tab)
-                let activeAccent = tab.accentColor ?? appearance.accentColor
-
-                // Render the tab button
-                TabButton(label: tab.label, icon: tab.icon, selected: isSelected) {
-                    if tab.view == .extensionExperience {
-                        coordinator.selectedExtensionExperienceID = tab.experienceID
-                    }
-                    coordinator.currentView = tab.view
-                }
-                .help(tab.label)
-                .accessibilityLabel(tab.label)
-                .frame(height: 26)
-                .foregroundStyle(isSelected ? activeAccent : .gray)
-                .background {
-                    if isSelected {
-                        Capsule()
-                            .fill((tab.accentColor ?? appearance.accentColor).opacity(0.18))
-                            .shadow(color: (tab.accentColor ?? .clear).opacity(0.4), radius: 8)
-                            .matchedGeometryEffect(id: "capsule", in: animation)
-                    } else {
-                        Capsule()
-                            .fill(Color.clear)
-                            .matchedGeometryEffect(id: "capsule", in: animation)
-                            .hidden()
-                    }
-                }
-
-                
-            }
-        }
-        .fixedSize(horizontal: true, vertical: false)
-        .clipShape(Capsule())
-        .onAppear {
-            ensureValidSelection(with: tabs)
-        }
-        .onChange(of: enableRemindersFeature) { _, _ in
-            ensureValidSelection(with: tabs)
-        }
+    private func revealSelection(using reader: ScrollViewProxy) {
+        guard let selected = tabs.first(where: { isSelected($0) }) else { return }
+        withAnimation(.smooth(duration: 0.28)) { reader.scrollTo(selected.id, anchor: .center) }
     }
 
     private var extensionTabsEnabled: Bool {

@@ -412,7 +412,7 @@ enum MediaControllerType: String, CaseIterable, Identifiable, Defaults.Serializa
     
     var localizedName: String {
         switch self {
-        case .nowPlaying: return String(localized: "Now Playing")
+        case .nowPlaying: return String(localized: "Automatic (System media)")
         case .appleMusic: return String(localized: "Apple Music")
         case .spotify: return String(localized: "Spotify")
         case .youtubeMusic: return String(localized: "Youtube Music")
@@ -1072,6 +1072,7 @@ extension Defaults.Keys {
     static let enableWobbleAnimation = Key<Bool>("enableWobbleAnimation", default: false)
     
     // MARK: Media Controller
+    static let notchSystemMediaMigration = Key<Bool>("notchSystemMediaMigration", default: false)
     static let mediaController = Key<MediaControllerType>("mediaController", default: defaultMediaController)
     static let spotifySPDCCookie = Key<String>("spotifySPDCCookie", default: "")
     static let spotifyAuthAccessToken = Key<String>("spotifyAuthAccessToken", default: "")
@@ -1306,15 +1307,10 @@ extension Defaults.Keys {
     static let enableAppleNotesSync = Key<Bool>("enableAppleNotesSync", default: false)
     static let appleNotesLastSyncDate = Key<Date?>("appleNotesLastSyncDate", default: nil)
     
-    // Helper to determine the default media controller based on macOS version
-    static var defaultMediaController: MediaControllerType {
-        if #available(macOS 15.4, *) {
-            return .appleMusic
-        } else {
-            return .nowPlaying
-        }
-    }
+    // The bundled system-hosted adapter works across supported macOS versions.
+    static var defaultMediaController: MediaControllerType { .nowPlaying }
     
+
     // Migration helper to convert from legacy enableGradient Boolean to new ProgressBarStyle enum
     static func migrateProgressBarStyle() {
         // Check if migration is needed by seeing if the old Boolean was set to gradient

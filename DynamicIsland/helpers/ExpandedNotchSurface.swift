@@ -6,10 +6,11 @@ import SwiftUI
 struct ExpandedNotchSurface<Surface: Shape>: View {
     let shape: Surface
     let isExpanded: Bool
-    let cameraBandHeight: CGFloat
     var styleOverride: NotchBackgroundStyle? = nil
     @Default(.notchBackgroundStyle) private var selectedStyle
     @Default(.notchOutline) private var outline
+    @Default(.notchArtworkGlow) private var artworkGlow
+    @ObservedObject private var coordinator = DynamicIslandViewCoordinator.shared
     @ObservedObject private var appearance = NotchAppearanceModel.shared
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
@@ -19,7 +20,10 @@ struct ExpandedNotchSurface<Surface: Shape>: View {
             Color.black.opacity(isExpanded && style != .black && !reduceTransparency ? 0.01 : 1)
             if isExpanded && !reduceTransparency {
                 surface
-                if cameraBandHeight > 0 { Color.black.frame(height: cameraBandHeight) }
+                if artworkGlow && coordinator.currentView == .home && style != .black {
+                    RadialGradient(colors: [appearance.accentColor.opacity(0.15), .clear],
+                                   center: .topLeading, startRadius: 0, endRadius: 440)
+                }
             }
         }
         .clipShape(shape)
@@ -45,15 +49,15 @@ struct ExpandedNotchSurface<Surface: Shape>: View {
         case .glass:
             if #available(macOS 26.0, *) {
                 shape.fill(.clear)
-                    .glassEffect(.regular.tint(.black.opacity(0.35)), in: shape)
+                    .glassEffect(.regular.tint(.black.opacity(0.12)), in: shape)
                     .environment(\.colorScheme, .dark)
             } else { frosted }
         case .frosted: frosted
         }
     }
     private var frosted: some View {
-        shape.fill(.regularMaterial)
-            .overlay { shape.fill(.black.opacity(0.3)) }
+        NotchFrostedMaterial()
+            .overlay { shape.fill(.black.opacity(0.08)) }
             .environment(\.colorScheme, .dark)
     }
 }
@@ -64,7 +68,7 @@ struct ExpandedNotchSurface<Surface: Shape>: View {
             Text(style.title).foregroundStyle(.white).frame(width: 340, height: 100)
                 .background {
                     ExpandedNotchSurface(shape: NotchShape(topCornerRadius: 6, bottomCornerRadius: 28),
-                                         isExpanded: true, cameraBandHeight: 20, styleOverride: style)
+                                         isExpanded: true, styleOverride: style)
                 }
         }
     }.padding().background(Color.gray)

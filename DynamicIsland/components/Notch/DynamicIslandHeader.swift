@@ -44,7 +44,11 @@ struct DynamicIslandHeader: View {
     @Default(.showMirror) private var showMirror
     
     var body: some View {
-        HStack(spacing: 0) {
+        VStack(spacing: 0) {
+            if !enableMinimalisticUI {
+                Color.clear.frame(height: notchCameraClearance(for: vm.screen))
+            }
+            HStack(spacing: 6) {
             HStack {
                 if !enableMinimalisticUI {
                     let shouldShowTabs = coordinator.alwaysShowTabs || vm.notchState == .open || !shelfState.items.isEmpty
@@ -58,18 +62,7 @@ struct DynamicIslandHeader: View {
             .blur(radius: vm.notchState == .closed ? 20 : 0)
             .animation(.smooth.delay(0.1), value: vm.notchState)
             .zIndex(2)
-            .padding(8)
-
-            if vm.notchState == .open {
-                let spacerWidth = min(vm.closedNotchSize.width, 300)
-                Rectangle()
-                    .fill(enableMinimalisticUI ? .clear : (NSScreen.screens
-                        .first(where: { $0.localizedName == coordinator.selectedScreen })?.safeAreaInsets.top ?? 0 > 0 ? .black : .clear))
-                    .frame(width: spacerWidth)
-                    .mask {
-                        NotchShape()
-                    }
-            }
+            .padding(.vertical, 1)
 
             HStack(spacing: 4) {
                 if vm.notchState == .open && !enableMinimalisticUI {
@@ -78,7 +71,7 @@ struct DynamicIslandHeader: View {
                             vm.toggleCameraPreview()
                         }) {
                             Capsule()
-                                .fill(.black)
+                                .fill(Color.white.opacity(0.055))
                                 .frame(width: 30, height: 30)
                                 .overlay {
                                     Image(systemName: "web.camera")
@@ -124,7 +117,7 @@ struct DynamicIslandHeader: View {
                             }
                         }) {
                             Capsule()
-                                .fill(.black)
+                                .fill(Color.white.opacity(0.055))
                                 .frame(width: 30, height: 30)
                                 .overlay {
                                     Image(systemName: "doc.on.clipboard")
@@ -165,7 +158,7 @@ struct DynamicIslandHeader: View {
                             }
                         }) {
                             Capsule()
-                                .fill(.black)
+                                .fill(Color.white.opacity(0.055))
                                 .frame(width: 30, height: 30)
                                 .overlay {
                                     Image(systemName: "eyedropper")
@@ -197,7 +190,7 @@ struct DynamicIslandHeader: View {
                             }
                         }) {
                             Capsule()
-                                .fill(.black)
+                                .fill(Color.white.opacity(0.055))
                                 .frame(width: 30, height: 30)
                                 .overlay {
                                     Image(systemName: "timer")
@@ -225,7 +218,7 @@ struct DynamicIslandHeader: View {
                             SettingsWindowController.shared.showWindow()
                         }) {
                             Capsule()
-                                .fill(.black)
+                                .fill(Color.white.opacity(0.055))
                                 .frame(width: 30, height: 30)
                                 .overlay {
                                     Image(systemName: "gear")
@@ -286,12 +279,14 @@ struct DynamicIslandHeader: View {
                 }
             }
             .font(.system(.headline, design: .rounded))
-            .frame(maxWidth: .infinity, alignment: .trailing)
+            .frame(maxWidth: enableMinimalisticUI ? .infinity : nil, alignment: .trailing)
+            .fixedSize(horizontal: !enableMinimalisticUI, vertical: false)
             .opacity(vm.notchState == .closed ? 0 : 1)
             .blur(radius: vm.notchState == .closed ? 20 : 0)
             .animation(.smooth.delay(0.1), value: vm.notchState)
             .zIndex(2)
         }
+            }
         .foregroundColor(.gray)
         .environmentObject(vm)
         .onChange(of: vm.isCameraExpanded) { _, visible in

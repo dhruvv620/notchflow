@@ -60,11 +60,19 @@ Glass has a shape-matched near-transparent backing so the inside of the expanded
 
 ## Music, timers and tab organization
 
-Music is a single full-width Now Playing panel with provider shortcut, artwork, progress and playback controls. Today/calendar content no longer appears alongside it. Calendar is a separate optional tab, hidden by default. The Mirror camera control opens a small popover rather than expanding the Music layout.
+Music is a single full-width Now Playing panel with a media-source picker, fixed 84-point artwork, progress and playback controls. Playing and pausing never enlarge its artwork. Today/calendar content no longer appears alongside it. Calendar is a separate optional tab, hidden by default. The Mirror camera control opens a small popover rather than expanding the Music layout.
+
+The header always uses an icon strip, with the selected icon moving smoothly during navigation. It sits below the physical camera so the entire row can use the panel width; additional extension icons scroll into view instead of replacing the strip with a dropdown. Frosted uses native behind-window blending to sample the desktop and apps behind the panel. Header and content share one surface and a gentle full-panel accent wash, without a painted black header band or a separate artwork rectangle.
+
+### System media and source selection
+
+Automatic follows the system Now Playing session: browser video, movies and music from apps that publish macOS media metadata. Use the source button at the upper right of Now Playing to pin Spotify, Apple Music or another installed supported player, then choose Automatic to follow the system again. Selecting an app does not start playback. Refresh reconnects system updates; Open app opens the current source. This update selects Automatic once and restores the compact music activity/visualizer; later source choices persist.
+
+Detection and transport commands both use the original bundled MediaRemote adapter through its system Perl host, including on macOS 15.4+. The app no longer silently substitutes Apple Music based on OS version or switches to Pear Desktop without a source choice. Diff updates preserve unchanged artwork, handle explicit removals, accept fractional timestamps and maintain the playback clock through pause/resume. Streams are stopped when switching sources and refreshed after wake. Apps that do not publish system media metadata cannot supply titles/artwork through Automatic.
 
 Timers contains **Timer**, **Pomodoro** and **Stopwatch** sections. Drag the ruler with the mouse to set a timer or focus duration; use the settings popover for exact hours/minutes/seconds and break options. Pomodoro defaults to 25-minute focus, 5-minute breaks and a 15-minute long break after four sessions, then repeats. Its pause/resume/reset state is shared with the compact live activity. Stopwatch elapsed time survives tab changes and sleep while the app is running. Starting a new Timer or Pomodoro asks before replacing an active timer; external Clock timers remain controlled by Clock.
 
-**Settings > Tabs & Features** has pinned Tabs and Features segments. Show/hide tabs, drag rows to reorder, use accessible move-up/down actions or reset the layout. The header, horizontal swipes and indicators share that order. Hidden tabs keep their position; hiding a tab does not disable its service. Features groups the tool switches and links to their detailed settings. Music remains the fallback if every tab is hidden.
+**Settings > Tabs & Features** has pinned Tabs and Features segments. Show/hide tabs, drag native list rows to reorder, use accessible move-up/down actions or reset the layout. The header, horizontal swipes and indicators share that order. Hidden tabs keep their position; hiding a tab does not disable its service. Features groups the tool switches and links to their detailed settings. Music remains the fallback if every tab is hidden.
 
 Clipboard cards use the native pointing-hand cursor. Slides use one stable clipped viewport, continuous card edges and cached, downsampled high-quality previews; decoded thumbnails do not inherit navigation animations. Originals remain intact for copying.
 
@@ -79,13 +87,13 @@ Settings > Appearance now contains:
 - **Motion:** combines the app's Reduce Motion option with macOS accessibility preferences, suppressing SwiftUI transitions and pausing native spectrum/waveform animations.
 - **Carousel:** optional bottom page indicators, displayed as Dots or Icons. They reuse the existing inset and can select a tab.
 
-Black keeps the classic opaque background. Dynamic uses the resolved accent in a dark gradient. Glass uses the public native Liquid Glass API on macOS 26+ and falls back to a frosted material on older supported systems. Frosted uses a regular material. The closed notch and physical camera strip stay black; Reduce Transparency makes the surface opaque. The old single Glass switch migrates to the new Glass option once. No private glass API is added by these controls.
+Black keeps the classic opaque background. Dynamic uses the resolved accent in a dark gradient. Glass uses the public native Liquid Glass API on macOS 26+ and falls back to a frosted material on older supported systems. Frosted uses a regular material. The closed notch stays black; the expanded surface continues behind navigation around the physical camera. Reduce Transparency makes the surface opaque. The old single Glass switch migrates to the new Glass option once. No private glass API is added by these controls.
 
 Compact keeps Clipboard and Todos at Music's original panel size. Spacious and Custom apply consistently to these tabs. Compact uses 640 × 200 points regardless of enabled tab count. Spacious uses 720 × 240; Timer reserves up to 224 points in Compact. Other utilities add at most 40 points automatically, with scrolling for larger content. Custom sizing remains an explicit choice.
 
 ## Verification
 
-GitHub's **NotchFlow Native Build** workflow compiles Debug on macOS 15 and Release on macOS 26 with Xcode 26+ and pinned packages, checks privacy declarations, and runs isolated Reminders/date-parser/clipboard/timer/tab-order/input-region regression executables. A separate Swift/Linux job compiles and runs the pure Foundation date, clipboard, timer and tab-order checks independently of macOS runner capacity. Build logs and Xcode result bundles are retained as workflow artifacts. These are compile and logic checks, not a claim of visual or account-sync validation.
+GitHub's **NotchFlow Native Build** workflow compiles Debug on macOS 15 and Release on macOS 26 with Xcode 26+ and pinned packages, checks privacy declarations, and runs isolated Reminders/date-parser/clipboard/timer/tab-order/input-region/system-media regression executables. A separate Swift/Linux job compiles and runs the pure Foundation date, clipboard, timer, tab-order and system-media checks independently of macOS runner capacity. Build logs and Xcode result bundles are retained as workflow artifacts. These are compile and logic checks, not a claim of visual or account-sync validation.
 
 The regression checks use a fake service and never request access to real reminder data. To run them manually on a Mac:
 
@@ -106,6 +114,9 @@ Before merging, verify on an interactive Mac:
 - Clipboard retains exactly the latest 20 recent items after 21 external copies, repeated external copies move to the front, clicking a card preserves full original content without adding duplicates, filters/pages remain valid, and clear requires confirmation.
 - A quick horizontal flick changes one tab, vertical scrolling does not navigate, disabled tabs are skipped, and reverse direction works. Clipboard/Reminders match Music's panel dimensions.
 - Close the notch with the pointer outside its closed shape and immediately click controls throughout its former expanded area; those clicks must reach the background app, with no invisible blocked rectangle. Test repeated open/close, trackpad drag, mouse-down outside, and display changes.
+- Artwork remains 84 points during repeated Play/Pause; header and content share one continuous background on light/dark desktops, without a black header seam or square artwork backdrop. All standard tab icons remain in the top strip and the selected icon follows swipes.
+- Automatic with Safari/Chrome YouTube, QuickTime/IINA or another Now Playing-enabled video player, Spotify, track changes, pause/resume, empty metadata and sleep/wake; pin Spotify while video plays, return to Automatic, and verify old helpers stop on source changes.
+- Native list drag reordering upward/downward and multiple rows, visibility toggles, scroll/restart, and saved order across header/swipes/indicators.
 - Timer/Pomodoro/Stopwatch start, pause, resume and reset; short/long break boundaries, compact controls, replacing an existing timer, sleep/wake, and switching tabs while running.
 - Tabs & Features visibility and drag ordering persist after restart and agree across header, swipes and indicators; hiding every tab keeps a usable fallback.
 - Hover every clipboard card for a hand cursor; swipe repeatedly between image-heavy Clipboard and Music on Retina displays and verify clean borders and stable columns.
@@ -113,3 +124,10 @@ Before merging, verify on an interactive Mac:
 - Scrolling remains inside reminder content, typing does not close the composer, permission denial or a slow prompt offers actionable feedback, manual Check Access accepts changed permissions, and sleep/wake/fullscreen do not leave stale panels.
 
 The editing environment is Linux. It cannot provide a real notch screenshot or verify iCloud synchronization; those remain explicit Mac acceptance checks.
+
+## Design and media references
+
+- [Apple HIG: Materials](https://developer.apple.com/design/human-interface-guidelines/materials): standard materials for content, restrained glass on controls, contrast and accessibility.
+- [SwiftUI Liquid Glass](https://developer.apple.com/documentation/swiftui/applying-liquid-glass-to-custom-views): one coherent material treatment and limited effect layering.
+- [SwiftUI native row movement](https://developer.apple.com/documentation/swiftui/dynamicviewcontent/onmove(perform:)): native list destinations and reordering.
+- [MediaRemote adapter documentation](https://github.com/ungive/mediaremote-adapter#readme): system-hosted stream/transport commands on modern macOS, diff semantics and timestamps.

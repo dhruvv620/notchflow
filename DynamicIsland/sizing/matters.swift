@@ -24,6 +24,17 @@ import Defaults
 import Foundation
 import SwiftUI
 
+/// Navigation sits below the physical camera, on the same continuous surface.
+func notchCameraClearance(for screenName: String?) -> CGFloat {
+    let screen = NSScreen.screens.first { $0.localizedName == screenName } ?? NSScreen.main
+    return screen?.safeAreaInsets.top ?? 0
+}
+
+func notchExpandedHeaderHeight(for screenName: String?, closedHeight: CGFloat, minimalistic: Bool) -> CGFloat {
+    if minimalistic { return shouldUseDynamicIslandMode(for: screenName) ? 0 : max(24, closedHeight) }
+    return notchCameraClearance(for: screenName) + 32
+}
+
 let downloadSneakSize: CGSize = .init(width: 65, height: 1)
 let batterySneakSize: CGSize = .init(width: 160, height: 1)
 

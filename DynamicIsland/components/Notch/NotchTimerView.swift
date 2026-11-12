@@ -37,7 +37,7 @@ struct NotchTimerView: View {
     var body: some View {
         Group {
             if enabled {
-                VStack(spacing: 6) {
+                VStack(spacing: 4) {
                     header
                     navigation
                     Group {
@@ -48,7 +48,7 @@ struct NotchTimerView: View {
                         }
                     }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 }
-                .padding(.horizontal, 16).padding(.vertical, 6)
+                .padding(.horizontal, 16).padding(.vertical, 4)
             } else {
                 ContentUnavailableView("Timers are off", systemImage: "timer", description: Text("Enable Timer in Settings to use these tools."))
             }
@@ -154,7 +154,7 @@ struct NotchTimerView: View {
     }
 
     private var countdownContent: some View {
-        VStack(spacing: 5) {
+        VStack(spacing: 4) {
             HStack(alignment: .firstTextBaseline) {
                 Text(timer.isTimerActive ? timer.formattedRemainingTime() : format(timerDuration))
                     .font(.system(size: 30, weight: .semibold, design: .rounded)).monospacedDigit()
@@ -188,7 +188,7 @@ struct NotchTimerView: View {
     }
 
     private var pomodoroContent: some View {
-        VStack(spacing: 5) {
+        VStack(spacing: 4) {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Text(modes.pomodoro.isActive ? format(modes.pomodoro.remaining(at: Date())) : format(focusMinutes * 60))
                     .font(.system(size: 30, weight: .semibold, design: .rounded)).monospacedDigit()
@@ -254,7 +254,7 @@ struct NotchTimerView: View {
     }
 
     private func durationField(_ title: String, unit: Int, maximum: Int) -> some View {
-        VStack(spacing: 5) {
+        VStack(spacing: 4) {
             Text(title).font(.caption)
             TextField("0", value: Binding(get: {
                 (Int(timerDuration) / unit) % (unit == 3600 ? 24 : 60)

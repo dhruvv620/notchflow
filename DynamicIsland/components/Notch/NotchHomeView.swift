@@ -166,115 +166,27 @@ struct MusicPlayerView: View {
 }
 
 struct AlbumArtView: View {
-    @ObservedObject private var appearance = NotchAppearanceModel.shared
     @ObservedObject var musicManager = MusicManager.shared
     @ObservedObject var vm: DynamicIslandViewModel
-    @Default(.showLiveCanvasInDynamicIsland) private var showLiveCanvasInDynamicIsland
-    @Default(.notchArtworkGlow) private var artworkGlow
     let albumArtNamespace: Namespace.ID
 
-    private var usesLiveCanvasArtwork: Bool {
-        showLiveCanvasInDynamicIsland && musicManager.videoArtworkURL != nil
-    }
-
-    private var albumArtCornerRadius: CGFloat {
-        Defaults[.cornerRadiusScaling]
-            ? musicManager.albumArt.size.width / musicManager.albumArt.size.height > 1.0
-                ? MusicPlayerImageSizes.cornerRadiusInset.opened / 3
-                : MusicPlayerImageSizes.cornerRadiusInset.opened
-            : musicManager.albumArt.size.width / musicManager.albumArt.size.height > 1.0
-                ? MusicPlayerImageSizes.cornerRadiusInset.closed / 3
-                : MusicPlayerImageSizes.cornerRadiusInset.closed
-    }
-
     var body: some View {
-        ZStack(alignment: .bottomTrailing) {
-            if artworkGlow {
-                albumArtBackground
-            }
-            albumArtButton
-        }
-    }
-
-    private var albumArtBackground: some View {
-        Color.clear
-            .aspectRatio(1, contentMode: .fit)
-            .background(
-                DynamicIslandArtworkSourceView(
-                    cornerRadius: albumArtCornerRadius,
-                    contentMode: .fill
-                )
-            )
-            .clipped()
-            .scaleEffect(x: 1.3, y: 1.4)
-            .rotationEffect(.degrees(92))
-            .blur(radius: 40)
-            .opacity(
-                usesLiveCanvasArtwork
-                    ? (musicManager.isPlaying ? 0.62 : 0.18)
-                    : (musicManager.isPlaying ? 0.5 : 0)
-            )
-            .shadow(
-                color: appearance.accentColor.opacity(usesLiveCanvasArtwork ? 0.24 : 0.16),
-                radius: usesLiveCanvasArtwork ? 22 : 14,
-                x: 0,
-                y: 0
-            )
-    }
-
-    private var albumArtButton: some View {
-        ZStack {
-            Button {
-                musicManager.openMusicApp()
-            } label: {
-                ZStack(alignment:.bottomTrailing) {
-                    albumArtImage
-                    appIconOverlay
+        Button { musicManager.openMusicApp() } label: {
+            DynamicIslandArtworkSourceView(cornerRadius: 12, contentMode: .fill)
+                .frame(width: 84, height: 84)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .overlay(alignment: .bottomTrailing) {
+                    if !musicManager.usingAppIconForArtwork, let identifier = musicManager.bundleIdentifier {
+                        AppIcon(for: identifier).resizable().scaledToFit()
+                            .frame(width: 16, height: 16).padding(3)
+                            .background(.black.opacity(0.55), in: RoundedRectangle(cornerRadius: 6))
+                            .padding(3)
+                    }
                 }
-                .albumArtFlip(angle: musicManager.flipAngle)
-                .parallax3D()
-                .padding(.bottom, -5)
-
-            }
-            .buttonStyle(PlainButtonStyle())
-            .scaleEffect(musicManager.isPlaying ? 1 : 0.85)
-            
-            albumArtDarkOverlay
         }
-    }
-
-    private var albumArtDarkOverlay: some View {
-        Rectangle()
-            .aspectRatio(1, contentMode: .fit)
-            .foregroundColor(Color.black)
-            .opacity(musicManager.isPlaying ? 0 : 0.8)
-            .blur(radius: 50)
-    }
-
-    private var albumArtImage: some View {
-        Color.clear
-            .aspectRatio(1, contentMode: .fit)
-            .overlay {
-                DynamicIslandArtworkSourceView(
-                    cornerRadius: albumArtCornerRadius,
-                    contentMode: .fit
-                )
-            }
-            .matchedGeometryEffect(id: "albumArt", in: albumArtNamespace)
-        .clipped()
-    }
-
-    @ViewBuilder
-    private var appIconOverlay: some View {
-        if vm.notchState == .open && !musicManager.usingAppIconForArtwork {
-            AppIcon(for: musicManager.bundleIdentifier ?? "com.apple.Music")
-                .resizable()
-                .scaledToFill()
-                .frame(width: 36, height: 36)
-                .offset(x: 10, y: 10)
-                .transition(.scale.combined(with: .opacity).animation(.bouncy.delay(0.3)))
-                .zIndex(2)
-        }
+        .buttonStyle(.plain)
+        .frame(width: 84, height: 84)
+        .accessibilityLabel("Open media app")
     }
 }
 
@@ -299,7 +211,7 @@ struct MusicControlsView: View {
     private let skipMagnitude: CGFloat = 6
 
     var body: some View {
-        VStack(alignment: .leading) {
+        VStack(alignment: .leading, spacing: 6) {
             songInfoAndSlider
             if shouldShowControlHUDRow {
                 controlHUDRow
@@ -330,16 +242,16 @@ struct MusicControlsView: View {
             MusicTitleMarqueeView(
                 text: musicManager.songTitle,
                 isExplicit: musicManager.isCurrentTrackExplicit,
-                font: .headline,
-                nsFont: .headline,
+                font: .system(size: 13, weight: .semibold),
+                nsFont: .systemFont(ofSize: 13, weight: .semibold),
                 textColor: .white,
                 frameWidth: width,
                 badgeHeight: 14
             )
             MarqueeText(
                 $musicManager.artistName,
-                font: .headline,
-                nsFont: .headline,
+                font: .system(size: 12, weight: .medium),
+                nsFont: .systemFont(ofSize: 12, weight: .medium),
                 textColor: appearance.accentColor.opacity(0.85),
                 frameWidth: width
             )
@@ -394,13 +306,18 @@ struct MusicControlsView: View {
                 elapsedTime: musicManager.elapsedTime,
                 playbackRate: musicManager.playbackRate,
                 isPlaying: musicManager.isPlaying,
-                isLiveStream: musicManager.isLiveStream
-            ) { newValue in
-                guard !musicManager.isLiveStream else { return }
-                MusicManager.shared.seek(to: newValue)
-            }
-            .padding(.top, 5)
-            .frame(height: 36)
+                isLiveStream: musicManager.isLiveStream,
+                onValueChange: { newValue in
+                    guard !musicManager.isLiveStream else { return }
+                    MusicManager.shared.seek(to: newValue)
+                },
+                labelLayout: .inline,
+                trailingLabel: .remaining,
+                restingTrackHeight: 4,
+                draggingTrackHeight: 8
+            )
+            .padding(.top, 3)
+            .frame(height: 20)
         }
     }
 
@@ -411,9 +328,7 @@ struct MusicControlsView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .center)
-        .background {
-            if elementStyle != .subtle { NotchElementSurface(cornerRadius: 12) }
-        }
+
     }
 
     private var shouldShowControlHUDRow: Bool {
@@ -580,7 +495,7 @@ struct MusicControlsView: View {
             HoverButton(
                 icon: musicManager.isPlaying ? (musicManager.isLiveStream ? "stop.fill" : "pause.fill") : "play.fill",
                 iconColor: appearance.accentColor,
-                scale: .large
+                scale: .medium
             ) {
                 MusicManager.shared.togglePlay()
             }
@@ -697,7 +612,6 @@ struct NotchHomeView: View {
     @ObservedObject private var musicManager = MusicManager.shared
     @Default(.showStandardMediaControls) private var showStandardMediaControls
     @Default(.autoHideInactiveNotchMediaPlayer) private var autoHideInactiveNotchMediaPlayer
-    @State private var playbackAppName: String?
     let albumArtNamespace: Namespace.ID
 
     /// Whether the music player should actively display (enabled AND has real content).
@@ -711,9 +625,7 @@ struct NotchHomeView: View {
                 mainContent
             }
         }
-        .onChange(of: musicManager.bundleIdentifier, initial: true) { _, identifier in
-            playbackAppName = displayName(for: identifier)
-        }
+
     }
 
     private var mainContent: some View {
@@ -755,31 +667,9 @@ struct NotchHomeView: View {
             Text("Now Playing")
                 .font(.system(size: 12, weight: .semibold))
             Spacer(minLength: 8)
-            if let appName = playbackAppName {
-                Button { musicManager.openMusicApp() } label: {
-                    Label(appName, systemImage: "arrow.up.right")
-                        .labelStyle(.titleAndIcon)
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-                .help("Open \(appName)")
-            }
+            MediaSourcePicker()
         }
         .frame(height: 14)
-    }
-
-    private func displayName(for identifier: String?) -> String? {
-        guard let identifier else { return nil }
-        if let app = NSRunningApplication.runningApplications(withBundleIdentifier: identifier).first,
-           let name = app.localizedName {
-            return name
-        }
-        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: identifier) else { return nil }
-        let bundle = Bundle(url: url)
-        return bundle?.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String
-            ?? bundle?.object(forInfoDictionaryKey: "CFBundleName") as? String
-            ?? url.deletingPathExtension().lastPathComponent
     }
 
     private var minimalisticOverridePayload: ExtensionNotchExperiencePayload? {
