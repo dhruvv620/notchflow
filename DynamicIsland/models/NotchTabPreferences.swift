@@ -109,24 +109,27 @@ final class NotchTabPreferences: ObservableObject {
         let hidden = Array(Set(Defaults[.notchHiddenTabs].filter { known.contains($0) || $0.hasPrefix("extension-") })).sorted()
         if Defaults[.notchHiddenTabs] != hidden { Defaults[.notchHiddenTabs] = hidden }
 
-        Publishers.MergeMany([
-            Defaults.publisher(.notchTabOrder, options: []).map { _ in true }.eraseToAnyPublisher(),
-            Defaults.publisher(.notchHiddenTabs, options: []).map { _ in true }.eraseToAnyPublisher(),
-            Defaults.publisher(.dynamicShelf, options: []).map { _ in true }.eraseToAnyPublisher(),
-            Defaults.publisher(.enableTimerFeature, options: []).map { _ in true }.eraseToAnyPublisher(),
-            Defaults.publisher(.timerDisplayMode, options: []).map { _ in true }.eraseToAnyPublisher(),
-            Defaults.publisher(.enableStatsFeature, options: []).map { _ in true }.eraseToAnyPublisher(),
-            Defaults.publisher(.enableLLMUsageFeature, options: []).map { _ in true }.eraseToAnyPublisher(),
-            Defaults.publisher(.enableNotes, options: []).map { _ in true }.eraseToAnyPublisher(),
-            Defaults.publisher(.enableClipboardManager, options: []).map { _ in true }.eraseToAnyPublisher(),
-            Defaults.publisher(.enableRemindersFeature, options: []).map { _ in true }.eraseToAnyPublisher(),
-            Defaults.publisher(.showCalendar, options: []).map { _ in true }.eraseToAnyPublisher(),
-            Defaults.publisher(.enableTerminalFeature, options: []).map { _ in true }.eraseToAnyPublisher(),
-            Defaults.publisher(.enableMinimalisticUI, options: []).map { _ in true }.eraseToAnyPublisher(),
-            Defaults.publisher(.enableThirdPartyExtensions, options: []).map { _ in true }.eraseToAnyPublisher(),
-            Defaults.publisher(.enableExtensionNotchExperiences, options: []).map { _ in true }.eraseToAnyPublisher(),
-            Defaults.publisher(.enableExtensionNotchTabs, options: []).map { _ in true }.eraseToAnyPublisher()
-        ]).receive(on: RunLoop.main).sink { [weak self] _ in
+        // Keep each generic Defaults publisher in a separate expression so
+        // Swift can type-check feature additions without one large inference graph.
+        var changes: [AnyPublisher<Bool, Never>] = []
+        changes.append(Defaults.publisher(.notchTabOrder, options: []).map { _ in true }.eraseToAnyPublisher())
+        changes.append(Defaults.publisher(.notchHiddenTabs, options: []).map { _ in true }.eraseToAnyPublisher())
+        changes.append(Defaults.publisher(.dynamicShelf, options: []).map { _ in true }.eraseToAnyPublisher())
+        changes.append(Defaults.publisher(.enableTimerFeature, options: []).map { _ in true }.eraseToAnyPublisher())
+        changes.append(Defaults.publisher(.timerDisplayMode, options: []).map { _ in true }.eraseToAnyPublisher())
+        changes.append(Defaults.publisher(.enableStatsFeature, options: []).map { _ in true }.eraseToAnyPublisher())
+        changes.append(Defaults.publisher(.enableLLMUsageFeature, options: []).map { _ in true }.eraseToAnyPublisher())
+        changes.append(Defaults.publisher(.enableNotes, options: []).map { _ in true }.eraseToAnyPublisher())
+        changes.append(Defaults.publisher(.enableClipboardManager, options: []).map { _ in true }.eraseToAnyPublisher())
+        changes.append(Defaults.publisher(.enableRemindersFeature, options: []).map { _ in true }.eraseToAnyPublisher())
+        changes.append(Defaults.publisher(.showCalendar, options: []).map { _ in true }.eraseToAnyPublisher())
+        changes.append(Defaults.publisher(.enableTerminalFeature, options: []).map { _ in true }.eraseToAnyPublisher())
+        changes.append(Defaults.publisher(.enableMinimalisticUI, options: []).map { _ in true }.eraseToAnyPublisher())
+        changes.append(Defaults.publisher(.enableThirdPartyExtensions, options: []).map { _ in true }.eraseToAnyPublisher())
+        changes.append(Defaults.publisher(.enableExtensionNotchExperiences, options: []).map { _ in true }.eraseToAnyPublisher())
+        changes.append(Defaults.publisher(.enableExtensionNotchTabs, options: []).map { _ in true }.eraseToAnyPublisher())
+        Publishers.MergeMany(changes)
+            .receive(on: RunLoop.main).sink { [weak self] _ in
             self?.revision += 1
             NotificationCenter.default.post(name: .notchTabsDidChange, object: nil)
         }.store(in: &subscriptions)
