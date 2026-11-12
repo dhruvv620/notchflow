@@ -78,8 +78,14 @@ final class NotchInputRegionProbe: NSView {
     }
 
     private var interactionRect: CGRect {
-        NotchInputRegionPolicy.interactionRect(in: bounds, isExpanded: isExpanded,
-                                              collapsedSize: lastCollapsedSize ?? collapsedSize)
+        let closedTarget: CGSize? = collapsedSize.map {
+            // Width is content-driven (timer labels and extension wings). Use
+            // its last real closed measurement, while current hover/HUD flags
+            // immediately supply the correct height when closing.
+            CGSize(width: lastCollapsedSize?.width ?? $0.width, height: $0.height)
+        } ?? lastCollapsedSize
+        return NotchInputRegionPolicy.interactionRect(in: bounds, isExpanded: isExpanded,
+                                                     collapsedSize: closedTarget)
     }
 
     func contains(screenPoint: NSPoint) -> Bool {

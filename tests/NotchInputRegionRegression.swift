@@ -26,6 +26,13 @@ struct NotchInputRegionRegression {
                                                             isExpanded: false,
                                                             collapsedSize: CGSize(width: 220, height: 0))
         try require(hidden.width == 220 && hidden.isEmpty, "Zero-height notch must retain hover width without capturing clicks")
+        let hovered = NotchInputRegionPolicy.interactionRect(in: expanded, isExpanded: false,
+                                                             collapsedSize: CGSize(width: 228, height: 40))
+        try require(hovered.contains(CGPoint(x: 320, y: 36)), "Visible closed hover growth became pass-through")
+        let battery = NotchInputRegionPolicy.interactionRect(in: expanded, isExpanded: false,
+                                                             collapsedSize: CGSize(width: 398, height: 115))
+        try require(battery.contains(CGPoint(x: 320, y: 100)), "Visible standard battery HUD became pass-through")
+        try require(!battery.contains(CGPoint(x: 320, y: 180)), "Closed battery HUD retained expanded input below its visible surface")
         let shape = NotchShape(topCornerRadius: 6, bottomCornerRadius: 14).path(in: collapsed)
         try require(shape.contains(CGPoint(x: collapsed.midX, y: 15)), "Closed shape rejected its center")
         try require(!shape.contains(CGPoint(x: collapsed.minX + 1, y: 15)), "Transparent clipped edge captured a click")

@@ -325,6 +325,33 @@ struct ContentView: View {
         return vm.effectiveClosedNotchHeight == 0 ? zeroHeightHoverPadding : 0
     }
 
+    /// A conservative closing target until the visible background reports its
+    /// measured closed bounds. Include hover growth and the temporary battery
+    /// HUD's real dimensions rather than treating every closed surface as the
+    /// physical camera cutout.
+    private var closedInputFallbackSize: CGSize {
+        let hoverGrowth: CGFloat = isHovering ? 8 : 0
+        let baseHeight = vm.effectiveClosedNotchHeight
+        let closedPadding = activeCornerRadiusInsets.closed.bottom * 2
+        var width = vm.closedNotchSize.width + baseHeight * 2 + closedPadding
+        var height = baseHeight + hoverGrowth
+
+        if isBatteryHUDVisibleOnCurrentScreen, let kind = batteryModel.activeTemporaryHUDKind {
+            let batteryWidth = vm.closedNotchSize.width + hoverGrowth
+            switch (kind, resolvedBatteryNotificationStyle(for: kind)) {
+            case (.charging, _), (.lowBattery, .compact), (.fullBattery, .compact):
+                width = batteryWidth + 180 + closedPadding
+            case (.lowBattery, .standard):
+                width = batteryWidth + 150 + closedPadding
+                height += 75
+            case (.fullBattery, .standard):
+                width = batteryWidth + 140 + closedPadding
+                height += 70
+            }
+        }
+        return CGSize(width: max(0, width), height: max(0, height))
+    }
+
     private var notchBottomPadding: CGFloat {
         currentShadowPadding + bodyHoverAreaPadding
     }
@@ -546,10 +573,7 @@ struct ContentView: View {
                     shape: resolvedClipShape,
                     isExpanded: vm.notchState == .open,
                     enabled: interactionsEnabled,
-                    collapsedSize: CGSize(
-                        width: vm.closedNotchSize.width + vm.effectiveClosedNotchHeight * 2 + 28,
-                        height: vm.effectiveClosedNotchHeight
-                    ),
+                    collapsedSize: closedInputFallbackSize,
                     onHover: handleHover
                 )
             }
