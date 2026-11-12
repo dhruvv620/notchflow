@@ -26,6 +26,7 @@ import AppKit
 // Lyrics are shown/hidden only via Defaults[.enableLyrics] in settings. Inline display is used in the player views.
 
 struct MinimalisticMusicPlayerView: View {
+    @Default(.notchElementStyle) private var elementStyle
     @ObservedObject private var appearance = NotchAppearanceModel.shared
     @EnvironmentObject var vm: DynamicIslandViewModel
     let albumArtNamespace: Namespace.ID
@@ -828,6 +829,9 @@ private struct MinimalisticReminderDetailsView: View {
         }
         .frame(maxWidth: .infinity, alignment: .center)
         .padding(.top, 2)
+        .background {
+            if elementStyle != .subtle { NotchElementSurface(cornerRadius: 12) }
+        }
     }
 
     private var shouldShowControlHUDRow: Bool {

@@ -93,7 +93,7 @@ struct NotchTimerView: View {
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(14)
-                    .background(Color.white.opacity(0.05))
+                    .background { NotchElementSurface(cornerRadius: 14) }
                     .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             } else {
                 let computedHeight = CGFloat(timerPresets.count) * 60 + 4
@@ -320,7 +320,7 @@ struct NotchTimerView: View {
             }
         }
         .padding(12)
-        .background(Color.white.opacity(0.04))
+        .background { NotchElementSurface(cornerRadius: 14) }
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
@@ -611,6 +611,7 @@ private struct DurationInputRow: View {
 }
 
 private struct DurationField: View {
+    @ObservedObject private var appearance = NotchAppearanceModel.shared
     let label: String
     @Binding var value: Int
     let range: ClosedRange<Int>
@@ -637,7 +638,7 @@ private struct DurationField: View {
                 .foregroundColor(.white)
                 .tint(appearance.accentColor)
                 .frame(width: width, height: 46)
-                .background(Color.white.opacity(0.08))
+                .background { NotchElementSurface(cornerRadius: 12) }
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
 
             Text(label)

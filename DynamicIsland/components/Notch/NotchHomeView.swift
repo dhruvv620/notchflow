@@ -122,6 +122,8 @@ private struct DynamicIslandArtworkVideoView: NSViewRepresentable {
 }
 
 struct DynamicIslandArtworkSourceView: View {
+    @Default(.notchReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @ObservedObject private var musicManager = MusicManager.shared
     @Default(.showLiveCanvasInDynamicIsland) private var showLiveCanvasInDynamicIsland
 
@@ -129,7 +131,7 @@ struct DynamicIslandArtworkSourceView: View {
     let contentMode: ContentMode
 
     private var liveCanvasURL: URL? {
-        guard showLiveCanvasInDynamicIsland else { return nil }
+        guard showLiveCanvasInDynamicIsland, !reduceMotion, !systemReduceMotion else { return nil }
         return musicManager.videoArtworkURL
     }
 
@@ -277,6 +279,7 @@ struct AlbumArtView: View {
 }
 
 struct MusicControlsView: View {
+    @Default(.notchElementStyle) private var elementStyle
     @ObservedObject private var appearance = NotchAppearanceModel.shared
     @EnvironmentObject var vm: DynamicIslandViewModel
     @ObservedObject var musicManager = MusicManager.shared
@@ -408,6 +411,9 @@ struct MusicControlsView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .center)
+        .background {
+            if elementStyle != .subtle { NotchElementSurface(cornerRadius: 12) }
+        }
     }
 
     private var shouldShowControlHUDRow: Bool {

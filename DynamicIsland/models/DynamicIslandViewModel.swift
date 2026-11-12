@@ -357,9 +357,18 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
         focusClipboardTabIfNeeded()
     }
     
+    func refreshAppearanceSize() {
+        guard notchState == .open else { return }
+        notchSize = calculateDynamicNotchSize()
+    }
+
     private func calculateDynamicNotchSize() -> CGSize {
         let baseSize = Defaults[.enableMinimalisticUI] ? minimalisticOpenNotchSize(isDynamicIslandMode: shouldUseDynamicIslandMode(for: screen)) : openNotchSize
         var adjustedSize = baseSize
+
+        if coordinator.currentView == .timer {
+            return CGSize(width: baseSize.width, height: max(baseSize.height, 250))
+        }
 
         if coordinator.currentView == .reminders {
             return baseSize

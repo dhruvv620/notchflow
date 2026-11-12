@@ -154,6 +154,18 @@ func minimalisticOpenNotchSize(isDynamicIslandMode: Bool) -> CGSize {
         size.height = 144 // Exact height of the minimalistic music player view
     }
 
+    let maxWidth = maxAllowedNotchWidth()
+    switch Defaults[.notchSizePreset] {
+    case .compact:
+        break // Keep the upstream compact dimensions for each display style.
+    case .spacious:
+        size.width = min(size.width + 140, maxWidth)
+        size.height += 80
+    case .custom:
+        size.width = min(max(Defaults[.openNotchWidth], min(480, maxWidth)), maxWidth)
+        size.height = CGFloat(min(max(Defaults[.notchCustomHeight], 200), 420))
+    }
+
     if Defaults[.enableLyrics] {
         size.height += minimalisticLyricsExtraHeight
     }

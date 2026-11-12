@@ -165,7 +165,7 @@ struct ContentView: View {
         }
 
         if coordinator.currentView == .timer {
-            return CGSize(width: baseSize.width, height: 250) // Extra height for timer presets
+            return CGSize(width: baseSize.width, height: max(baseSize.height, 250)) // Preserve custom height while reserving room for presets
         }
         
         if coordinator.currentView == .notes {

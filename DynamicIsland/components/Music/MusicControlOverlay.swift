@@ -20,6 +20,7 @@ import SwiftUI
 import Defaults
 
 struct MusicControlOverlay: View {
+    @Default(.notchElementStyle) private var elementStyle
     @ObservedObject private var appearance = NotchAppearanceModel.shared
     let notchHeight: CGFloat
     let cornerRadius: CGFloat
@@ -156,8 +157,10 @@ struct MusicControlOverlay: View {
         .frame(height: notchHeight)
         .frame(minWidth: buttonSide * 3.2)
         .background {
-            RoundedRectangle(cornerRadius: windowCornerRadius, style: .continuous)
-            .fill(Color.black)
+            ZStack {
+                RoundedRectangle(cornerRadius: windowCornerRadius, style: .continuous).fill(Color.black)
+                if elementStyle != .subtle { NotchElementSurface(cornerRadius: windowCornerRadius) }
+            }
         }
         .compositingGroup()
         .animation(.smooth(duration: 0.2), value: musicManager.isPlaying)

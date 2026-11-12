@@ -496,7 +496,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // Use a consistent height for different view types
         if coordinator.currentView == .timer {
-            baseSize.height = 250 // Extra space for timer presets
+            baseSize.height = max(baseSize.height, 250) // Preserve custom height while reserving room for presets
         } else if coordinator.currentView == .notes {
             let preferredHeight = coordinator.notesLayoutState.preferredHeight
             baseSize.height = max(baseSize.height, preferredHeight)
@@ -709,20 +709,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self?.debouncedUpdateWindowSize()
         }.store(in: &cancellables)
 
-        Defaults.publisher(.openNotchWidth, options: []).sink { [weak self] _ in
-            self?.debouncedUpdateWindowSize()
-        }.store(in: &cancellables)
-
         Defaults.publisher(.enableRemindersFeature, options: []).sink { [weak self] _ in
             self?.debouncedUpdateWindowSize()
         }.store(in: &cancellables)
 
         Publishers.MergeMany([
+            Defaults.publisher(.openNotchWidth, options: []).map { _ in true }.eraseToAnyPublisher(),
             Defaults.publisher(.notchSizePreset, options: []).map { _ in true }.eraseToAnyPublisher(),
             Defaults.publisher(.notchCustomHeight, options: []).map { _ in true }.eraseToAnyPublisher()
         ]).receive(on: RunLoop.main).sink { [weak self] _ in
             enforceMinimumNotchWidth()
-            self?.updateWindowSizeForTabSwitch()
+            guard let self else { return }
+            self.vm.refreshAppearanceSize()
+            for viewModel in self.viewModels.values { viewModel.refreshAppearanceSize() }
+            self.updateWindowSizeForTabSwitch()
         }.store(in: &cancellables)
 
         // Observe terminal settings changes
