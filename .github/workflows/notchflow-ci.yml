@@ -13,6 +13,24 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  foundation-policy:
+    name: Date parsing and clipboard policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    container: swift:6.2
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Compile and run deterministic date parser checks
+        run: |
+          swiftc -swift-version 5 -parse-as-library DynamicIsland/helpers/ReminderDateParser.swift tests/ReminderDateParserRegression.swift -o /tmp/reminder-date-tests
+          /tmp/reminder-date-tests
+      - name: Compile and run clipboard policy checks
+        run: |
+          swiftc -swift-version 5 -parse-as-library DynamicIsland/helpers/CompactClipboardPolicy.swift tests/CompactClipboardRegression.swift -o /tmp/clipboard-policy-tests
+          /tmp/clipboard-policy-tests
+
   build:
     name: macOS — ${{ matrix.configuration }}
     runs-on: ${{ matrix.os }}
@@ -61,6 +79,15 @@ jobs:
 
       - name: Validate privacy configuration
         run: python3 -m unittest tests.test_privacy_configuration
+
+      - name: Check reminder date parsing
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcrun swiftc -swift-version 5 -parse-as-library \
+            DynamicIsland/helpers/ReminderDateParser.swift \
+            tests/ReminderDateParserRegression.swift -o "$RUNNER_TEMP/ReminderDateParserRegression"
+          "$RUNNER_TEMP/ReminderDateParserRegression"
 
       - name: Check compact clipboard policy
         shell: bash

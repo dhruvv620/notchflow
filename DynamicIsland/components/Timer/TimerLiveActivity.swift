@@ -28,6 +28,7 @@ typealias PlatformFont = UIFont
 #endif
 
 struct TimerLiveActivity: View {
+    @ObservedObject private var appearance = NotchAppearanceModel.shared
     @EnvironmentObject var vm: DynamicIslandViewModel
     @ObservedObject var timerManager = TimerManager.shared
     @ObservedObject var lockScreenManager = LockScreenManager.shared
@@ -44,9 +45,6 @@ struct TimerLiveActivity: View {
     @Default(.timerShowsProgress) private var showsProgress
     @Default(.timerShowsLabel) private var showsLabel
     @Default(.timerProgressStyle) private var progressStyle
-    @Default(.timerIconColorMode) private var colorMode
-    @Default(.timerSolidColor) private var solidColor
-    @Default(.timerPresets) private var timerPresets
     @Default(.timerControlWindowEnabled) private var controlWindowEnabled
     @Default(.enableMinimalisticUI) private var enableMinimalisticUI
     
@@ -151,12 +149,7 @@ struct TimerLiveActivity: View {
     }
 
     private var glyphColor: Color {
-        switch colorMode {
-        case .adaptive:
-            return activePresetColor ?? timerManager.timerColor
-        case .solid:
-            return solidColor
-        }
+        timerManager.isOvertime ? .red : appearance.accentColor
     }
 
     private var showsRingProgress: Bool {
@@ -173,11 +166,6 @@ struct TimerLiveActivity: View {
 
     private var showsInfoSection: Bool {
         shouldDisplayLabel || (showsBarProgress && !showsCountdown)
-    }
-
-    private var activePresetColor: Color? {
-        guard let presetId = timerManager.activePresetId else { return nil }
-        return timerPresets.first { $0.id == presetId }?.color
     }
 
     private var middleSectionWidth: CGFloat {
@@ -481,7 +469,7 @@ struct TimerLiveActivity: View {
         return VStack(spacing: 4) {
             Text(timerManager.formattedRemainingTime())
                 .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                .foregroundColor(timerManager.isOvertime ? .red : .white)
+                .foregroundColor(timerManager.isOvertime ? .red : appearance.accentColor)
                 .lineLimit(1)
                 .fixedSize(horizontal: true, vertical: false)
                 .contentTransition(.numericText())

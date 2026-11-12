@@ -6,6 +6,7 @@ import SwiftUI
 
 /// Recent copies stay inside the existing notch bounds; pagination replaces expansion.
 struct CompactClipboardView: View {
+    @ObservedObject private var appearance = NotchAppearanceModel.shared
     @EnvironmentObject private var vm: DynamicIslandViewModel
     @ObservedObject private var manager = ClipboardManager.shared
     @Default(.enableClipboardManager) private var enabled
@@ -113,9 +114,9 @@ struct CompactClipboardView: View {
                 if value != .all { Image(systemName: value.symbol).font(.system(size: 9)) }
                 Text(value.label).font(.system(size: 10, weight: .medium))
             }
-            .foregroundStyle(filter == value ? .black : .white.opacity(0.8))
+            .foregroundStyle(filter == value ? appearance.accentForegroundColor : .white.opacity(0.8))
             .padding(.horizontal, 7).padding(.vertical, 4)
-            .background(filter == value ? Color.white : Color.white.opacity(0.07), in: Capsule())
+            .background(filter == value ? appearance.accentColor : Color.white.opacity(0.07), in: Capsule())
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Filter clipboard: \(value.label)")
@@ -149,7 +150,7 @@ struct CompactClipboardView: View {
                 .padding(.horizontal, 7).padding(.vertical, 4)
                 .background(.black.opacity(0.3))
             }
-            .background(Color.white.opacity(0.045))
+            .background(NotchElementSurface(cornerRadius: 10))
             .clipShape(RoundedRectangle(cornerRadius: 10))
             .overlay {
                 RoundedRectangle(cornerRadius: 10)

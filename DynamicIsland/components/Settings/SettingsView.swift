@@ -818,14 +818,22 @@ struct SettingsView: View {
             // Appearance
             SettingsSearchEntry(tab: .appearance, title: "Main screen style", keywords: ["dynamic island", "pill", "non-notch", "display style", "notch style"], highlightID: SettingsTab.appearance.highlightID(for: "Main screen style")),
             SettingsSearchEntry(tab: .appearance, title: "Settings icon in notch", keywords: ["settings button", "toolbar"], highlightID: SettingsTab.appearance.highlightID(for: "Settings icon in notch")),
-            SettingsSearchEntry(tab: .appearance, title: "Liquid Glass expanded notch", keywords: ["liquid", "glass", "material", "transparency", "notch"], highlightID: SettingsTab.appearance.highlightID(for: "Liquid Glass expanded notch")),
+            SettingsSearchEntry(tab: .appearance, title: "Element style", keywords: ["subtle", "graphite", "gradient", "cards"], highlightID: SettingsTab.appearance.highlightID(for: "Element style")),
+            SettingsSearchEntry(tab: .appearance, title: "Island size", keywords: ["compact", "spacious", "custom", "height", "width"], highlightID: SettingsTab.appearance.highlightID(for: "Island size")),
+            SettingsSearchEntry(tab: .appearance, title: "Custom island size", keywords: ["width", "height", "resize"], highlightID: SettingsTab.appearance.highlightID(for: "Custom island size")),
+            SettingsSearchEntry(tab: .appearance, title: "Corner radius", keywords: ["radius", "rounded", "shape"], highlightID: SettingsTab.appearance.highlightID(for: "Corner radius")),
+            SettingsSearchEntry(tab: .appearance, title: "Island background", keywords: ["black", "dynamic", "glass", "liquid", "frosted", "material"], highlightID: SettingsTab.appearance.highlightID(for: "Island background")),
+            SettingsSearchEntry(tab: .appearance, title: "Island outline", keywords: ["border", "stroke", "outline"], highlightID: SettingsTab.appearance.highlightID(for: "Island outline")),
+            SettingsSearchEntry(tab: .appearance, title: "Notch accent color", keywords: ["adaptive", "artwork", "fixed", "system", "accent", "slider", "playback", "visualizer"], highlightID: SettingsTab.appearance.highlightID(for: "Notch accent color")),
+            SettingsSearchEntry(tab: .appearance, title: "Artwork glow", keywords: ["artwork", "glow", "shadow"], highlightID: SettingsTab.appearance.highlightID(for: "Artwork glow")),
+            SettingsSearchEntry(tab: .appearance, title: "Reduce notch motion", keywords: ["animation", "accessibility", "motion"], highlightID: SettingsTab.appearance.highlightID(for: "Reduce notch motion")),
+            SettingsSearchEntry(tab: .appearance, title: "Activity indicators", keywords: ["dots", "icons", "carousel", "indicator"], highlightID: SettingsTab.appearance.highlightID(for: "Activity indicators")),
             SettingsSearchEntry(tab: .appearance, title: "Enable window shadow", keywords: ["shadow", "appearance"], highlightID: SettingsTab.appearance.highlightID(for: "Enable window shadow")),
             SettingsSearchEntry(tab: .appearance, title: "Corner radius scaling", keywords: ["corner radius", "shape"], highlightID: SettingsTab.appearance.highlightID(for: "Corner radius scaling")),
             SettingsSearchEntry(tab: .appearance, title: "Use simpler close animation", keywords: ["close animation", "notch"], highlightID: SettingsTab.appearance.highlightID(for: "Use simpler close animation")),
-            SettingsSearchEntry(tab: .appearance, title: "Notch Width", keywords: ["expanded notch", "width", "resize"], highlightID: SettingsTab.appearance.highlightID(for: "Expanded notch width")),
+            SettingsSearchEntry(tab: .appearance, title: "Closed notch / pill width", keywords: ["closed notch", "pill", "width"], highlightID: SettingsTab.appearance.highlightID(for: "Closed notch / pill width")),
             SettingsSearchEntry(tab: .appearance, title: "Enable colored spectrograms", keywords: ["spectrogram", "audio"], highlightID: SettingsTab.appearance.highlightID(for: "Enable colored spectrograms")),
             SettingsSearchEntry(tab: .appearance, title: "Enable blur effect behind album art", keywords: ["blur", "album art"], highlightID: SettingsTab.appearance.highlightID(for: "Enable blur effect behind album art")),
-            SettingsSearchEntry(tab: .appearance, title: "Slider color", keywords: ["slider", "accent"], highlightID: SettingsTab.appearance.highlightID(for: "Slider color")),
             SettingsSearchEntry(tab: .appearance, title: "Enable Dynamic mirror", keywords: ["mirror", "reflection"], highlightID: SettingsTab.appearance.highlightID(for: "Enable Dynamic mirror")),
             SettingsSearchEntry(tab: .appearance, title: "Mirror shape", keywords: ["mirror shape", "circle", "rectangle"], highlightID: SettingsTab.appearance.highlightID(for: "Mirror shape")),
             SettingsSearchEntry(tab: .appearance, title: "Idle Animation", keywords: ["face animation", "idle", "cool face"], highlightID: SettingsTab.appearance.highlightID(for: "Idle Animation")),
@@ -4281,13 +4289,11 @@ struct Appearance: View {
     @ObservedObject var webcamManager = WebcamManager.shared
     @Default(.mirrorShape) var mirrorShape
     @Default(.selectedCameraID) var selectedCameraID
-    @Default(.sliderColor) var sliderColor
     @Default(.useMusicVisualizer) var useMusicVisualizer
     @Default(.customVisualizers) var customVisualizers
     @Default(.selectedVisualizer) var selectedVisualizer
     @Default(.customAppIcons) private var customAppIcons
     @Default(.selectedAppIconID) private var selectedAppIconID
-    @Default(.openNotchWidth) var openNotchWidth
     @Default(.closedNotchWidth) var closedNotchWidth
     @Default(.customizePhysicalNotchWidth) var customizePhysicalNotchWidth
     @Default(.enableMinimalisticUI) var enableMinimalisticUI
@@ -4316,15 +4322,6 @@ struct Appearance: View {
     private var mainScreenHasPhysicalNotch: Bool {
         guard let screen = NSScreen.main else { return false }
         return screen.safeAreaInsets.top > 0
-    }
-
-    private var notchWidthRange: ClosedRange<Double> {
-        let minW = Double(currentRecommendedMinimumNotchWidth())
-        let maxW = min(900, Double(maxAllowedNotchWidth()))
-        return minW...max(minW, maxW)
-    }
-    private var defaultOpenNotchWidth: CGFloat {
-        currentRecommendedMinimumNotchWidth()
     }
 
     private func highlightID(_ title: String) -> String {
@@ -4364,6 +4361,8 @@ struct Appearance: View {
 
     var body: some View {
         Form {
+            NotchAppearanceSettingsSection(highlightID: highlightID)
+
             Section {
                 Toggle("Always show tabs", isOn: $coordinator.alwaysShowTabs)
                 Defaults.Toggle(key: .settingsIconInNotch) {
@@ -4374,14 +4373,6 @@ struct Appearance: View {
                     Text("Enable window shadow")
                 }
                 .settingsHighlight(id: highlightID("Enable window shadow"))
-                Defaults.Toggle(key: .expandedNotchLiquidGlass) {
-                    Text("Liquid Glass expanded notch")
-                }
-                .settingsHighlight(id: highlightID("Liquid Glass expanded notch"))
-                Text("Keeps the original layout and the closed notch black. Uses Liquid Glass on macOS 26 or later and a frosted material on earlier versions. Reduce Transparency uses the classic black surface.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
                 Defaults.Toggle(key: .cornerRadiusScaling) {
                     Text("Corner radius scaling")
                 }
@@ -4499,19 +4490,13 @@ struct Appearance: View {
                     Text("Enable colored spectrograms")
                 }
                 .settingsHighlight(id: highlightID("Enable colored spectrograms"))
-                Defaults.Toggle(key: .playerColorTinting) {
-                    Text("Enable colored spectograms")
-                }
                 Defaults.Toggle(key: .lightingEffect) {
                     Text("Enable blur effect behind album art")
                 }
                 .settingsHighlight(id: highlightID("Enable blur effect behind album art"))
-                Picker("Slider color", selection: $sliderColor) {
-                    ForEach(SliderColorEnum.allCases, id: \.self) { option in
-                        Text(option.localizedName)
-                    }
-                }
-                .settingsHighlight(id: highlightID("Slider color"))
+                Text("Playback and visualizer accent colors are managed in the Accent section above.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             } header: {
                 Text("Media")
             }
@@ -4934,107 +4919,28 @@ struct Appearance: View {
         return false
     }
 
-    @ViewBuilder
     private func notchWidthControls() -> some View {
         Section {
-            let recommendedMin = currentRecommendedMinimumNotchWidth()
-            let tabCount = enabledStandardTabCount()
-            let dynamicRange = Double(recommendedMin)...900
-            
-            let closedRange = Double(80)...400
-            let minimalisticRange = Double(250)...600
-
-            let widthBinding = Binding<Double>(
-                get: { Double(openNotchWidth) },
-                set: { newValue in
-                    let clamped = min(max(newValue, dynamicRange.lowerBound), dynamicRange.upperBound)
-                    let value = CGFloat(clamped)
-                    if openNotchWidth != value {
-                        openNotchWidth = value
-                    }
-                }
-            )
-            
-            let closedWidthBinding = Binding<Double>(
+            Defaults.Toggle(key: .customizePhysicalNotchWidth) {
+                Text("Customize physical notch width")
+            }
+            .onChange(of: customizePhysicalNotchWidth) {
+                NotificationCenter.default.post(name: Notification.Name.notchHeightChanged, object: nil)
+            }
+            .settingsHighlight(id: highlightID("Customize physical notch width"))
+            Slider(value: Binding(
                 get: { Double(closedNotchWidth) },
-                set: { newValue in
-                    let clamped = min(max(newValue, closedRange.lowerBound), closedRange.upperBound)
-                    let value = CGFloat(clamped)
-                    if closedNotchWidth != value {
-                        closedNotchWidth = value
-                        NotificationCenter.default.post(name: Notification.Name.notchHeightChanged, object: nil)
-                    }
-                }
-            )
-
-            VStack(alignment: .leading, spacing: 10) {
-                Defaults.Toggle(key: .customizePhysicalNotchWidth) {
-                    Text("Customize physical notch width")
-                }
-                .onChange(of: customizePhysicalNotchWidth) {
-                    NotificationCenter.default.post(name: Notification.Name.notchHeightChanged, object: nil)
-                }
-                .settingsHighlight(id: highlightID("Customize physical notch width"))
-                
-                Slider(
-                    value: closedWidthBinding,
-                    in: closedRange,
-                    step: 5
-                ) {
-                    HStack {
-                        Text("Closed notch / pill width")
-                        Spacer()
-                        Text("\(Int(closedNotchWidth)) px")
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .settingsHighlight(id: highlightID("Closed notch / pill width"))
-
-                Divider().padding(.vertical, 4)
-
-                Slider(
-                    value: widthBinding,
-                    in: dynamicRange,
-                    step: 10
-                ) {
-                    HStack {
-                        Text("Expanded notch width")
-                        Spacer()
-                        Text("\(Int(openNotchWidth)) px")
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .disabled(enableMinimalisticUI)
-                .settingsHighlight(id: highlightID("Expanded notch width"))
-
+                set: { closedNotchWidth = CGFloat($0); NotificationCenter.default.post(name: Notification.Name.notchHeightChanged, object: nil) }
+            ), in: 80...400, step: 5) {
                 HStack {
-                    Text("\(tabCount) tab\(tabCount == 1 ? "" : "s") enabled · min \(Int(recommendedMin)) px")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    Text("Closed notch / pill width")
                     Spacer()
-                    Button("Reset Width") {
-                        openNotchWidth = recommendedMin
-                    }
-                    .disabled(abs(openNotchWidth - recommendedMin) < 0.5)
-                    .buttonStyle(.bordered)
+                    Text("\(Int(closedNotchWidth)) pt").foregroundStyle(.secondary)
                 }
-
-                let description = enableMinimalisticUI
-                ? String(localized: "Expanded width adjustments apply only to the standard notch layout. Disable Minimalistic UI to edit this value.")
-                : String(localized: "Recommended minimum width adjusts automatically based on the number of enabled tabs.")
-
-                Text(description)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
-            .onAppear {
-                enforceMinimumNotchWidth()
-            }
+            .settingsHighlight(id: highlightID("Closed notch / pill width"))
         } header: {
-            HStack {
-                Text("Notch Width")
-                customBadge(text: "Beta")
-            }
+            Text("Closed Notch")
         }
     }
 

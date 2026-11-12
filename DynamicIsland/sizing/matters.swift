@@ -28,11 +28,22 @@ let downloadSneakSize: CGSize = .init(width: 65, height: 1)
 let batterySneakSize: CGSize = .init(width: 160, height: 1)
 
 var openNotchSize: CGSize {
-    let storedWidth = Defaults[.openNotchWidth]
-    let minWidth = currentRecommendedMinimumNotchWidth()
     let maxWidth = maxAllowedNotchWidth()
-    let width = min(max(storedWidth, minWidth), maxWidth)
-    return .init(width: width, height: 200)
+    let minWidth = Defaults[.notchSizePreset] == .custom ? min(480, maxWidth) : currentRecommendedMinimumNotchWidth()
+    let desiredWidth: CGFloat
+    let height: CGFloat
+    switch Defaults[.notchSizePreset] {
+    case .compact:
+        desiredWidth = minWidth
+        height = 200
+    case .spacious:
+        desiredWidth = max(minWidth, 780)
+        height = 280
+    case .custom:
+        desiredWidth = Defaults[.openNotchWidth]
+        height = CGFloat(min(max(Defaults[.notchCustomHeight], 200), 420))
+    }
+    return .init(width: min(max(desiredWidth, minWidth), maxWidth), height: height)
 }
 
 /// Maximum notch width based on the current screen's point width.
@@ -115,8 +126,8 @@ func currentRecommendedMinimumNotchWidth() -> CGFloat {
 /// Only adjusts when not in minimalistic mode.
 func enforceMinimumNotchWidth() {
     guard !Defaults[.enableMinimalisticUI] else { return }
-    let minWidth = currentRecommendedMinimumNotchWidth()
     let maxWidth = maxAllowedNotchWidth()
+    let minWidth = Defaults[.notchSizePreset] == .custom ? min(480, maxWidth) : currentRecommendedMinimumNotchWidth()
     var width = Defaults[.openNotchWidth]
     if width < minWidth { width = minWidth }
     if width > maxWidth { width = maxWidth }
@@ -183,9 +194,7 @@ func notchTerminalBottomCornerRadii(
     if isDynamicIslandMode {
         let outer: CGFloat
         if notchState == .open {
-            outer = enableMinimalisticUI
-                ? minimalisticCornerRadiusInsets.opened.top
-                : dynamicIslandPillCornerRadiusInsets.opened
+            outer = CGFloat(Defaults[.notchCornerRadius])
         } else {
             outer = max(closedNotchHeight / 2, dynamicIslandPillCornerRadiusInsets.closed.standard)
         }
@@ -199,7 +208,7 @@ func notchTerminalBottomCornerRadii(
     }()
     let outerBottom: CGFloat
     if notchState == .open && cornerRadiusScaling {
-        outerBottom = active.opened.bottom
+        outerBottom = CGFloat(Defaults[.notchCornerRadius])
     } else {
         outerBottom = active.closed.bottom
     }

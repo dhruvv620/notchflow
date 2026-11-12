@@ -39,6 +39,9 @@ struct ContentView: View {
     @EnvironmentObject var vm: DynamicIslandViewModel
     @EnvironmentObject var webcamManager: WebcamManager
 
+    @ObservedObject private var appearance = NotchAppearanceModel.shared
+    @Default(.notchReduceMotion) private var notchReduceMotion
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @ObservedObject var coordinator = DynamicIslandViewCoordinator.shared
     @ObservedObject var musicManager = MusicManager.shared
     @ObservedObject var timerManager = TimerManager.shared
@@ -56,7 +59,6 @@ struct ContentView: View {
     @State private var downloadManager = DownloadManager.shared
     @ObservedObject var shelfState = ShelfStateViewModel.shared
     
-    @Default(.expandedNotchLiquidGlass) private var expandedNotchLiquidGlass
     @Default(.enableStatsFeature) var enableStatsFeature
     @Default(.showCpuGraph) var showCpuGraph
     @Default(.showMemoryGraph) var showMemoryGraph
@@ -357,11 +359,11 @@ struct ContentView: View {
     
     // Use minimalistic corner radius ONLY when opened, keep normal when closed
     private var activeCornerRadiusInsets: (opened: (top: CGFloat, bottom: CGFloat), closed: (top: CGFloat, bottom: CGFloat)) {
+        let selectedRadius = CGFloat(Defaults[.notchCornerRadius])
         if enableMinimalisticUI {
-            // Keep normal closed corner radius, use minimalistic when opened
-            return (opened: minimalisticCornerRadiusInsets.opened, closed: cornerRadiusInsets.closed)
+            return (opened: (top: selectedRadius, bottom: selectedRadius), closed: cornerRadiusInsets.closed)
         }
-        return cornerRadiusInsets
+        return (opened: (top: cornerRadiusInsets.opened.top, bottom: selectedRadius), closed: cornerRadiusInsets.closed)
     }
     
     private var currentShadowPadding: CGFloat {
@@ -372,7 +374,7 @@ struct ContentView: View {
         let topRadius = (vm.notchState == .open && Defaults[.cornerRadiusScaling])
             ? activeCornerRadiusInsets.opened.top
             : activeCornerRadiusInsets.closed.top
-        let bottomRadius = (vm.notchState == .open && Defaults[.cornerRadiusScaling])
+        let bottomRadius = (vm.notchState == .open)
             ? activeCornerRadiusInsets.opened.bottom
             : activeCornerRadiusInsets.closed.bottom
         return NotchShape(topCornerRadius: topRadius, bottomCornerRadius: bottomRadius)
@@ -434,9 +436,7 @@ struct ContentView: View {
     private var currentPillShape: DynamicIslandPillShape {
         let radius: CGFloat
         if vm.notchState == .open {
-            radius = enableMinimalisticUI
-                ? minimalisticCornerRadiusInsets.opened.top
-                : dynamicIslandPillCornerRadiusInsets.opened
+            radius = CGFloat(Defaults[.notchCornerRadius])
         } else {
             // Use half the closed height for a true capsule shape
             radius = max(vm.closedNotchSize.height / 2, dynamicIslandPillCornerRadiusInsets.closed.standard)
@@ -524,6 +524,14 @@ struct ContentView: View {
 
     var body: some View {
         installRootLifecycleHandlers(on: rootBodyView)
+            .tint(appearance.accentColor)
+            .accentColor(appearance.accentColor)
+            .transaction { transaction in
+                if notchReduceMotion || systemReduceMotion {
+                    transaction.animation = nil
+                    transaction.disablesAnimations = true
+                }
+            }
     }
 
     private var mainLayoutBase: some View {
@@ -535,9 +543,13 @@ struct ContentView: View {
                 ExpandedNotchSurface(
                     shape: resolvedClipShape,
                     isExpanded: vm.notchState == .open,
-                    useLiquidGlass: expandedNotchLiquidGlass,
                     cameraBandHeight: isDynamicIslandMode ? 0 : vm.effectiveClosedNotchHeight
                 )
+            }
+            .overlay(alignment: .bottom) {
+                if vm.notchState == .open && !enableMinimalisticUI {
+                    NotchPageIndicators().padding(.bottom, 2)
+                }
             }
             .clipShape(resolvedClipShape)
             .compositingGroup()
@@ -1254,7 +1266,7 @@ struct ContentView: View {
                             MusicTitleMarqueeView(
                                 text: musicManager.songTitle,
                                 isExplicit: musicManager.isCurrentTrackExplicit,
-                                textColor: Defaults[.coloredSpectrogram] ? Color(nsColor: musicManager.avgColor) : Color.gray,
+                                textColor: appearance.accentColor,
                                 minDuration: 0.4,
                                 frameWidth: max(0, (effectiveCenterWidth - vm.closedNotchSize.width) / 2 - 12),
                                 badgeHeight: 13
@@ -1265,7 +1277,7 @@ struct ContentView: View {
                             Text(musicManager.artistName)
                                 .lineLimit(1)
                                 .truncationMode(.tail)
-                                .foregroundStyle(Defaults[.coloredSpectrogram] ? Color(nsColor: musicManager.avgColor) : Color.gray)
+                                .foregroundStyle(appearance.accentColor)
                                 .padding(.trailing, 8)
                                 .opacity((coordinator.expandingView.show && coordinator.expandingView.type == .music && Defaults[.enableSneakPeek] && Defaults[.sneakPeekStyles] == .inline) ? 1 : 0)
                         } else if(coordinator.expandingView.show && coordinator.expandingView.type == .timer) {
@@ -1287,7 +1299,7 @@ struct ContentView: View {
                         } else if Defaults[.showSongMetadataInClosedNotch] && isNonNotchScreen && !musicManager.songTitle.isEmpty {
                             MarqueeText(
                                 .constant("\(musicManager.songTitle) • \(musicManager.artistName)"),
-                                textColor: Defaults[.coloredSpectrogram] ? Color(nsColor: musicManager.avgColor) : Color.gray,
+                                textColor: appearance.accentColor,
                                 minDuration: 3,
                                 frameWidth: max(0, effectiveCenterWidth - 16)
                             )
@@ -1560,7 +1572,7 @@ struct ContentView: View {
         let width = CGFloat(Defaults[.visualizerBarCount]) * 4
         if useMusicVisualizer || forceSpectrum {
             Rectangle()
-                .fill((Defaults[.coloredSpectrogram] ? Color(nsColor: musicManager.avgColor) : Color.gray).spectrogramGradient())
+                .fill(LinearGradient(colors: [appearance.accentColor, appearance.accentColor.opacity(0.45)], startPoint: .top, endPoint: .bottom))
                 .frame(width: 50, alignment: .center)
                 .matchedGeometryEffect(id: "spectrum", in: albumArtNamespace)
                 .mask {

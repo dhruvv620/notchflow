@@ -2,6 +2,10 @@ import SwiftUI
 import Defaults
 
 struct RealTimeWaveformScrubberView: View {
+    @ObservedObject private var appearance = NotchAppearanceModel.shared
+    @Default(.notchReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+    private var motionReduced: Bool { reduceMotion || systemReduceMotion }
     let color: Color
     let secondaryColor: Color?
     let progress: Double
@@ -19,7 +23,7 @@ struct RealTimeWaveformScrubberView: View {
                 
                 // Foreground (Played portion)
                 WaveformShape(magnitudes: magnitudes, minHeight: minHeight)
-                    .fill(Defaults[.sliderColor] == .albumArt && Defaults[.colorExtractionMode] == .vibrant ? AnyShapeStyle(color.spectrogramGradient(secondary: secondaryColor)) : AnyShapeStyle(color))
+                    .fill(appearance.accentColor)
                     .opacity(0.8)
                     .mask(
                         HStack {
@@ -37,9 +41,13 @@ struct RealTimeWaveformScrubberView: View {
         .onDisappear {
             stopTimer()
         }
+        .onChange(of: motionReduced) { _, reduced in
+            if reduced { stopTimer() } else { startTimer() }
+        }
     }
     
     private func startTimer() {
+        guard !motionReduced else { return }
         timer?.invalidate()
         let newTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { _ in
             let tapMagnitudes = AudioTap.shared.getSmoothedMagnitudes()

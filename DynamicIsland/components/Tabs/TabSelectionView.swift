@@ -44,6 +44,7 @@ struct TabModel: Identifiable {
 }
 
 struct TabSelectionView: View {
+    @ObservedObject private var appearance = NotchAppearanceModel.shared
     @ObservedObject var coordinator = DynamicIslandViewCoordinator.shared
     @ObservedObject private var extensionNotchExperienceManager = ExtensionNotchExperienceManager.shared
     @StateObject private var quickShareService = QuickShareService.shared
@@ -163,7 +164,7 @@ struct TabSelectionView: View {
         HStack(spacing: tabs.count > 4 ? 16 : 24) {
             ForEach(Array(tabs.enumerated()), id: \.element.id) { idx, tab in
                 let isSelected = isSelected(tab)
-                let activeAccent = tab.accentColor ?? .white
+                let activeAccent = tab.accentColor ?? appearance.accentColor
 
                 // Render the tab button
                 TabButton(label: tab.label, icon: tab.icon, selected: isSelected) {
@@ -179,7 +180,7 @@ struct TabSelectionView: View {
                 .background {
                     if isSelected {
                         Capsule()
-                            .fill((tab.accentColor ?? Color(nsColor: .secondarySystemFill)).opacity(0.25))
+                            .fill((tab.accentColor ?? appearance.accentColor).opacity(0.18))
                             .shadow(color: (tab.accentColor ?? .clear).opacity(0.4), radius: 8)
                             .matchedGeometryEffect(id: "capsule", in: animation)
                     } else {

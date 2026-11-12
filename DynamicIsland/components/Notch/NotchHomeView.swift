@@ -164,9 +164,11 @@ struct MusicPlayerView: View {
 }
 
 struct AlbumArtView: View {
+    @ObservedObject private var appearance = NotchAppearanceModel.shared
     @ObservedObject var musicManager = MusicManager.shared
     @ObservedObject var vm: DynamicIslandViewModel
     @Default(.showLiveCanvasInDynamicIsland) private var showLiveCanvasInDynamicIsland
+    @Default(.notchArtworkGlow) private var artworkGlow
     let albumArtNamespace: Namespace.ID
 
     private var usesLiveCanvasArtwork: Bool {
@@ -185,7 +187,7 @@ struct AlbumArtView: View {
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
-            if Defaults[.lightingEffect] {
+            if artworkGlow {
                 albumArtBackground
             }
             albumArtButton
@@ -211,7 +213,7 @@ struct AlbumArtView: View {
                     : (musicManager.isPlaying ? 0.5 : 0)
             )
             .shadow(
-                color: Color(nsColor: musicManager.avgColor).opacity(usesLiveCanvasArtwork ? 0.24 : 0.16),
+                color: appearance.accentColor.opacity(usesLiveCanvasArtwork ? 0.24 : 0.16),
                 radius: usesLiveCanvasArtwork ? 22 : 14,
                 x: 0,
                 y: 0
@@ -275,6 +277,7 @@ struct AlbumArtView: View {
 }
 
 struct MusicControlsView: View {
+    @ObservedObject private var appearance = NotchAppearanceModel.shared
     @EnvironmentObject var vm: DynamicIslandViewModel
     @ObservedObject var musicManager = MusicManager.shared
     @ObservedObject var coordinator = DynamicIslandViewCoordinator.shared
@@ -334,8 +337,7 @@ struct MusicControlsView: View {
                 $musicManager.artistName,
                 font: .headline,
                 nsFont: .headline,
-                textColor: Defaults[.playerColorTinting] ? Color(nsColor: musicManager.avgColor)
-                    .ensureMinimumBrightness(factor: 0.6) : .gray,
+                textColor: appearance.accentColor.opacity(0.85),
                 frameWidth: width
             )
             .fontWeight(.medium)
@@ -461,7 +463,7 @@ struct MusicControlsView: View {
                     }
                 ),
                 range: 0...1,
-                color: .white,
+                color: appearance.accentColor,
                 dragging: $hudDragging,
                 lastDragged: $hudLastDragged,
                 onValueChange: { newValue in
@@ -523,9 +525,7 @@ struct MusicControlsView: View {
         }
     }
 
-    private var brandAccentColor: Color {
-        musicManager.brandAccentColor
-    }
+    private var brandAccentColor: Color { appearance.accentColor }
 
     private var repeatIcon: String {
         switch musicManager.repeatMode {
@@ -541,7 +541,7 @@ struct MusicControlsView: View {
     private var repeatIconColor: Color {
         switch musicManager.repeatMode {
         case .off:
-            return .white
+            return appearance.accentColor.opacity(0.65)
         case .all, .one:
             return brandAccentColor
         }
@@ -573,6 +573,7 @@ struct MusicControlsView: View {
         case .playPause:
             HoverButton(
                 icon: musicManager.isPlaying ? (musicManager.isLiveStream ? "stop.fill" : "pause.fill") : "play.fill",
+                iconColor: appearance.accentColor,
                 scale: .large
             ) {
                 MusicManager.shared.togglePlay()
@@ -612,7 +613,7 @@ struct MusicControlsView: View {
         case .shuffle:
             HoverButton(
                 icon: "shuffle",
-                iconColor: musicManager.isShuffled ? brandAccentColor : .white,
+                iconColor: musicManager.isShuffled ? brandAccentColor : appearance.accentColor.opacity(0.65),
                 scale: .medium
             ) {
                 MusicManager.shared.toggleShuffle()
@@ -632,7 +633,7 @@ struct MusicControlsView: View {
         case .lyrics:
             HoverButton(
                 icon: enableLyrics ? "quote.bubble.fill" : "quote.bubble",
-                iconColor: enableLyrics ? brandAccentColor : .white,
+                iconColor: enableLyrics ? brandAccentColor : appearance.accentColor.opacity(0.65),
                 scale: .medium
             ) {
                 enableLyrics.toggle()
@@ -653,6 +654,7 @@ struct MusicControlsView: View {
     ) -> some View {
         HoverButton(
             icon: icon,
+            iconColor: appearance.accentColor,
             scale: .medium,
             pressEffect: press,
             externalTriggerToken: trigger?.token,
@@ -763,6 +765,7 @@ struct NotchHomeView: View {
 }
 
 struct MusicSliderView: View {
+    @ObservedObject private var appearance = NotchAppearanceModel.shared
     @Binding var sliderValue: Double
     @Binding var duration: Double
     @Binding var lastDragged: Date
@@ -904,22 +907,11 @@ struct MusicSliderView: View {
         )
     }
 
-    private var sliderTint: Color {//
-        switch Defaults[.sliderColor] {
-        case .albumArt:
-            return Color(nsColor: color).ensureMinimumBrightness(factor: 0.6)
-        case .accent:
-            return .accentColor
-        case .white:
-            return .white
-        }
-    }
+    // The notch-wide accent is authoritative for playback chrome. The input
+    // color remains part of this view's initializer for existing callers.
+    private var sliderTint: Color { appearance.accentColor }
 
-    private var timeLabelColor: Color {
-        Defaults[.playerColorTinting]
-            ? Color(nsColor: color).ensureMinimumBrightness(factor: 0.6)
-            : .gray
-    }
+    private var timeLabelColor: Color { appearance.accentColor.opacity(0.82) }
 
     private var trailingTimeText: String {
         switch trailingLabel {
@@ -1035,6 +1027,7 @@ struct CustomSlider: View {
 }
 
 private struct MediaOutputPickerButton: View {
+    @ObservedObject private var appearance = NotchAppearanceModel.shared
     @ObservedObject private var routeManager = AudioRouteManager.shared
     @StateObject private var volumeModel = MediaOutputVolumeViewModel()
     @State private var isPopoverPresented = false
@@ -1042,7 +1035,7 @@ private struct MediaOutputPickerButton: View {
     @EnvironmentObject private var vm: DynamicIslandViewModel
 
     var body: some View {
-        HoverButton(icon: buttonIcon, iconColor: .white, scale: .medium) {
+        HoverButton(icon: buttonIcon, iconColor: appearance.accentColor, scale: .medium) {
             isPopoverPresented.toggle()
             if isPopoverPresented {
                 routeManager.refreshDevices()
@@ -1087,6 +1080,7 @@ private struct MediaOutputPickerButton: View {
 }
 
 private struct AirPlayPickerButton: View {
+    @ObservedObject private var appearance = NotchAppearanceModel.shared
     @ObservedObject private var musicManager = MusicManager.shared
     @ObservedObject private var airPlayManager = AppleMusicAirPlayManager.shared
     @State private var isPopoverPresented = false
@@ -1098,7 +1092,7 @@ private struct AirPlayPickerButton: View {
     }
 
     var body: some View {
-        HoverButton(icon: "airplayaudio", iconColor: .white, scale: .medium) {
+        HoverButton(icon: "airplayaudio", iconColor: appearance.accentColor, scale: .medium) {
             isPopoverPresented.toggle()
             if isPopoverPresented {
                 Task { await airPlayManager.refreshDevices() }

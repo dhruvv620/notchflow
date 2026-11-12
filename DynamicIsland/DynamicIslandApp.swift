@@ -717,6 +717,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self?.debouncedUpdateWindowSize()
         }.store(in: &cancellables)
 
+        Publishers.MergeMany([
+            Defaults.publisher(.notchSizePreset, options: []).map { _ in true }.eraseToAnyPublisher(),
+            Defaults.publisher(.notchCustomHeight, options: []).map { _ in true }.eraseToAnyPublisher()
+        ]).receive(on: RunLoop.main).sink { [weak self] _ in
+            enforceMinimumNotchWidth()
+            self?.updateWindowSizeForTabSwitch()
+        }.store(in: &cancellables)
+
         // Observe terminal settings changes
         Defaults.publisher(.enableTerminalFeature, options: []).sink { [weak self] _ in
             self?.debouncedUpdateWindowSize()

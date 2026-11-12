@@ -23,14 +23,13 @@ import AppKit
 #endif
 
 struct NotchTimerView: View {
+    @ObservedObject private var appearance = NotchAppearanceModel.shared
     @EnvironmentObject var vm: DynamicIslandViewModel
     @ObservedObject var timerManager = TimerManager.shared
     @ObservedObject var coordinator = DynamicIslandViewCoordinator.shared
     @Default(.enableTimerFeature) var enableTimerFeature
     @Default(.enableMinimalisticUI) private var enableMinimalisticUI
     @Default(.timerPresets) private var timerPresets
-    @Default(.timerIconColorMode) private var colorMode
-    @Default(.timerSolidColor) private var solidColor
     @Default(.timerShowsProgress) private var showsProgress
     @Default(.timerProgressStyle) private var progressStyle
     @Default(.showTimerPresetsInNotchTab) private var showTimerPresetsInNotchTab
@@ -42,7 +41,6 @@ struct NotchTimerView: View {
     @State private var customMinutes: Int = 10
     @State private var customSeconds: Int = 0
     @State private var isSyncingCustomDuration = false
-    @State private var lockedAccentColor: Color?
 
     var body: some View {
         Group {
@@ -67,21 +65,6 @@ struct NotchTimerView: View {
                 .onChange(of: customSeconds) { _, _ in updateStoredCustomDuration() }
             } else {
                 disabledState
-            }
-        }
-        .onAppear {
-            lockAccentColorIfNeeded()
-        }
-        .onChange(of: timerManager.isTimerActive) { _, isActive in
-            if isActive {
-                lockAccentColorIfNeeded()
-            } else {
-                lockedAccentColor = nil
-            }
-        }
-        .onChange(of: timerManager.activePresetId) { _, _ in
-            if timerManager.isTimerActive && lockedAccentColor == nil {
-                lockAccentColorIfNeeded()
             }
         }
     }
@@ -382,23 +365,8 @@ struct NotchTimerView: View {
         return max(130, available)
     }
 
-    private func lockAccentColorIfNeeded() {
-        if timerManager.isTimerActive {
-            lockedAccentColor = resolvedAccentColor
-        }
-    }
-
     private var timerAccentColor: Color {
-        lockedAccentColor ?? resolvedAccentColor
-    }
-
-    private var resolvedAccentColor: Color {
-        switch colorMode {
-        case .adaptive:
-            return timerManager.activePreset?.color ?? timerManager.timerColor
-        case .solid:
-            return solidColor
-        }
+        timerManager.isOvertime ? .red : appearance.accentColor
     }
 
     private var normalizedProgress: CGFloat {
@@ -667,7 +635,7 @@ private struct DurationField: View {
                 .multilineTextAlignment(.center)
                 .textFieldStyle(.plain)
                 .foregroundColor(.white)
-                .tint(.white)
+                .tint(appearance.accentColor)
                 .frame(width: width, height: 46)
                 .background(Color.white.opacity(0.08))
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))

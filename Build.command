@@ -31,6 +31,12 @@ DERIVED_DIR="$BUILD_ROOT/DerivedData"
 mkdir -p "$BUILD_ROOT"
 printf 'Building %s with cached dependencies in %s\n' "$CONFIGURATION" "$BUILD_ROOT"
 
+printf '\nChecking natural-language reminder dates...\n'
+/usr/bin/xcrun swiftc -swift-version 5 -parse-as-library \
+    "$SOURCE_DIR/DynamicIsland/helpers/ReminderDateParser.swift" \
+    "$SOURCE_DIR/tests/ReminderDateParserRegression.swift" -o "$BUILD_ROOT/ReminderDateParserRegression"
+"$BUILD_ROOT/ReminderDateParserRegression"
+
 printf '\nChecking clipboard filters and pagination...\n'
 /usr/bin/xcrun swiftc -swift-version 5 -parse-as-library \
     "$SOURCE_DIR/DynamicIsland/helpers/CompactClipboardPolicy.swift" \

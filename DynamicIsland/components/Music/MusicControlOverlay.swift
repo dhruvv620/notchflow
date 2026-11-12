@@ -20,6 +20,7 @@ import SwiftUI
 import Defaults
 
 struct MusicControlOverlay: View {
+    @ObservedObject private var appearance = NotchAppearanceModel.shared
     let notchHeight: CGFloat
     let cornerRadius: CGFloat
 
@@ -115,7 +116,7 @@ struct MusicControlOverlay: View {
                 icon: backwardConfig.icon,
                 frameSize: CGSize(width: buttonSide, height: buttonSide),
                 cornerRadius: buttonCornerRadius,
-                foregroundColor: .white.opacity(controlsEnabled ? 0.9 : 0.35),
+                foregroundColor: appearance.accentColor.opacity(controlsEnabled ? 0.9 : 0.35),
                 pressEffect: backwardConfig.pressEffect,
                 symbolEffectStyle: backwardConfig.symbolEffect,
                 externalTriggerToken: backwardGestureTrigger?.token,
@@ -128,7 +129,7 @@ struct MusicControlOverlay: View {
                 icon: playPauseConfig.icon,
                 frameSize: CGSize(width: playPauseSide, height: playPauseSide),
                 cornerRadius: max(buttonCornerRadius + 2, playPauseSide * 0.32),
-                foregroundColor: .white,
+                foregroundColor: appearance.accentColor,
                 pressEffect: playPauseConfig.pressEffect,
                 symbolEffectStyle: playPauseConfig.symbolEffect,
                 externalTriggerToken: nil,
@@ -141,7 +142,7 @@ struct MusicControlOverlay: View {
                 icon: forwardConfig.icon,
                 frameSize: CGSize(width: buttonSide, height: buttonSide),
                 cornerRadius: buttonCornerRadius,
-                foregroundColor: .white.opacity(controlsEnabled ? 0.9 : 0.35),
+                foregroundColor: appearance.accentColor.opacity(controlsEnabled ? 0.9 : 0.35),
                 pressEffect: forwardConfig.pressEffect,
                 symbolEffectStyle: forwardConfig.symbolEffect,
                 externalTriggerToken: forwardGestureTrigger?.token,
@@ -173,6 +174,7 @@ struct MusicControlOverlay: View {
 }
 
 private struct FloatingMediaButton: View {
+    @ObservedObject private var appearance = NotchAppearanceModel.shared
     let icon: String
     let frameSize: CGSize
     let cornerRadius: CGFloat
@@ -200,7 +202,7 @@ private struct FloatingMediaButton: View {
                 .frame(width: frameSize.width, height: frameSize.height)
                 .background(
                     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .fill(isHovering && isEnabled ? Color.white.opacity(0.18) : .clear)
+                        .fill(isHovering && isEnabled ? appearance.accentColor.opacity(0.18) : .clear)
                 )
                 .contentShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         }
