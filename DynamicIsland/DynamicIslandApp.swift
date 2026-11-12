@@ -40,11 +40,11 @@ struct DynamicNotchApp: App {
         // The AtollUpdaterDelegate overrides the feed URL at runtime
         // based on the user's selected update channel.
         updaterController = SPUStandardUpdaterController(
-            startingUpdater: !AppRuntimeEnvironment.isUITesting,
+            startingUpdater: false,
             updaterDelegate: updaterDelegate, userDriverDelegate: nil)
 
         // Initialize the settings window controller with the updater controller
-        SettingsWindowController.shared.setUpdaterController(updaterController)
+        // Personal fork: official Atoll updates would replace this build.
     }
 
     var body: some Scene {
@@ -52,9 +52,9 @@ struct DynamicNotchApp: App {
             Button("Settings") {
                 SettingsWindowController.shared.showWindow()
             }
-            CheckForUpdatesView(updater: updaterController.updater)
+            Text("NotchFlow local build")
             Divider()
-            Button("Restart Atoll") {
+            Button("Restart NotchFlow") {
                 guard let bundleIdentifier = Bundle.main.bundleIdentifier else { return }
 
                 let workspace = NSWorkspace.shared
@@ -495,7 +495,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         var baseSize = Defaults[.enableMinimalisticUI] ? minimalisticOpenNotchSize(isDynamicIslandMode: shouldUseDynamicIslandMode(for: vm.screen)) : openNotchSize
         
         // Use a consistent height for different view types
-        if coordinator.currentView == .timer {
+        if coordinator.currentView == .reminders {
+            baseSize.height = 300
+        } else if coordinator.currentView == .timer {
             baseSize.height = 250 // Extra space for timer presets
         } else if coordinator.currentView == .notes || coordinator.currentView == .clipboard {
             let preferredHeight = coordinator.notesLayoutState.preferredHeight
@@ -589,8 +591,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         LockScreenLiveActivityWindowManager.shared.configure(viewModel: vm)
         LockScreenManager.shared.configure(viewModel: vm)
-        extensionXPCServiceHost.start()
-        extensionRPCServer.start()
+        // Legacy extension servers are not needed by this personal build.
         
         // Migrate legacy progress bar settings
         Defaults.Keys.migrateProgressBarStyle()
@@ -711,6 +712,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }.store(in: &cancellables)
 
         Defaults.publisher(.openNotchWidth, options: []).sink { [weak self] _ in
+            self?.debouncedUpdateWindowSize()
+        }.store(in: &cancellables)
+
+        Defaults.publisher(.enableRemindersFeature, options: []).sink { [weak self] _ in
             self?.debouncedUpdateWindowSize()
         }.store(in: &cancellables)
 

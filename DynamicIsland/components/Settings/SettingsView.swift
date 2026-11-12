@@ -787,6 +787,7 @@ struct SettingsView: View {
             SettingsSearchEntry(tab: .media, title: "Enable album art parallax effect", keywords: ["parallax", "parallax effect", "album art"], highlightID: SettingsTab.media.highlightID(for: "Enable album art parallax effect")),
 
             // Calendar
+            SettingsSearchEntry(tab: .calendar, title: "Show Reminders tab", keywords: ["reminders", "apple reminders", "tasks", "lists"], highlightID: SettingsTab.calendar.highlightID(for: "Show Reminders tab")),
             SettingsSearchEntry(tab: .calendar, title: "Show calendar", keywords: ["calendar", "events"], highlightID: SettingsTab.calendar.highlightID(for: "Show calendar")),
             SettingsSearchEntry(tab: .calendar, title: "Enable reminder live activity", keywords: ["reminder", "live activity"], highlightID: SettingsTab.calendar.highlightID(for: "Enable reminder live activity")),
             SettingsSearchEntry(tab: .calendar, title: "Countdown style", keywords: ["reminder countdown"], highlightID: SettingsTab.calendar.highlightID(for: "Countdown style")),
@@ -817,6 +818,7 @@ struct SettingsView: View {
             // Appearance
             SettingsSearchEntry(tab: .appearance, title: "Main screen style", keywords: ["dynamic island", "pill", "non-notch", "display style", "notch style"], highlightID: SettingsTab.appearance.highlightID(for: "Main screen style")),
             SettingsSearchEntry(tab: .appearance, title: "Settings icon in notch", keywords: ["settings button", "toolbar"], highlightID: SettingsTab.appearance.highlightID(for: "Settings icon in notch")),
+            SettingsSearchEntry(tab: .appearance, title: "Liquid Glass expanded notch", keywords: ["liquid", "glass", "material", "transparency", "notch"], highlightID: SettingsTab.appearance.highlightID(for: "Liquid Glass expanded notch")),
             SettingsSearchEntry(tab: .appearance, title: "Enable window shadow", keywords: ["shadow", "appearance"], highlightID: SettingsTab.appearance.highlightID(for: "Enable window shadow")),
             SettingsSearchEntry(tab: .appearance, title: "Corner radius scaling", keywords: ["corner radius", "shape"], highlightID: SettingsTab.appearance.highlightID(for: "Corner radius scaling")),
             SettingsSearchEntry(tab: .appearance, title: "Use simpler close animation", keywords: ["close animation", "notch"], highlightID: SettingsTab.appearance.highlightID(for: "Use simpler close animation")),
@@ -3174,6 +3176,16 @@ struct CalendarSettings: View {
 
     var body: some View {
         Form {
+            Section {
+                Defaults.Toggle(key: .enableRemindersFeature) {
+                    Text("Show Reminders tab")
+                }
+                .settingsHighlight(id: highlightID("Show Reminders tab"))
+                Text("View and create reminders in your Apple Reminders lists from the notch.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             if !calendarManager.hasCalendarAccess || !calendarManager.hasReminderAccess {
                 Text("Calendar or Reminder access is denied. Please enable it in System Settings.")
                     .foregroundColor(.red)
@@ -4362,6 +4374,14 @@ struct Appearance: View {
                     Text("Enable window shadow")
                 }
                 .settingsHighlight(id: highlightID("Enable window shadow"))
+                Defaults.Toggle(key: .expandedNotchLiquidGlass) {
+                    Text("Liquid Glass expanded notch")
+                }
+                .settingsHighlight(id: highlightID("Liquid Glass expanded notch"))
+                Text("Keeps the original layout and the closed notch black. Uses Liquid Glass on macOS 26 or later and a frosted material on earlier versions. Reduce Transparency uses the classic black surface.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
                 Defaults.Toggle(key: .cornerRadiusScaling) {
                     Text("Corner radius scaling")
                 }

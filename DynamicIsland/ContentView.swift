@@ -56,6 +56,7 @@ struct ContentView: View {
     @State private var downloadManager = DownloadManager.shared
     @ObservedObject var shelfState = ShelfStateViewModel.shared
     
+    @Default(.expandedNotchLiquidGlass) private var expandedNotchLiquidGlass
     @Default(.enableStatsFeature) var enableStatsFeature
     @Default(.showCpuGraph) var showCpuGraph
     @Default(.showMemoryGraph) var showMemoryGraph
@@ -157,6 +158,10 @@ struct ContentView: View {
             }
         }
         
+        if coordinator.currentView == .reminders {
+            return CGSize(width: baseSize.width, height: 300)
+        }
+
         if coordinator.currentView == .timer {
             return CGSize(width: baseSize.width, height: 250) // Extra height for timer presets
         }
@@ -526,7 +531,14 @@ struct ContentView: View {
             .frame(alignment: .top)
             .padding(.horizontal, notchHorizontalPadding)
             .padding([.horizontal, .bottom], vm.notchState == .open ? 12 : 0)
-            .background(.black)
+            .background {
+                ExpandedNotchSurface(
+                    shape: resolvedClipShape,
+                    isExpanded: vm.notchState == .open,
+                    useLiquidGlass: expandedNotchLiquidGlass,
+                    cameraBandHeight: isDynamicIslandMode ? 0 : vm.effectiveClosedNotchHeight
+                )
+            }
             .clipShape(resolvedClipShape)
             .compositingGroup()
             .shadow(
@@ -1088,6 +1100,8 @@ struct ContentView: View {
                                   NotchShelfView()
                               case .timer:
                                   NotchTimerView()
+                              case .reminders:
+                                  NotchRemindersView()
                               case .stats:
                                   NotchStatsView()
                               case .llmUsage:

@@ -51,6 +51,7 @@ struct TabSelectionView: View {
     @State private var showQuickSharePopover = false
     @Default(.enableTimerFeature) var enableTimerFeature
     @Default(.enableStatsFeature) var enableStatsFeature
+    @Default(.enableRemindersFeature) private var enableRemindersFeature
     @Default(.enableColorPickerFeature) var enableColorPickerFeature
     @Default(.timerDisplayMode) var timerDisplayMode
     @Default(.enableThirdPartyExtensions) private var enableThirdPartyExtensions
@@ -95,6 +96,9 @@ struct TabSelectionView: View {
         if Defaults[.enableTerminalFeature] {
             tabsArray.append(TabModel(label: "Terminal", icon: "apple.terminal", view: .terminal))
         }
+        if enableRemindersFeature {
+            tabsArray.append(TabModel(label: "Reminders", icon: "checklist", view: .reminders))
+        }
         if extensionTabsEnabled {
             for payload in extensionTabPayloads {
                 guard let tab = payload.descriptor.tab else { continue }
@@ -126,6 +130,8 @@ struct TabSelectionView: View {
                     }
                     coordinator.currentView = tab.view
                 }
+                .help(tab.label)
+                .accessibilityLabel(tab.label)
                 .frame(height: 26)
                 .foregroundStyle(isSelected ? activeAccent : .gray)
                 .background {
@@ -147,6 +153,9 @@ struct TabSelectionView: View {
         }
         .clipShape(Capsule())
         .onAppear {
+            ensureValidSelection(with: tabs)
+        }
+        .onChange(of: enableRemindersFeature) { _, _ in
             ensureValidSelection(with: tabs)
         }
     }

@@ -62,7 +62,7 @@
 		A058D80A7EF44593B0F24EB7 /* DynamicIslandUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DynamicIslandUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		DAA671E7B1B26733F02166C5 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		F4C1DD09EC134302938E84F6 /* MediaRemoteAdapter.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MediaRemoteAdapter.framework; path = Frameworks/MediaRemoteAdapter.framework; sourceTree = SOURCE_ROOT; };
-		F54406E72CD4987A00C7AFD9 /* Atoll.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Atoll.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		F54406E72CD4987A00C7AFD9 /* NotchFlow.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = NotchFlow.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -216,7 +216,7 @@
 		F54406E82CD4987A00C7AFD9 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				F54406E72CD4987A00C7AFD9 /* Atoll.app */,
+				F54406E72CD4987A00C7AFD9 /* NotchFlow.app */,
 				A058D80A7EF44593B0F24EB7 /* DynamicIslandUITests.xctest */,
 			);
 			name = Products;
@@ -275,7 +275,7 @@
 				7EF19C162F577040005B9929 /* SwiftTerm */,
 			);
 			productName = DynamicIsland;
-			productReference = F54406E72CD4987A00C7AFD9 /* Atoll.app */;
+			productReference = F54406E72CD4987A00C7AFD9 /* NotchFlow.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -600,7 +600,7 @@
 				);
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = DynamicIsland/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = Atoll;
+				INFOPLIST_KEY_CFBundleDisplayName = NotchFlow;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_MetalCaptureEnabled = YES;
@@ -623,8 +623,8 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.6;
 				MARKETING_VERSION = 2.3.3;
-				PRODUCT_BUNDLE_IDENTIFIER = com.Ebullioscopic.Atoll.dev;
-				PRODUCT_NAME = Atoll;
+				PRODUCT_BUNDLE_IDENTIFIER = com.dhruvv620.NotchFlowFresh.dev;
+				PRODUCT_NAME = NotchFlow;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				RUNTIME_EXCEPTION_ALLOW_DYLD_ENVIRONMENT_VARIABLES = NO;
 				RUNTIME_EXCEPTION_ALLOW_JIT = NO;
@@ -674,7 +674,7 @@
 				);
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = DynamicIsland/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = Atoll;
+				INFOPLIST_KEY_CFBundleDisplayName = NotchFlow;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_MetalCaptureEnabled = YES;
@@ -697,8 +697,8 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.6;
 				MARKETING_VERSION = 2.3.3;
-				PRODUCT_BUNDLE_IDENTIFIER = com.Ebullioscopic.Atoll;
-				PRODUCT_NAME = Atoll;
+				PRODUCT_BUNDLE_IDENTIFIER = com.dhruvv620.NotchFlowFresh;
+				PRODUCT_NAME = NotchFlow;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				RUNTIME_EXCEPTION_ALLOW_DYLD_ENVIRONMENT_VARIABLES = NO;
 				RUNTIME_EXCEPTION_ALLOW_JIT = NO;

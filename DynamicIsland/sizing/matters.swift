@@ -87,6 +87,11 @@ func enabledStandardTabCount() -> Int {
         count += 1
     }
 
+    // Reminders tab
+    if Defaults[.enableRemindersFeature] {
+        count += 1
+    }
+
     // Terminal tab
     if Defaults[.enableTerminalFeature] {
         count += 1

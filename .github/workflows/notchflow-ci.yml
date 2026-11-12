@@ -1,0 +1,130 @@
+name: NotchFlow Native Build
+
+on:
+  push:
+    branches:
+      - fresh/reminders-liquid-glass
+  pull_request:
+    branches:
+      - baseline/atoll-v2.3.3
+
+permissions:
+  contents: read
+
+concurrency:
+  group: notchflow-native-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: macOS — ${{ matrix.configuration }}
+    runs-on: macos-26
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        configuration: [Debug, Release]
+
+    steps:
+      - name: Checkout source and upstream artwork
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          lfs: true
+
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Record toolchain
+        id: toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild -version
+          sw_vers
+          xcode_major=$(xcodebuild -version | awk '/^Xcode / { split($2, parts, "."); print parts[1] }')
+          if [ "$xcode_major" -lt 26 ]; then
+            echo "::error::Xcode 26 or newer is required to compile the native Liquid Glass implementation."
+            exit 1
+          fi
+          echo "cache-key=$(xcodebuild -version | shasum -a 256 | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache pinned Swift packages
+        uses: actions/cache@v4
+        with:
+          path: .build-ci/SourcePackages
+          key: ${{ runner.os }}-notchflow-swiftpm-${{ steps.toolchain.outputs.cache-key }}-${{ hashFiles('DynamicIsland.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
+
+      - name: Validate privacy configuration
+        run: python3 -m unittest tests.test_privacy_configuration
+
+      - name: Prepare Metal toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo xcodebuild -runFirstLaunch
+          if xcrun -f metal >/dev/null 2>&1; then
+            exit 0
+          fi
+          for attempt in 1 2 3 4 5; do
+            if sudo xcodebuild -downloadComponent MetalToolchain && xcrun -f metal >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::Metal toolchain is unavailable after five download attempts."
+          exit 1
+
+      - name: Resolve recorded dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .build-ci
+          xcodebuild -resolvePackageDependencies \
+            -project DynamicIsland.xcodeproj \
+            -scheme DynamicIsland \
+            -clonedSourcePackagesDirPath .build-ci/SourcePackages \
+            -onlyUsePackageVersionsFromResolvedFile \
+            2>&1 | tee .build-ci/package-resolution.log
+          git diff --exit-code -- DynamicIsland.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
+
+      - name: Compile native app
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild build \
+            -project DynamicIsland.xcodeproj \
+            -scheme DynamicIsland \
+            -configuration '${{ matrix.configuration }}' \
+            -destination 'platform=macOS' \
+            -derivedDataPath .build-ci/DerivedData \
+            -clonedSourcePackagesDirPath .build-ci/SourcePackages \
+            -disableAutomaticPackageResolution \
+            -onlyUsePackageVersionsFromResolvedFile \
+            -resultBundlePath '.build-ci/BuildResults-${{ matrix.configuration }}.xcresult' \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY='' \
+            DEVELOPMENT_TEAM='' \
+            2>&1 | tee '.build-ci/build-${{ matrix.configuration }}.log'
+
+      - name: Surface build errors
+        if: failure()
+        shell: bash
+        run: |
+          if [ -f '.build-ci/build-${{ matrix.configuration }}.log' ]; then
+            grep -n -B 3 -A 6 'error:' '.build-ci/build-${{ matrix.configuration }}.log' | head -160 || true
+          fi
+
+      - name: Upload build evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-build-${{ matrix.configuration }}
+          path: |
+            .build-ci/*.log
+            .build-ci/*.xcresult
+          if-no-files-found: ignore
+          retention-days: 7

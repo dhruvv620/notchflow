@@ -39,8 +39,11 @@ jobs:
     # Skip CI-generated commits to prevent infinite loops
     # (appcast/changelog commits pushed by this workflow)
     if: >-
+      github.repository == 'Ebullioscopic/Atoll' &&
+      (
       !contains(github.event.head_commit.message, 'ci: update appcast') &&
       !contains(github.event.head_commit.message, 'ci: archive changelog')
+      )
 
     steps:
       # ─────────────────────────────────────────────────────────────────

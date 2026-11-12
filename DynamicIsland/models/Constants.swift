@@ -875,6 +875,7 @@ extension Defaults.Keys {
     static let lightingEffect = Key<Bool>("lightingEffect", default: true)
     static let accentColor = Key<Color>("accentColor", default: Color.blue)
     static let enableShadow = Key<Bool>("enableShadow", default: true)
+    static let expandedNotchLiquidGlass = Key<Bool>("expandedNotchLiquidGlass", default: false)
     static let cornerRadiusScaling = Key<Bool>("cornerRadiusScaling", default: true)
     static let useModernCloseAnimation = Key<Bool>("useModernCloseAnimation", default: true)
     static let showNotHumanFace = Key<Bool>("showNotHumanFace", default: false)
@@ -1294,6 +1295,7 @@ extension Defaults.Keys {
     static let showLiveCanvasInDynamicIsland = Key<Bool>("showLiveCanvasInDynamicIsland", default: false)
     
     // MARK: Notes Feature
+    static let enableRemindersFeature = Key<Bool>("enableRemindersFeature", default: true)
     static let enableNotes = Key<Bool>("enableNotes", default: false)
     static let enableNotePinning = Key<Bool>("enableNotePinning", default: true)
     static let enableNoteSearch = Key<Bool>("enableNoteSearch", default: false)
