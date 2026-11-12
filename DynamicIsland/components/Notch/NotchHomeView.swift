@@ -226,24 +226,24 @@ struct MusicControlsView: View {
     private var songInfoAndSlider: some View {
         GeometryReader { geo in
             VStack(alignment: .leading, spacing: 4) {
-                songInfo(width: geo.size.width)
+                songInfo(width: geo.size.width, showsLyrics: geo.size.height >= 82)
                     .zIndex(1) // Ensure it draws above the waveform scrubber
                 musicSlider
                     .zIndex(0)
             }
         }
-        .padding(.top, 3)
+        .padding(.top, 2)
         .padding(.leading, 5)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func songInfo(width: CGFloat) -> some View {
+    private func songInfo(width: CGFloat, showsLyrics: Bool) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             MusicTitleMarqueeView(
                 text: musicManager.songTitle,
                 isExplicit: musicManager.isCurrentTrackExplicit,
                 font: .system(size: 13, weight: .semibold),
-                nsFont: .systemFont(ofSize: 13, weight: .semibold),
+                nsFont: .headline,
                 textColor: .white,
                 frameWidth: width,
                 badgeHeight: 14
@@ -251,13 +251,13 @@ struct MusicControlsView: View {
             MarqueeText(
                 $musicManager.artistName,
                 font: .system(size: 12, weight: .medium),
-                nsFont: .systemFont(ofSize: 12, weight: .medium),
+                nsFont: .subheadline,
                 textColor: appearance.accentColor.opacity(0.85),
                 frameWidth: width
             )
             .fontWeight(.medium)
             // Lyrics shown under the author name (same font size as author) when enabled in settings
-            if enableLyrics {
+            if enableLyrics && showsLyrics {
                 let transition = AnyTransition.asymmetric(
                     insertion: .move(edge: .bottom).combined(with: .opacity),
                     removal: .move(edge: .top).combined(with: .opacity)
