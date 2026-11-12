@@ -31,6 +31,12 @@ DERIVED_DIR="$BUILD_ROOT/DerivedData"
 mkdir -p "$BUILD_ROOT"
 printf 'Building %s with cached dependencies in %s\n' "$CONFIGURATION" "$BUILD_ROOT"
 
+printf '\nChecking clipboard filters and pagination...\n'
+/usr/bin/xcrun swiftc -swift-version 5 -parse-as-library \
+    "$SOURCE_DIR/DynamicIsland/helpers/CompactClipboardPolicy.swift" \
+    "$SOURCE_DIR/tests/CompactClipboardRegression.swift" -o "$BUILD_ROOT/CompactClipboardRegression"
+"$BUILD_ROOT/CompactClipboardRegression"
+
 printf '\nChecking Reminders behavior without accessing your reminders...\n'
 /usr/bin/xcrun swiftc -swift-version 5 -parse-as-library \
     "$SOURCE_DIR/DynamicIsland/models/ReminderItem.swift" \

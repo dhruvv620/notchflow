@@ -83,14 +83,12 @@ func enabledStandardTabCount() -> Int {
     }
 
     // Notes / Clipboard tab
-    if Defaults[.enableNotes] || (Defaults[.enableClipboardManager] && Defaults[.clipboardDisplayMode] == .separateTab) {
+    if Defaults[.enableNotes] {
         count += 1
     }
 
-    // Reminders tab
-    if Defaults[.enableRemindersFeature] {
-        count += 1
-    }
+    // Compact Reminders and Clipboard share the existing header budget.
+    // Tab overflow uses a menu instead of enlarging the panel.
 
     // Terminal tab
     if Defaults[.enableTerminalFeature] {

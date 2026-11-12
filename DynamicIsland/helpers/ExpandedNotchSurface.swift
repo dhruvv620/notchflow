@@ -14,6 +14,11 @@ struct ExpandedNotchSurface<Surface: Shape>: View {
     var body: some View {
         ZStack(alignment: .top) {
             if isExpanded && useLiquidGlass && !reduceTransparency {
+                // A transparent NSPanel can pass clicks through fully clear pixels
+                // before SwiftUI's contentShape participates in hit testing. Keep a
+                // nonzero-alpha backing inside the notch shape, underneath the glass.
+                // The clipped corners and window margins remain transparent.
+                shape.fill(Color.black.opacity(0.01))
                 glassSurface
                 if cameraBandHeight > 0 {
                     Rectangle()

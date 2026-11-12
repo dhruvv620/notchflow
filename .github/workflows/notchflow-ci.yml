@@ -62,6 +62,15 @@ jobs:
       - name: Validate privacy configuration
         run: python3 -m unittest tests.test_privacy_configuration
 
+      - name: Check compact clipboard policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcrun swiftc -swift-version 5 -parse-as-library \
+            DynamicIsland/helpers/CompactClipboardPolicy.swift \
+            tests/CompactClipboardRegression.swift -o "$RUNNER_TEMP/CompactClipboardRegression"
+          "$RUNNER_TEMP/CompactClipboardRegression"
+
       - name: Check Reminders with fake service
         shell: bash
         run: |

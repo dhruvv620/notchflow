@@ -52,6 +52,7 @@ struct TabSelectionView: View {
     @Default(.enableTimerFeature) var enableTimerFeature
     @Default(.enableStatsFeature) var enableStatsFeature
     @Default(.enableRemindersFeature) private var enableRemindersFeature
+    @Default(.enableClipboardManager) private var enableClipboardManager
     @Default(.enableColorPickerFeature) var enableColorPickerFeature
     @Default(.timerDisplayMode) var timerDisplayMode
     @Default(.enableThirdPartyExtensions) private var enableThirdPartyExtensions
@@ -63,10 +64,12 @@ struct TabSelectionView: View {
     @Default(.enableMinimalisticUI) private var enableMinimalisticUI
     @Namespace var animation
     
-    private var tabs: [TabModel] {
+    private var tabs: [TabModel] { Self.availableTabs }
+
+    static var availableTabs: [TabModel] {
         var tabsArray: [TabModel] = []
 
-        if homeTabVisible {
+        if Defaults[.enableMinimalisticUI] || Defaults[.showStandardMediaControls] || Defaults[.showCalendar] || Defaults[.showMirror] {
             tabsArray.append(TabModel(label: "Home", icon: "house.fill", view: .home))
         }
 
@@ -74,7 +77,7 @@ struct TabSelectionView: View {
             tabsArray.append(TabModel(label: "Shelf", icon: "tray.fill", view: .shelf))
         }
         
-        if enableTimerFeature && timerDisplayMode == .tab {
+        if Defaults[.enableTimerFeature] && Defaults[.timerDisplayMode] == .tab {
             tabsArray.append(TabModel(label: "Timer", icon: "timer", view: .timer))
         }
 
@@ -88,19 +91,20 @@ struct TabSelectionView: View {
             tabsArray.append(TabModel(label: "Usage", icon: "chart.bar.doc.horizontal", view: .llmUsage))
         }
 
-        if Defaults[.enableNotes] || (Defaults[.enableClipboardManager] && Defaults[.clipboardDisplayMode] == .separateTab) {
-            let label = Defaults[.enableNotes] ? "Notes" : "Clipboard"
-            let icon = Defaults[.enableNotes] ? "note.text" : "doc.on.clipboard"
-            tabsArray.append(TabModel(label: label, icon: icon, view: .notes))
+        if Defaults[.enableNotes] {
+            tabsArray.append(TabModel(label: "Notes", icon: "note.text", view: .notes))
+        }
+        if Defaults[.enableClipboardManager] {
+            tabsArray.append(TabModel(label: "Clipboard", icon: "doc.on.clipboard", view: .clipboard))
         }
         if Defaults[.enableTerminalFeature] {
             tabsArray.append(TabModel(label: "Terminal", icon: "apple.terminal", view: .terminal))
         }
-        if enableRemindersFeature {
+        if Defaults[.enableRemindersFeature] {
             tabsArray.append(TabModel(label: "Reminders", icon: "checklist", view: .reminders))
         }
-        if extensionTabsEnabled {
-            for payload in extensionTabPayloads {
+        if Defaults[.enableThirdPartyExtensions] && Defaults[.enableExtensionNotchExperiences] && Defaults[.enableExtensionNotchTabs] {
+            for payload in ExtensionNotchExperienceManager.shared.activeExperiences.filter({ $0.descriptor.tab != nil }) {
                 guard let tab = payload.descriptor.tab else { continue }
                 let accent = payload.descriptor.accentColor.swiftUIColor
                 let iconName = tab.iconSymbolName ?? "puzzlepiece.extension"
@@ -117,8 +121,46 @@ struct TabSelectionView: View {
         }
         return tabsArray
     }
+    static func advanceTab(forward: Bool) {
+        let coordinator = DynamicIslandViewCoordinator.shared
+        let tabs = availableTabs
+        guard !tabs.isEmpty else { return }
+        let current = tabs.firstIndex {
+            $0.view == coordinator.currentView && ($0.view != .extensionExperience || $0.experienceID == coordinator.selectedExtensionExperienceID)
+        }
+        let index = current.map { ($0 + (forward ? 1 : tabs.count - 1)) % tabs.count } ?? 0
+        let target = tabs[index]
+        withAnimation(.easeInOut(duration: 0.2)) {
+            coordinator.selectedExtensionExperienceID = target.experienceID
+            coordinator.currentView = target.view
+            coordinator.tabSwitchForward = forward
+        }
+    }
+
     var body: some View {
-        HStack(spacing: 24) {
+        ViewThatFits(in: .horizontal) {
+            tabButtons
+            Menu {
+                ForEach(tabs) { tab in
+                    Button {
+                        coordinator.selectedExtensionExperienceID = tab.experienceID
+                        coordinator.currentView = tab.view
+                    } label: { Label(tab.label, systemImage: tab.icon) }
+                }
+            } label: {
+                Label(tabs.first(where: { isSelected($0) })?.label ?? "Tabs",
+                      systemImage: tabs.first(where: { isSelected($0) })?.icon ?? "square.grid.2x2")
+            }
+            .menuStyle(.borderlessButton)
+            .fixedSize()
+        }
+        .onAppear { ensureValidSelection(with: tabs) }
+        .onChange(of: enableRemindersFeature) { _, _ in ensureValidSelection(with: tabs) }
+        .onChange(of: enableClipboardManager) { _, _ in ensureValidSelection(with: tabs) }
+    }
+
+    private var tabButtons: some View {
+        HStack(spacing: tabs.count > 4 ? 16 : 24) {
             ForEach(Array(tabs.enumerated()), id: \.element.id) { idx, tab in
                 let isSelected = isSelected(tab)
                 let activeAccent = tab.accentColor ?? .white
@@ -151,6 +193,7 @@ struct TabSelectionView: View {
                 
             }
         }
+        .fixedSize(horizontal: true, vertical: false)
         .clipShape(Capsule())
         .onAppear {
             ensureValidSelection(with: tabs)

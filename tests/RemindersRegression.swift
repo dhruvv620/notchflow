@@ -8,6 +8,12 @@ private final class FakeRemindersService: RemindersServiceProviding {
     var access: ReminderAccess = .authorized
     var fetchCount = 0
     var requestedAccess = false
+    var requestCount = 0
+    var requestResult = true
+    var accessAfterRequest: ReminderAccess = .authorized
+    var failRequest = false
+    var waitForRequest = false
+    var permissionContinuation: CheckedContinuation<Bool, Error>?
     var savedTitles: [String] = []
     var completedIDs: [String] = []
     var failCreate = false
@@ -24,8 +30,13 @@ private final class FakeRemindersService: RemindersServiceProviding {
 
     func requestAccess() async throws -> Bool {
         requestedAccess = true
-        access = .authorized
-        return true
+        requestCount += 1
+        if failRequest { throw ReminderServiceError.accessRequired }
+        if waitForRequest {
+            return try await withCheckedThrowingContinuation { permissionContinuation = $0 }
+        }
+        access = accessAfterRequest
+        return requestResult
     }
     func snapshot(includeCompleted: Bool) async throws -> ReminderSnapshot {
         fetchCount += 1
@@ -119,6 +130,44 @@ private struct RemindersRegression {
         try require(service.fetchCount == fetches && manager.reminders.isEmpty && manager.lists.isEmpty, "Revoked permission leaked cached reminders or fetched without access")
         await manager.requestAccess()
         try require(service.requestedAccess && manager.access == .authorized && !manager.isRequestingAccess, "Permission request did not reload the authorized state")
+        // A refusal that leaves TCC undetermined must not silently redisplay Allow.
+        service.access = .notDetermined
+        service.requestResult = false
+        service.accessAfterRequest = .notDetermined
+        await manager.requestAccess()
+        try require(manager.access == .notDetermined && manager.errorMessage != nil && !manager.isRequestingAccess,
+                    "Undetermined refusal returned silently or left the button busy")
+        service.accessAfterRequest = .denied
+        await manager.requestAccess()
+        try require(manager.access == .denied && manager.errorMessage != nil && manager.reminders.isEmpty,
+                    "Denied access was not surfaced or kept stale reminders")
+        service.access = .notDetermined
+        service.failRequest = true
+        await manager.requestAccess()
+        try require(!manager.isRequestingAccess && manager.errorMessage != nil, "Permission error left its spinner active")
+        service.failRequest = false
+
+        let pendingService = FakeRemindersService()
+        pendingService.access = .notDetermined
+        pendingService.waitForRequest = true
+        let pendingManager = RemindersManager(service: pendingService, permissionHelpDelayNanoseconds: 1)
+        let request = Task { @MainActor in await pendingManager.requestAccess() }
+        for _ in 0..<100 where pendingService.permissionContinuation == nil { await Task.yield() }
+        try require(pendingService.permissionContinuation != nil && pendingManager.isRequestingAccess,
+                    "Pending native request was not marked busy")
+        await pendingManager.requestAccess()
+        try require(pendingService.requestCount == 1, "Repeated taps launched overlapping permission dialogs")
+        try await Task.sleep(nanoseconds: 5_000_000)
+        try require(pendingManager.permissionNeedsAttention && pendingManager.isRequestingAccess,
+                    "Slow dialog did not offer help or was falsely cancelled")
+        pendingService.access = .authorized
+        await pendingManager.refresh()
+        try require(pendingManager.access == .authorized && !pendingManager.isRequestingAccess && !pendingManager.permissionNeedsAttention,
+                    "Manual recheck did not resolve the pending request")
+        pendingService.permissionContinuation?.resume(returning: false)
+        await request.value
+        try require(pendingManager.access == .authorized && pendingManager.errorMessage == nil,
+                    "Late refusal overwrote the manually refreshed permission")
         print("Reminders policy and fake-service checks passed")
     }
 }

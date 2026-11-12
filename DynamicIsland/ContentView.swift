@@ -159,14 +159,14 @@ struct ContentView: View {
         }
         
         if coordinator.currentView == .reminders {
-            return CGSize(width: baseSize.width, height: 300)
+            return baseSize
         }
 
         if coordinator.currentView == .timer {
             return CGSize(width: baseSize.width, height: 250) // Extra height for timer presets
         }
         
-        if coordinator.currentView == .notes || coordinator.currentView == .clipboard {
+        if coordinator.currentView == .notes {
             let preferredHeight = coordinator.notesLayoutState.preferredHeight
             let resolvedHeight = max(baseSize.height, preferredHeight)
             return CGSize(width: baseSize.width, height: resolvedHeight)
@@ -583,6 +583,7 @@ struct ContentView: View {
                         handleHover(hovering)
                     }
                     .onTapGesture {
+                        guard vm.notchState == .closed else { return }
                         if handleClosedMusicWaveformTapIfNeeded() {
                             return
                         }
@@ -596,10 +597,10 @@ struct ContentView: View {
                             .panGesture(direction: .down) { translation, phase in
                                 handleDownGesture(translation: translation, phase: phase)
                             }
-                            .panGesture(direction: .left) { translation, phase in
+                            .panGesture(direction: .left, mouseDragEnabled: vm.notchState == .closed) { translation, phase in
                                 handleSkipGesture(direction: .forward, translation: translation, phase: phase)
                             }
-                            .panGesture(direction: .right) { translation, phase in
+                            .panGesture(direction: .right, mouseDragEnabled: vm.notchState == .closed) { translation, phase in
                                 handleSkipGesture(direction: .backward, translation: translation, phase: phase)
                             }
                     }
@@ -1111,7 +1112,7 @@ struct ContentView: View {
                             case .notes:
                                 NotchNotesView()
                             case .clipboard:
-                                NotchNotesView()
+                                CompactClipboardView()
                             case .terminal:
                                 NotchTerminalView()
                             case .extensionExperience:
@@ -2343,6 +2344,19 @@ struct ContentView: View {
     private func handleSkipGesture(direction: MusicManager.SkipDirection, translation: CGFloat, phase: NSEvent.Phase) {
         if phase == .ended {
             skipGestureActiveDirection = nil
+            return
+        }
+
+        if vm.notchState == .open {
+            guard !lockScreenManager.isLocked, !hasAnyActivePopovers() else { return }
+            // One discrete horizontal trackpad gesture changes one visible tab.
+            // Vertical-scroll suppression belongs to the up/down handlers.
+            if skipGestureActiveDirection == nil && translation >= 40 {
+                skipGestureActiveDirection = direction
+                let forward = (direction == .forward) != Defaults[.reverseSwipeGestures]
+                TabSelectionView.advanceTab(forward: forward)
+                if Defaults[.enableHaptics] { triggerHapticIfAllowed() }
+            }
             return
         }
 

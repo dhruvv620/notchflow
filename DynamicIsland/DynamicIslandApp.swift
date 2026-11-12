@@ -495,11 +495,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         var baseSize = Defaults[.enableMinimalisticUI] ? minimalisticOpenNotchSize(isDynamicIslandMode: shouldUseDynamicIslandMode(for: vm.screen)) : openNotchSize
         
         // Use a consistent height for different view types
-        if coordinator.currentView == .reminders {
-            baseSize.height = 300
-        } else if coordinator.currentView == .timer {
+        if coordinator.currentView == .timer {
             baseSize.height = 250 // Extra space for timer presets
-        } else if coordinator.currentView == .notes || coordinator.currentView == .clipboard {
+        } else if coordinator.currentView == .notes {
             let preferredHeight = coordinator.notesLayoutState.preferredHeight
             baseSize.height = max(baseSize.height, preferredHeight)
         } else if coordinator.currentView == .terminal {
@@ -1251,12 +1249,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             case .separateTab:
                 if vm.notchState == .closed {
                     vm.open()
-                    coordinator.currentView = .notes
+                    coordinator.currentView = .clipboard
                 } else {
-                    if coordinator.currentView == .notes {
+                    if coordinator.currentView == .clipboard {
                         vm.close()
                     } else {
-                        coordinator.currentView = .notes
+                        coordinator.currentView = .clipboard
                     }
                 }
             }

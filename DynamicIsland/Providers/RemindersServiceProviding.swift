@@ -45,7 +45,16 @@ final class EventKitRemindersService: RemindersServiceProviding {
     }
 
     func requestAccess() async throws -> Bool {
-        try await store.requestFullAccessToReminders()
+        switch access {
+        case .authorized: return true
+        case .denied, .restricted: return false
+        case .notDetermined: break
+        }
+        // The notch is a nonactivating panel. Bring this explicit user request
+        // to the foreground before macOS presents its privacy dialog.
+        NSApplication.shared.activate()
+        await Task.yield()
+        return try await store.requestFullAccessToReminders()
     }
 
     func snapshot(includeCompleted: Bool) async throws -> ReminderSnapshot {

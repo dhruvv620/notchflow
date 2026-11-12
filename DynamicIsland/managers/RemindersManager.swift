@@ -12,6 +12,7 @@ final class RemindersManager: ObservableObject {
     @Published private(set) var reminders: [ReminderItem] = []
     @Published private(set) var isLoading = false
     @Published private(set) var isRequestingAccess = false
+    @Published private(set) var permissionNeedsAttention = false
     @Published private(set) var isSaving = false
     @Published private(set) var pendingIDs: Set<String> = []
     @Published var errorMessage: String?
@@ -20,8 +21,12 @@ final class RemindersManager: ObservableObject {
     private let service: RemindersServiceProviding
     private var refreshID = UUID()
     private var defaultListID: String?
+    private var permissionAttemptID: UUID?
+    private var permissionHelpTask: Task<Void, Never>?
+    private let permissionHelpDelayNanoseconds: UInt64
 
-    init(service: RemindersServiceProviding) {
+    init(service: RemindersServiceProviding, permissionHelpDelayNanoseconds: UInt64 = 8_000_000_000) {
+        self.permissionHelpDelayNanoseconds = permissionHelpDelayNanoseconds
         self.service = service
         access = service.access
     }
@@ -41,22 +46,57 @@ final class RemindersManager: ObservableObject {
 
     func requestAccess() async {
         guard !isRequestingAccess else { return }
+        let attempt = UUID()
+        permissionAttemptID = attempt
         isRequestingAccess = true
-        defer { isRequestingAccess = false }
+        permissionNeedsAttention = false
         errorMessage = nil
+        let delay = permissionHelpDelayNanoseconds
+        permissionHelpTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: delay)
+            guard !Task.isCancelled, let self, self.permissionAttemptID == attempt else { return }
+            // This is help for a slow system dialog, not a denial or cancellation.
+            self.permissionNeedsAttention = true
+        }
         do {
-            _ = try await service.requestAccess()
+            let granted = try await service.requestAccess()
+            guard permissionAttemptID == attempt else { return }
+            finishPermissionAttempt()
             await refresh()
+            if access != .authorized {
+                if access == .restricted {
+                    errorMessage = String(localized: "Reminders access is restricted on this Mac.")
+                } else if granted {
+                    errorMessage = String(localized: "macOS has not updated Reminders access yet. Open Privacy Settings, then choose Check Access.")
+                } else {
+                    errorMessage = String(localized: "macOS did not grant Reminders access. Enable NotchFlow in Privacy Settings, then choose Check Access.")
+                }
+            }
         } catch {
+            guard permissionAttemptID == attempt else { return }
+            finishPermissionAttempt()
             access = service.access
             errorMessage = error.localizedDescription
         }
+    }
+
+    private func finishPermissionAttempt() {
+        permissionAttemptID = nil
+        permissionHelpTask?.cancel()
+        permissionHelpTask = nil
+        isRequestingAccess = false
+        permissionNeedsAttention = false
     }
 
     func refresh() async {
         let id = UUID()
         refreshID = id
         access = service.access
+        if permissionAttemptID != nil && access != .notDetermined {
+            // A manual recheck or returning from System Settings can resolve
+            // access before the original EventKit completion arrives.
+            finishPermissionAttempt()
+        }
         guard access == .authorized else {
             lists = []
             reminders = []

@@ -7493,7 +7493,6 @@ struct StatsSettings: View {
 struct ClipboardSettings: View {
     @ObservedObject var clipboardManager = ClipboardManager.shared
     @Default(.enableClipboardManager) var enableClipboardManager
-    @Default(.clipboardHistorySize) var clipboardHistorySize
     @Default(.showClipboardIcon) var showClipboardIcon
     @Default(.clipboardDisplayMode) var clipboardDisplayMode
 
@@ -7544,14 +7543,7 @@ struct ClipboardSettings: View {
                     HStack {
                         Text("History Size")
                         Spacer()
-                        Picker("", selection: $clipboardHistorySize) {
-                            Text("3 items").tag(3)
-                            Text("5 items").tag(5)
-                            Text("7 items").tag(7)
-                            Text("10 items").tag(10)
-                        }
-                        .pickerStyle(.menu)
-                        .frame(minWidth: 100)
+                        Text("20 recent items").foregroundStyle(.secondary)
                     }
                     .settingsHighlight(id: highlightID("History Size"))
 

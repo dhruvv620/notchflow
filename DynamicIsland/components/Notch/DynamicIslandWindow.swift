@@ -42,6 +42,9 @@ class DynamicIslandWindow: NSPanel {
         titleVisibility = .hidden
         titlebarAppearsTransparent = true
         backgroundColor = .clear
+        // Visible notch pixels must receive events even though this panel is
+        // nonactivating. The shape-matched surface keeps outside margins clear.
+        ignoresMouseEvents = false
         isMovable = false
         
         collectionBehavior = [

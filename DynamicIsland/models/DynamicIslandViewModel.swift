@@ -98,9 +98,9 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
         guard Defaults[.clipboardDisplayMode] == .separateTab else { return }
         guard let lastCopyDate = ClipboardManager.shared.lastCopiedItemDate else { return }
         guard Date().timeIntervalSince(lastCopyDate) <= clipboardFocusWindow else { return }
-        guard coordinator.currentView != .notes else { return }
+        guard coordinator.currentView != .clipboard else { return }
         withAnimation(.smooth) {
-            coordinator.currentView = .notes
+            coordinator.currentView = .clipboard
         }
     }
     
@@ -362,10 +362,10 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
         var adjustedSize = baseSize
 
         if coordinator.currentView == .reminders {
-            return CGSize(width: baseSize.width, height: 300)
+            return baseSize
         }
 
-        if coordinator.currentView == .notes || coordinator.currentView == .clipboard {
+        if coordinator.currentView == .notes {
             let preferred = coordinator.notesLayoutState.preferredHeight
             adjustedSize.height = max(adjustedSize.height, preferred)
             return adjustedSize

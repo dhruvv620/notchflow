@@ -156,27 +156,57 @@ struct NotchRemindersView: View {
     }
 
     private var accessState: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "checklist").font(.system(size: 28)).foregroundStyle(.secondary)
-            Text("Apple Reminders").font(.headline)
-            Text(manager.access == .restricted
-                 ? "Reminders access is restricted on this Mac."
-                 : "View your lists, add reminders, and mark them complete. Changes sync through Apple Reminders.")
-                .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
-            if manager.access == .notDetermined {
-                Button("Allow Reminders access") { Task { await manager.requestAccess() } }
+        ScrollView {
+            VStack(spacing: 10) {
+                Image(systemName: "checklist").font(.system(size: 28)).foregroundStyle(.secondary)
+                Text("Apple Reminders").font(.headline)
+                Text(permissionDescription)
+                    .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                if manager.access == .notDetermined {
+                    Button(manager.isRequestingAccess ? "Waiting for macOS…" : "Allow Reminders access") {
+                        Task { await manager.requestAccess() }
+                    }
                     .disabled(manager.isRequestingAccess)
-            } else if manager.access == .denied {
-                Button("Open Privacy Settings") {
-                    if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Reminders") {
-                        NSWorkspace.shared.open(url)
+                    .accessibilityIdentifier("RemindersAllowAccess")
+                }
+                if manager.isRequestingAccess {
+                    HStack(spacing: 8) {
+                        ProgressView().controlSize(.small)
+                        Text("Check for a macOS permission dialog.").font(.caption)
                     }
                 }
+                HStack(spacing: 12) {
+                    Button("Open Privacy Settings", action: openReminderPrivacySettings)
+                        .accessibilityIdentifier("RemindersPrivacySettings")
+                    Button("Check Access") { Task { await manager.refresh() } }
+                        .accessibilityIdentifier("RemindersCheckAccess")
+                }
+                if manager.permissionNeedsAttention {
+                    Text("macOS has not finished the request. You can check the Reminders privacy settings, then choose Check Access. If no permission entry appears, quit and reopen NotchFlow and try again.")
+                        .font(.caption).foregroundStyle(.orange).multilineTextAlignment(.center)
+                }
             }
-            if manager.isRequestingAccess { ProgressView().controlSize(.small) }
+            .padding(.horizontal, 24)
+            .frame(maxWidth: .infinity)
         }
-        .padding(.horizontal, 24)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onHover { hovering in vm.setScrollGestureSuppression(hovering, token: interactionToken) }
+    }
+
+    private var permissionDescription: String {
+        switch manager.access {
+        case .restricted:
+            return String(localized: "Reminders access is restricted on this Mac.")
+        case .denied:
+            return String(localized: "Enable NotchFlow in System Settings → Privacy & Security → Reminders, then choose Check Access.")
+        default:
+            return String(localized: "View your lists, add reminders, and mark them complete. Changes sync through Apple Reminders.")
+        }
+    }
+
+    private func openReminderPrivacySettings() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Reminders") {
+            NSWorkspace.shared.open(url)
+        }
     }
 
     private var composer: some View {
