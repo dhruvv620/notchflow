@@ -666,6 +666,11 @@ struct NotchHomeView: View {
         HStack {
             Text("Now Playing")
                 .font(.system(size: 12, weight: .semibold))
+            if musicManager.hasActiveSession {
+                AudioSpectrumView(isPlaying: $musicManager.isPlaying)
+                    .frame(width: CGFloat(Defaults[.visualizerBarCount]) * 4, height: 14)
+                    .accessibilityLabel(musicManager.isPlaying ? "Playing" : "Paused")
+            }
             Spacer(minLength: 8)
             MediaSourcePicker()
         }

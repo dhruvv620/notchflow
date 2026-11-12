@@ -28,6 +28,9 @@ struct SystemMediaRegression {
         let play = try decode(#"{"diff":true,"payload":{"playing":true}}"#)
         let resumed = SystemNowPlayingSnapshot.applying(play, to: paused, now: origin.addingTimeInterval(60))
         try require(resumed.currentTime == 15 && resumed.lastUpdated == origin.addingTimeInterval(60), "Resume reused a stale clock and jumped forward")
+        let stoppedRate = SystemNowPlayingSnapshot.applying(try decode(#"{"diff":true,"payload":{"playing":false,"playbackRate":0}}"#), to: initial, now: origin.addingTimeInterval(1))
+        let resumedRate = SystemNowPlayingSnapshot.applying(play, to: stoppedRate, now: origin.addingTimeInterval(20))
+        try require(resumedRate.playbackRate == 1, "Resume without an explicit rate left the progress clock frozen")
         let removed = try decode(#"{"diff":true,"payload":{"artist":null,"artworkData":null}}"#)
         let cleared = SystemNowPlayingSnapshot.applying(removed, to: initial, now: origin)
         try require(cleared.artist.isEmpty && cleared.artwork == nil && cleared.title == "Track", "Null diff fields did not clear previous metadata")
@@ -39,6 +42,7 @@ struct SystemMediaRegression {
 
         // A pipe can split a multi-byte title anywhere; decode complete byte lines,
         // rather than losing a whole update when a chunk is not valid UTF-8 alone.
+        #if os(macOS)
         let handler = JSONLinesPipeHandler()
         let pipe = await handler.getPipe()
         let received = ReceivedUpdates()
@@ -54,5 +58,8 @@ struct SystemMediaRegression {
         try require(updates.count == 1 && updates[0].payload.title == "Music 🎵", "Split UTF-8 pipe reads lost a live update")
         await handler.close()
         print("System media snapshots, clocks, source changes and stream checks passed")
+        #else
+        print("System media snapshots, clocks and source changes passed")
+        #endif
     }
 }

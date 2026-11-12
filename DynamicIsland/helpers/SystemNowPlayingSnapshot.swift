@@ -58,6 +58,7 @@ enum SystemNowPlayingSnapshot {
 
     static func applying(_ update: NowPlayingUpdate, to previous: PlaybackState, now: Date = Date()) -> PlaybackState {
         let payload = update.payload
+        let sampleDate = payload.timestamp.flatMap { date(from: $0) } ?? now
         let source = payload.parentApplicationBundleIdentifier ?? payload.bundleIdentifier
         let sameSource = source == nil || source == previous.bundleIdentifier
         let isDiff = update.diff == true && sameSource
@@ -65,7 +66,7 @@ enum SystemNowPlayingSnapshot {
         if let source { state.bundleIdentifier = source }
         let changesClock = payload.playing != nil || payload.playbackRate != nil
         if isDiff, changesClock, payload.elapsedTime == nil {
-            let delta = previous.isPlaying ? max(0, now.timeIntervalSince(previous.lastUpdated)) * previous.playbackRate : 0
+            let delta = previous.isPlaying ? max(0, sampleDate.timeIntervalSince(previous.lastUpdated)) * previous.playbackRate : 0
             state.currentTime = previous.currentTime + delta
         }
         if let value = payload.title { state.title = value }
@@ -74,7 +75,10 @@ enum SystemNowPlayingSnapshot {
         if let value = payload.duration, value.isFinite { state.duration = max(0, value) }
         if let value = payload.elapsedTime, value.isFinite { state.currentTime = max(0, value) }
         if let value = payload.playbackRate, value.isFinite { state.playbackRate = max(0, value) }
-        if let value = payload.playing { state.isPlaying = value }
+        if let value = payload.playing {
+            state.isPlaying = value
+            if value && payload.playbackRate == nil && state.playbackRate <= 0 { state.playbackRate = 1 }
+        }
         if let value = payload.shuffleMode { state.isShuffled = value != 1 }
         if let value = payload.repeatMode { state.repeatMode = RepeatMode(rawValue: value) ?? .off }
         if let value = payload.artworkData { state.artwork = Data(base64Encoded: value, options: .ignoreUnknownCharacters) }
@@ -93,10 +97,8 @@ enum SystemNowPlayingSnapshot {
             default: break
             }
         }
-        if let timestamp = payload.timestamp, let date = date(from: timestamp) {
-            state.lastUpdated = date
-        } else if payload.elapsedTime != nil || changesClock || !isDiff {
-            state.lastUpdated = now
+        if payload.timestamp != nil || payload.elapsedTime != nil || changesClock || !isDiff {
+            state.lastUpdated = sampleDate
         }
         return state
     }

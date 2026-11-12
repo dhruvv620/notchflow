@@ -83,10 +83,10 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
         guard time.isFinite, time >= 0 else { return }
         await command(["seek", String(Int(min(time, 31_536_000) * 1_000_000))])
     }
-    func toggleShuffle() async { await command(["shuffle", playbackState.isShuffled ? "1" : "3"]) }
-    func toggleRepeat() async { await command(["repeat", String(playbackState.repeatMode == .off ? 3 : playbackState.repeatMode.rawValue - 1)]) }
+    @MainActor func toggleShuffle() async { await command(["shuffle", playbackState.isShuffled ? "1" : "3"]) }
+    @MainActor func toggleRepeat() async { await command(["repeat", String(playbackState.repeatMode == .off ? 3 : playbackState.repeatMode.rawValue - 1)]) }
 
-    private func command(_ arguments: [String]) async {
+    @MainActor private func command(_ arguments: [String]) async {
         guard !stopped else { return }
         do { _ = try await MediaRemoteCommandRunner.run(arguments); await updatePlaybackInfo() }
         catch { await MainActor.run { lastError = "This media app did not respond. Try Refresh." } }
