@@ -600,7 +600,7 @@ struct ContentView: View {
             .accessibilityIdentifier("AtollNotch")
     }
 
-    private var configuredMainLayout: some View {
+    private var animatedMainLayout: some View {
         mainLayoutBase
             .conditionalModifier(!useModernCloseAnimation) { view in
                 let hoverAnimation = Animation.bouncy.speed(1.2)
@@ -621,6 +621,10 @@ struct ContentView: View {
                     .animation(notchAnimation, value: vm.notchState)
                     .animation(.smooth, value: gestureProgress)
             }
+    }
+
+    private var interactiveMainLayout: some View {
+        animatedMainLayout
             .conditionalModifier(interactionsEnabled) { view in
                 view
                     .contentShape(resolvedClipShape)
@@ -661,6 +665,10 @@ struct ContentView: View {
                 ? -(vm.closedNotchSize.height + pillTopOffset + currentShadowPadding + 10)
                 : 0
             )
+    }
+
+    private var stateConfiguredMainLayout: some View {
+        interactiveMainLayout
             .onAppear(perform: {
                 if coordinator.firstLaunch {
                     // Single open during first launch; closeHello() handles the timed close.
@@ -726,6 +734,10 @@ struct ContentView: View {
                     }
                 }
             }
+    }
+
+    private var configuredMainLayout: some View {
+        stateConfiguredMainLayout
             .onReceive(NotificationCenter.default.publisher(for: .sharingDidFinish)) { _ in
                 runAfter(0.1) {
                     if vm.notchState == .open && !isHovering && !shouldPreventAutoClose() {

@@ -94,6 +94,7 @@ struct CommunicationsSettingsView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Incoming calls take priority in the notch. Ongoing calls keep a compact status and duration; your selected tab returns afterward.")
                     Text("Answer, decline, mute, video and end controls appear only when the app exposes them. Open app remains available. iPhone calls must already be configured to work on this Mac.")
+                    Text("This prototype recognizes English native controls. Browser calls and changed app layouts may remain unavailable; use Open app in those cases.")
                     Text("If the app does not provide a connection time, the timer is labeled Detected and counts from first observation.")
                 }.font(.caption).foregroundStyle(.secondary).padding(6)
             }
