@@ -16,6 +16,7 @@ final class NativeCallBridge: @unchecked Sendable {
         let pid: pid_t
         let bundle: String
         let scope: AXUIElement
+        let window: AXUIElement
         let capturedAt: Date
     }
     private struct Candidate {
@@ -79,7 +80,11 @@ final class NativeCallBridge: @unchecked Sendable {
                 let controlIndices = Self.controlIndices(nodes)
                 let controls = controlIndices.map { Self.control(nodes[$0]) }
                 let context = nodes.flatMap(\.labels).joined(separator: " ")
-                guard let match = CallClassificationPolicy.classify(app: current.call.app, context: context, controls: controls),
+                let liveSource = Self.contextSource(Self.source(for: current.bundle), context: context, nodes: nodes)
+                guard liveSource == current.call.app,
+                      let match = CallClassificationPolicy.classify(app: current.call.app, context: context, controls: controls),
+                      Self.caller(in: nodes, windowTitle: CommunicationsAX.string(current.window, kAXTitleAttribute) ?? "",
+                                  app: current.call.app, phase: match.phase) == current.call.caller,
                       let index = match.actions[action], controlIndices.indices.contains(index) else {
                     continuation.resume(throwing: CommunicationActionError.expired); return
                 }
@@ -153,7 +158,7 @@ final class NativeCallBridge: @unchecked Sendable {
                     actions.insert(.open)
                     let call = CommunicationCall(id: id, app: candidate.source, caller: caller, phase: candidate.match.phase,
                                                  connectedAt: nil, observedAt: first, actions: actions)
-                    next[id] = Record(call: call, pid: process.pid, bundle: process.bundle, scope: scope.element, capturedAt: now)
+                    next[id] = Record(call: call, pid: process.pid, bundle: process.bundle, scope: scope.element, window: window, capturedAt: now)
                 }
             }
         }

@@ -54,7 +54,17 @@ final class CommunicationsManager: ObservableObject {
 
     func refreshAccess() {
         let granted = AXIsProcessTrusted()
+        let revoked = accessGranted && !granted
         if accessGranted != granted { accessGranted = granted }
+        if revoked {
+            generation += 1
+            calls = []; latestNotification = nil; alertTask?.cancel()
+            notifications = notifications.map { item in
+                var copy = item; copy.canReply = false; copy.canOpen = false; copy.canDismiss = false
+                return copy
+            }
+            Task { await notificationBridge.stop(); await callBridge.stop() }
+        }
         let text = !enabled ? "Communications is off" : (granted ? "Watching exposed notifications and call controls" : "Accessibility access is required")
         if statusText != text { statusText = text }
     }
@@ -95,6 +105,7 @@ final class CommunicationsManager: ObservableObject {
         async let observedNotifications = notificationBridge.scan(allowedApps: notificationApps)
         async let observedCalls = callBridge.scan(allowedApps: callApps)
         let (capturedMessages, observed) = await (observedNotifications, observedCalls)
+        refreshAccess()
         guard enabled, accessGranted, version == generation, !Task.isCancelled else { return }
         let now = Date()
         hiddenNotificationIDs.formIntersection(Set(capturedMessages.map(\.id)))
@@ -208,7 +219,8 @@ final class CommunicationsManager: ObservableObject {
         else { lastError = "Open \(app.title) to continue. This app could not be found on your Mac." }
     }
     func isCallMediaSource(_ bundleIdentifier: String) -> Bool {
-        calls.contains {
+        guard enabled, accessGranted else { return false }
+        return calls.contains {
             $0.app.bundleIdentifiers.contains(bundleIdentifier)
                 || ([CommunicationApp.faceTime, .phone].contains($0.app) && bundleIdentifier.lowercased().hasPrefix("com.apple.facetime"))
         }

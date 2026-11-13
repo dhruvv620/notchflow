@@ -12,13 +12,16 @@ struct CommunicationCompactActivity: View {
     private var app: CommunicationApp { call?.app ?? notification?.app ?? .messages }
     var body: some View {
         HStack(spacing: 6) {
-            Image(systemName: app.symbol)
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(call?.phase == .incoming ? Color.green : Color.accentColor)
-                .frame(width: 28)
+            HStack(spacing: 5) {
+                Image(systemName: app.symbol)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(call?.phase == .incoming ? Color.green : Color.accentColor)
+                Text(title).font(.system(size: 11, weight: .semibold)).lineLimit(1)
+            }.frame(width: 130, alignment: .leading)
             Color.clear.frame(width: max(0, cameraWidth))
             VStack(alignment: .leading, spacing: 1) {
-                Text(title).font(.system(size: 11, weight: .semibold)).lineLimit(1)
+                Text(call == nil ? app.title : (call?.phase == .incoming ? "Incoming call" : "Call"))
+                    .font(.system(size: 11, weight: .semibold)).lineLimit(1)
                 if let call, call.phase == .active {
                     TimelineView(.periodic(from: .now, by: 1)) { context in
                         Text(CommunicationsPolicy.durationLabel(call, now: context.date))

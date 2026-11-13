@@ -155,6 +155,8 @@ struct CommunicationsInboxView: View {
     }
     private func cancelReply() { replyTarget = nil; draft = ""; replyFocused = false }
     private func updateSuppression() {
-        vm.setAutoCloseSuppression(replyTarget != nil || busyID != nil, token: token)
+        let active = replyTarget != nil || busyID != nil
+        vm.setAutoCloseSuppression(active, token: token)
+        if !active { vm.shouldRecheckHover.toggle() }
     }
 }
