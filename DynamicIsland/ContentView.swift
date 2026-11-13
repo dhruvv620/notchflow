@@ -43,6 +43,8 @@ struct ContentView: View {
     @Default(.notchReduceMotion) private var notchReduceMotion
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @ObservedObject var coordinator = DynamicIslandViewCoordinator.shared
+    @ObservedObject private var communications = CommunicationsManager.shared
+    @State private var showCallControls = false
     @ObservedObject var musicManager = MusicManager.shared
     @ObservedObject var timerManager = TimerManager.shared
     @ObservedObject var reminderManager = ReminderLiveActivityManager.shared
@@ -501,6 +503,7 @@ struct ContentView: View {
 
 
     private var activeClosedBatterySurfaceShape: AnyShape? {
+        guard visibleCommunicationCall == nil, visibleCommunicationNotification == nil else { return nil }
         guard vm.notchState == .closed else { return nil }
         guard isBatteryHUDVisibleOnCurrentScreen else { return nil }
         guard let kind = batteryModel.activeTemporaryHUDKind else { return nil }
@@ -743,7 +746,12 @@ struct ContentView: View {
             .onReceive(NotificationCenter.default.publisher(for: .notchTabsDidChange)) { _ in
                 TabSelectionView.validateCurrentSelection()
             }
+            .onReceive(NotificationCenter.default.publisher(for: .notchTabExplicitSelection)) { _ in showCallControls = false }
+            .onChange(of: communications.calls.map(\.id)) { _, ids in
+                if ids.isEmpty { showCallControls = false; musicManager.forceUpdate() }
+            }
             .onChange(of: coordinator.currentView) { _, newValue in
+                showCallControls = false
                 if enableStatsFeature {
                     let currentViewString = newValue == .stats ? "stats" : "other"
                     statsManager.updateMonitoringState(
@@ -922,7 +930,13 @@ struct ContentView: View {
       func NotchLayout() -> some View {
           VStack(alignment: .leading) {
               VStack(alignment: .leading) {
-                  if coordinator.firstLaunch {
+                  if vm.notchState == .closed, let call = visibleCommunicationCall {
+                      CommunicationCompactActivity(call: call, notification: nil, cameraWidth: vm.closedNotchSize.width,
+                                                   height: vm.effectiveClosedNotchHeight)
+                  } else if vm.notchState == .closed, let notification = visibleCommunicationNotification {
+                      CommunicationCompactActivity(call: nil, notification: notification, cameraWidth: vm.closedNotchSize.width,
+                                                   height: vm.effectiveClosedNotchHeight)
+                  } else if coordinator.firstLaunch {
                       Spacer()
                       HelloAnimation().frame(width: 200, height: 80).onAppear(perform: {
                           vm.closeHello()
@@ -1142,6 +1156,15 @@ struct ContentView: View {
                               .frame(width: geometry.size.width, height: geometry.size.height, alignment: .top)
                               .id(coordinator.currentView)
                               .transition(tabSwitchTransition)
+                              .opacity(visibleCallOverlay == nil ? 1 : 0)
+                              .allowsHitTesting(visibleCallOverlay == nil)
+                              .accessibilityHidden(visibleCallOverlay != nil)
+                              .disabled(visibleCallOverlay != nil)
+                          if let call = visibleCallOverlay {
+                              CallIslandView(call: call)
+                                  .frame(width: geometry.size.width, height: geometry.size.height)
+                                  .transition(.opacity).zIndex(3)
+                          }
                       }
                       .frame(width: geometry.size.width, height: geometry.size.height, alignment: .top)
                       .clipped()
@@ -1153,6 +1176,21 @@ struct ContentView: View {
           }
       }
 
+    private var visibleCommunicationCall: CommunicationCall? {
+        guard communications.enabled, communications.accessGranted, interactionsEnabled else { return nil }
+        if Defaults[.communicationRespectFocus] && doNotDisturbManager.isDoNotDisturbActive && communications.priorityCall?.phase == .incoming { return nil }
+        return communications.priorityCall
+    }
+    private var visibleCommunicationNotification: CommunicationNotification? {
+        guard communications.enabled, communications.accessGranted, interactionsEnabled else { return nil }
+        if Defaults[.communicationRespectFocus] && doNotDisturbManager.isDoNotDisturbActive { return nil }
+        return communications.latestNotification
+    }
+    private var visibleCallOverlay: CommunicationCall? {
+        guard let call = visibleCommunicationCall, call.phase == .incoming || showCallControls else { return nil }
+        return call
+    }
+
     private var expandedHeaderHeight: CGFloat {
         notchExpandedHeaderHeight(for: vm.screen, closedHeight: vm.effectiveClosedNotchHeight, minimalistic: enableMinimalisticUI)
     }
@@ -1163,6 +1201,7 @@ struct ContentView: View {
         case .shelf: NotchShelfView()
         case .timer: NotchTimerView()
         case .reminders: NotchRemindersView()
+        case .notifications: CommunicationsInboxView()
         case .calendar:
             NotchScrollableContent { StandaloneCalendarView().padding(.horizontal, 12) }
         case .stats: NotchScrollableContent { NotchStatsView() }
@@ -1938,8 +1977,11 @@ struct ContentView: View {
 
     // MARK: - Private Methods
     private func openNotch() {
+        if visibleCommunicationCall != nil { showCallControls = true }
+        let opensNotification = visibleCommunicationCall == nil && visibleCommunicationNotification != nil
         withAnimation(.bouncy.speed(1.2)) {
             vm.open()
+            if opensNotification { coordinator.currentView = .notifications }
         }
     }
 

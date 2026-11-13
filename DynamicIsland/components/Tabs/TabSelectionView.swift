@@ -103,6 +103,9 @@ struct TabSelectionView: View {
         if Defaults[.enableRemindersFeature] {
             tabsArray.append(TabModel(label: "Todos", icon: "checklist", view: .reminders))
         }
+        if Defaults[.communicationsEnabled] {
+            tabsArray.append(TabModel(label: "Notifications", icon: "bell.badge", view: .notifications))
+        }
         if Defaults[.showCalendar] {
             tabsArray.append(TabModel(label: "Calendar", icon: "calendar", view: .calendar))
         }
@@ -167,6 +170,7 @@ struct TabSelectionView: View {
                         Button {
                             coordinator.selectedExtensionExperienceID = tab.experienceID
                             coordinator.currentView = tab.view
+                            NotificationCenter.default.post(name: .notchTabExplicitSelection, object: nil)
                         } label: {
                             Image(systemName: tab.icon)
                                 .font(.system(size: 13, weight: .medium))

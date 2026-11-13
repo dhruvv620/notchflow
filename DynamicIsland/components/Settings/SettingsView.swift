@@ -48,6 +48,7 @@ private enum SettingsTabGroup: String, CaseIterable, Identifiable {
 private enum SettingsTab: String, CaseIterable, Identifiable {
     case general
     case tabsAndFeatures
+    case communications
     case liveActivities
     case appearance
     case lockScreen
@@ -74,7 +75,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
     /// Which sidebar group this tab belongs to.
     var group: SettingsTabGroup {
         switch self {
-        case .general, .appearance, .tabsAndFeatures:                                          return .core
+        case .general, .appearance, .tabsAndFeatures, .communications:                                          return .core
         case .media, .liveActivities, .lockScreen, .devices:                 return .mediaAndDisplay
         case .hudAndOSD, .battery:                                           return .system
         case .timer, .calendar, .notes:                                      return .productivity
@@ -90,6 +91,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         switch self {
         case .general: return String(localized: "General")
         case .tabsAndFeatures: return String(localized: "Tabs & Features")
+        case .communications: return String(localized: "Communications")
         case .liveActivities: return String(localized: "Live Activities")
         case .appearance: return String(localized: "Appearance")
         case .lockScreen: return String(localized: "Lock Screen")
@@ -117,6 +119,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         switch self {
         case .general: return "gear"
         case .tabsAndFeatures: return "rectangle.3.group"
+        case .communications: return "phone.bubble"
         case .liveActivities: return "waveform.path.ecg"
         case .appearance: return "paintpalette"
         case .lockScreen: return "lock.laptopcomputer"
@@ -144,6 +147,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         switch self {
         case .general: return .blue
         case .tabsAndFeatures: return .indigo
+        case .communications: return .green
         case .liveActivities: return .pink
         case .appearance: return .purple
         case .lockScreen: return .orange
@@ -489,6 +493,7 @@ struct SettingsView: View {
             // Core
             .general,
             .tabsAndFeatures,
+            .communications,
             .appearance,
             // Media & Display
             .media,
@@ -700,6 +705,9 @@ struct SettingsView: View {
 
     private var settingsSearchIndex: [SettingsSearchEntry] {
         [
+            SettingsSearchEntry(tab: .communications, title: "Enable Communications", keywords: ["notifications", "messages", "imessage", "whatsapp", "instagram", "accessibility", "permission"], highlightID: SettingsTab.communications.highlightID(for: "Enable Communications")),
+            SettingsSearchEntry(tab: .communications, title: "Notification apps", keywords: ["reply", "inbox", "message", "notification", "preview", "focus"], highlightID: SettingsTab.communications.highlightID(for: "Notification apps")),
+            SettingsSearchEntry(tab: .communications, title: "Call Island", keywords: ["call", "facetime", "phone", "teams", "zoom", "answer", "decline", "mute"], highlightID: SettingsTab.communications.highlightID(for: "Call Island")),
             SettingsSearchEntry(tab: .tabsAndFeatures, title: "Tabs & Features", keywords: ["tabs", "features", "notch", "applications", "options"], highlightID: SettingsTab.tabsAndFeatures.highlightID(for: "Tabs & Features")),
             SettingsSearchEntry(tab: .tabsAndFeatures, title: "Tab visibility and order", keywords: ["reorder", "drag", "drop", "hide", "show", "music", "timers", "todos", "calendar"], highlightID: SettingsTab.tabsAndFeatures.highlightID(for: "Tab visibility and order")),
             SettingsSearchEntry(tab: .tabsAndFeatures, title: "Notch feature controls", keywords: ["enable", "disable", "clipboard", "stats", "notes", "terminal"], highlightID: SettingsTab.tabsAndFeatures.highlightID(for: "Notch feature controls")),
@@ -973,6 +981,10 @@ struct SettingsView: View {
                         selectedTab = target
                     }
                 }
+            }
+        case .communications:
+            SettingsForm(tab: .communications) {
+                CommunicationsSettingsView()
             }
         case .liveActivities:
             SettingsForm(tab: .liveActivities) {

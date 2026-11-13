@@ -40,6 +40,12 @@ jobs:
         run: |
           swiftc -swift-version 5 -parse-as-library DynamicIsland/models/PlaybackState.swift DynamicIsland/helpers/SystemNowPlayingSnapshot.swift DynamicIsland/helpers/JSONLinesPipeHandler.swift tests/SystemMediaRegression.swift -o /tmp/system-media-tests
           /tmp/system-media-tests
+      - name: Check communications policies
+        run: |
+          swiftc -swift-version 5 -parse-as-library DynamicIsland/Communications/CommunicationModels.swift DynamicIsland/Communications/CommunicationsPolicy.swift DynamicIsland/Communications/CallClassificationPolicy.swift tests/CommunicationsRegression.swift -o /tmp/communications-tests
+          /tmp/communications-tests
+          swiftc -swift-version 5 -parse-as-library DynamicIsland/Communications/CommunicationModels.swift DynamicIsland/Communications/NotificationCardPolicy.swift tests/NotificationCardRegression.swift -o /tmp/notification-tests
+          /tmp/notification-tests
 
   build:
     name: macOS — ${{ matrix.configuration }}
@@ -138,6 +144,15 @@ jobs:
         run: |
           xcrun swiftc -swift-version 5 -parse-as-library DynamicIsland/models/PlaybackState.swift DynamicIsland/helpers/SystemNowPlayingSnapshot.swift DynamicIsland/helpers/JSONLinesPipeHandler.swift tests/SystemMediaRegression.swift -o "$RUNNER_TEMP/SystemMediaRegression"
           "$RUNNER_TEMP/SystemMediaRegression"
+
+      - name: Check native hosting size ownership and communications
+        run: |
+          xcrun swiftc -swift-version 5 -parse-as-library DynamicIsland/helpers/NotchHostingView.swift tests/NotchHostingSizeRegression.swift -o "$RUNNER_TEMP/NotchHostingSizeRegression"
+          "$RUNNER_TEMP/NotchHostingSizeRegression"
+          xcrun swiftc -swift-version 5 -parse-as-library DynamicIsland/Communications/CommunicationModels.swift DynamicIsland/Communications/CommunicationsPolicy.swift DynamicIsland/Communications/CallClassificationPolicy.swift tests/CommunicationsRegression.swift -o "$RUNNER_TEMP/CommunicationsRegression"
+          "$RUNNER_TEMP/CommunicationsRegression"
+          xcrun swiftc -swift-version 5 -parse-as-library DynamicIsland/Communications/CommunicationModels.swift DynamicIsland/Communications/NotificationCardPolicy.swift tests/NotificationCardRegression.swift -o "$RUNNER_TEMP/NotificationCardRegression"
+          "$RUNNER_TEMP/NotificationCardRegression"
 
       - name: Prepare Metal toolchain
         shell: bash

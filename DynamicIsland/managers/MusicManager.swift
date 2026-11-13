@@ -683,8 +683,16 @@ class MusicManager: ObservableObject {
     }
 
     // MARK: - Update Methods
+    @MainActor func excludeCallPlaybackIfNeeded() {
+        guard selectedMediaSource == .nowPlaying,
+              CommunicationsManager.shared.isCallMediaSource(bundleIdentifier ?? "") else { return }
+        updateFromPlaybackState(SystemNowPlayingSnapshot.empty())
+        isPlayerIdle = true
+    }
+
     @MainActor
     private func updateFromPlaybackState(_ state: PlaybackState) {
+        if selectedMediaSource == .nowPlaying && CommunicationsManager.shared.isCallMediaSource(state.bundleIdentifier) { return }
         // Check for playback state changes (playing/paused)
         let eventIsPlaying = state.isPlaying
         let expectedState = pendingOptimisticPlayState

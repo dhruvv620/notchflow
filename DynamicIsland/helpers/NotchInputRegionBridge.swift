@@ -177,7 +177,10 @@ final class NotchWindowInputController {
         let visible = window.isVisible && window.alphaValue > 0.01
         let location = NSEvent.mouseLocation
         let inside = visible && probe?.contains(screenPoint: location) == true
-        window.ignoresMouseEvents = !(visible && (inside || capturedPress))
+        let ignoresMouseEvents = !(visible && (inside || capturedPress))
+        if window.ignoresMouseEvents != ignoresMouseEvents {
+            window.ignoresMouseEvents = ignoresMouseEvents
+        }
         deliverHover(visible && probe?.containsHoverActivation(screenPoint: location) == true)
     }
 

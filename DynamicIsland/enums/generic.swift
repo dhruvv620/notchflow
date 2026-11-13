@@ -81,6 +81,7 @@ public enum NotchViews {
     case clipboard
     case terminal
     case reminders
+    case notifications
     case calendar
     case extensionExperience
 }

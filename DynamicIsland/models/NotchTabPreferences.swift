@@ -15,7 +15,7 @@ extension Notification.Name {
 }
 
 enum NotchBuiltinTab: String, CaseIterable, Identifiable {
-    case music, shelf, timers, stats, usage, notes, clipboard, todos, calendar, terminal
+    case music, shelf, timers, stats, usage, notes, clipboard, todos, notifications, calendar, terminal
     var id: String { rawValue }
     var title: String {
         switch self {
@@ -27,6 +27,7 @@ enum NotchBuiltinTab: String, CaseIterable, Identifiable {
         case .notes: return "Notes"
         case .clipboard: return "Clipboard"
         case .todos: return "Todos"
+        case .notifications: return "Notifications"
         case .calendar: return "Calendar"
         case .terminal: return "Terminal"
         }
@@ -41,6 +42,7 @@ enum NotchBuiltinTab: String, CaseIterable, Identifiable {
         case .notes: return "note.text"
         case .clipboard: return "doc.on.clipboard"
         case .todos: return "checklist"
+        case .notifications: return "bell.badge"
         case .calendar: return "calendar"
         case .terminal: return "apple.terminal"
         }
@@ -55,6 +57,7 @@ enum NotchBuiltinTab: String, CaseIterable, Identifiable {
         case .notes: return .notes
         case .clipboard: return .clipboard
         case .todos: return .reminders
+        case .notifications: return .notifications
         case .calendar: return .calendar
         case .terminal: return .terminal
         }
@@ -72,6 +75,7 @@ enum NotchBuiltinTab: String, CaseIterable, Identifiable {
         case .notes: return Defaults[.enableNotes]
         case .clipboard: return Defaults[.enableClipboardManager]
         case .todos: return Defaults[.enableRemindersFeature]
+        case .notifications: return Defaults[.communicationsEnabled]
         case .calendar: return Defaults[.showCalendar]
         case .terminal: return Defaults[.enableTerminalFeature]
         }
@@ -86,6 +90,7 @@ enum NotchBuiltinTab: String, CaseIterable, Identifiable {
         case .notes: return "notes"
         case .clipboard: return "clipboard"
         case .todos: return "calendar"
+        case .notifications: return "communications"
         case .calendar: return "calendar"
         case .terminal: return "terminal"
         }
@@ -128,6 +133,7 @@ final class NotchTabPreferences: ObservableObject {
         changes.append(Defaults.publisher(.enableThirdPartyExtensions, options: []).map { _ in true }.eraseToAnyPublisher())
         changes.append(Defaults.publisher(.enableExtensionNotchExperiences, options: []).map { _ in true }.eraseToAnyPublisher())
         changes.append(Defaults.publisher(.enableExtensionNotchTabs, options: []).map { _ in true }.eraseToAnyPublisher())
+        changes.append(Defaults.publisher(.communicationsEnabled, options: []).map { _ in true }.eraseToAnyPublisher())
         Publishers.MergeMany(changes)
             .receive(on: RunLoop.main).sink { [weak self] _ in
             self?.revision += 1

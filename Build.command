@@ -74,6 +74,14 @@ printf '\nChecking live system media updates...\n'
     "$SOURCE_DIR/tests/SystemMediaRegression.swift" -o "$BUILD_ROOT/SystemMediaRegression"
 "$BUILD_ROOT/SystemMediaRegression"
 
+printf '\nChecking native hosting and communications...\n'
+/usr/bin/xcrun swiftc -swift-version 5 -parse-as-library "$SOURCE_DIR/DynamicIsland/helpers/NotchHostingView.swift" "$SOURCE_DIR/tests/NotchHostingSizeRegression.swift" -o "$BUILD_ROOT/NotchHostingSizeRegression"
+"$BUILD_ROOT/NotchHostingSizeRegression"
+/usr/bin/xcrun swiftc -swift-version 5 -parse-as-library "$SOURCE_DIR/DynamicIsland/Communications/CommunicationModels.swift" "$SOURCE_DIR/DynamicIsland/Communications/CommunicationsPolicy.swift" "$SOURCE_DIR/DynamicIsland/Communications/CallClassificationPolicy.swift" "$SOURCE_DIR/tests/CommunicationsRegression.swift" -o "$BUILD_ROOT/CommunicationsRegression"
+"$BUILD_ROOT/CommunicationsRegression"
+/usr/bin/xcrun swiftc -swift-version 5 -parse-as-library "$SOURCE_DIR/DynamicIsland/Communications/CommunicationModels.swift" "$SOURCE_DIR/DynamicIsland/Communications/NotificationCardPolicy.swift" "$SOURCE_DIR/tests/NotificationCardRegression.swift" -o "$BUILD_ROOT/NotificationCardRegression"
+"$BUILD_ROOT/NotificationCardRegression"
+
 /usr/bin/xcodebuild -resolvePackageDependencies \
     -project "$SOURCE_DIR/DynamicIsland.xcodeproj" -scheme DynamicIsland \
     -clonedSourcePackagesDirPath "$BUILD_ROOT/Packages" \

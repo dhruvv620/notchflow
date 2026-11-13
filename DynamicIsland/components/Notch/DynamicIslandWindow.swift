@@ -24,6 +24,7 @@ import Cocoa
 
 class DynamicIslandWindow: NSPanel {
     private var inputController: NotchWindowInputController?
+    private var inputRefreshScheduled = false
 
     override init(
         contentRect: NSRect,
@@ -74,7 +75,16 @@ class DynamicIslandWindow: NSPanel {
 
     override func setFrame(_ frameRect: NSRect, display flag: Bool) {
         super.setFrame(frameRect, display: flag)
-        inputController?.refresh()
+        // AppKit may call this while laying out its hosting view. Keep native
+        // event-property writes out of that window display/constraint cycle.
+        // Probe state updates still clamp the collapsed region immediately.
+        guard !inputRefreshScheduled else { return }
+        inputRefreshScheduled = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.inputRefreshScheduled = false
+            self.inputController?.refresh()
+        }
     }
 
     override var alphaValue: CGFloat {
