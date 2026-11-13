@@ -143,6 +143,7 @@ struct NotchTabsSettingsView: View {
                     featureToggle("Color picker", symbol: "eyedropper", key: .enableColorPickerFeature, destination: "colorPicker")
                     featureToggle("Download alerts", symbol: "arrow.down.circle", key: .enableDownloadListener, destination: "downloads")
                     featureToggle("System HUDs", symbol: "speaker.wave.2", key: .enableSystemHUD, destination: "hudAndOSD")
+                    featureToggle("Upcoming reminder activity", symbol: "calendar.badge.clock", key: .enableReminderLiveActivity, destination: "liveActivities")
                     settingsLink("Appearance and size", symbol: "paintpalette", destination: "appearance")
                     settingsLink("Live activities", symbol: "waveform.path.ecg", destination: "liveActivities")
                     settingsLink("Calendar and Reminders access", symbol: "calendar", destination: "calendar")
@@ -151,7 +152,7 @@ struct NotchTabsSettingsView: View {
                     settingsLink("Keyboard shortcuts", symbol: "keyboard", destination: "shortcuts")
                 }.padding(6)
             }
-            Text("Turning Clipboard off stops collecting new copies. Tab visibility alone keeps the feature running.")
+            Text("Turning Clipboard off stops collecting new copies. Hiding a tab only removes its icon; reminder activity is controlled separately above.")
                 .font(.caption).foregroundStyle(.secondary)
         }
         .settingsHighlight(id: "tabsAndFeatures-Notch feature controls")

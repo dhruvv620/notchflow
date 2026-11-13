@@ -803,7 +803,7 @@ struct SettingsView: View {
             SettingsSearchEntry(tab: .media, title: "Enable album art parallax effect", keywords: ["parallax", "parallax effect", "album art"], highlightID: SettingsTab.media.highlightID(for: "Enable album art parallax effect")),
 
             // Calendar
-            SettingsSearchEntry(tab: .calendar, title: "Show Reminders tab", keywords: ["reminders", "apple reminders", "tasks", "lists"], highlightID: SettingsTab.calendar.highlightID(for: "Show Reminders tab")),
+            SettingsSearchEntry(tab: .calendar, title: "Enable Todos tab", keywords: ["reminders", "apple reminders", "tasks", "lists", "hide todos"], highlightID: SettingsTab.calendar.highlightID(for: "Show Reminders tab")),
             SettingsSearchEntry(tab: .calendar, title: "Show calendar", keywords: ["calendar", "events"], highlightID: SettingsTab.calendar.highlightID(for: "Show calendar")),
             SettingsSearchEntry(tab: .calendar, title: "Enable reminder live activity", keywords: ["reminder", "live activity"], highlightID: SettingsTab.calendar.highlightID(for: "Enable reminder live activity")),
             SettingsSearchEntry(tab: .calendar, title: "Countdown style", keywords: ["reminder countdown"], highlightID: SettingsTab.calendar.highlightID(for: "Countdown style")),
@@ -3214,10 +3214,10 @@ struct CalendarSettings: View {
         Form {
             Section {
                 Defaults.Toggle(key: .enableRemindersFeature) {
-                    Text("Show Reminders tab")
+                    Text("Enable Todos tab")
                 }
                 .settingsHighlight(id: highlightID("Show Reminders tab"))
-                Text("View and create reminders in your Apple Reminders lists from the notch.")
+                Text("View and create reminders in your Apple Reminders lists from the notch. This is separate from the upcoming-reminder live activity.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -3287,7 +3287,7 @@ struct CalendarSettings: View {
 
                 Section(header: Text("Reminder Live Activity")) {
                     Defaults.Toggle(key: .enableReminderLiveActivity) {
-                        Text("Enable reminder live activity")
+                        Text("Show upcoming reminders in the closed notch")
                     }
                     .settingsHighlight(id: highlightID("Enable reminder live activity"))
 

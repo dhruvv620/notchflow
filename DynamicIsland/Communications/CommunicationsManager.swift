@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import AppKit
-import ApplicationServices
 import Combine
 import Defaults
 import SwiftUI
@@ -30,6 +29,7 @@ final class CommunicationsManager: ObservableObject {
     @Published private(set) var latestNotification: CommunicationNotification?
     private let notificationBridge = NativeNotificationBridge()
     private let callBridge = NativeCallBridge()
+    private let accessibilityPermission = AccessibilityPermissionStore.shared
     private var loop: Task<Void, Never>?
     private var alertTask: Task<Void, Never>?
     private var subscriptions = Set<AnyCancellable>()
@@ -49,11 +49,20 @@ final class CommunicationsManager: ObservableObject {
         changes.append(Defaults.publisher(.communicationNotificationApps, options: []).map { _ in true }.eraseToAnyPublisher())
         changes.append(Defaults.publisher(.communicationCallApps, options: []).map { _ in true }.eraseToAnyPublisher())
         Publishers.MergeMany(changes).receive(on: RunLoop.main).sink { [weak self] _ in self?.configure() }.store(in: &subscriptions)
+        accessibilityPermission.$isAuthorized
+            .removeDuplicates()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] granted in self?.applyAccessStatus(granted) }
+            .store(in: &subscriptions)
         configure()
     }
 
     func refreshAccess() {
-        let granted = AXIsProcessTrusted()
+        accessibilityPermission.refreshStatus()
+        applyAccessStatus(accessibilityPermission.isAuthorized)
+    }
+
+    private func applyAccessStatus(_ granted: Bool) {
         let revoked = accessGranted && !granted
         if accessGranted != granted { accessGranted = granted }
         if revoked {
@@ -69,9 +78,7 @@ final class CommunicationsManager: ObservableObject {
         if statusText != text { statusText = text }
     }
     func requestAccess() {
-        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
-        _ = AXIsProcessTrustedWithOptions(options)
-        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") { NSWorkspace.shared.open(url) }
+        accessibilityPermission.requestAuthorizationPrompt()
         refreshAccess()
     }
     private func configure() {

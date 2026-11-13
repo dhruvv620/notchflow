@@ -22,7 +22,7 @@ bash Build.command
 
 Save uncommitted work before switching. If this local branch already exists, use `git switch fresh/reminders-liquid-glass` and `git pull --ff-only`.
 
-`Build.command` uses cached packages and a Debug build, signs locally without a paid Apple developer account, and installs `~/Applications/NotchFlow.app`. It backs up an existing app before replacement. Quit any older notch app before opening it. The full build output is saved as `Build.log` next to the script.
+`Build.command` uses cached packages and a Debug build and installs `~/Applications/NotchFlow.app`. When Xcode has an Apple Development (or Developer ID) identity, the script reuses it so privacy grants remain attached to the same signed application identity. It falls back to ad-hoc signing without a paid developer account, with a warning that Accessibility may then require reapproval after rebuilding. Existing app backups are kept under `~/Library/Application Support/NotchFlow/Build Backups` rather than beside the live app, preventing several backup copies from appearing as indistinguishable permission rows. Quit any older notch app before opening the new build. The full build output is saved as `Build.log` next to the script.
 
 For the fastest edit/build/run loop, open `DynamicIsland.xcodeproj`, choose scheme **DynamicIsland**, destination **My Mac**, configuration **Debug**, and use Command-R. The product is NotchFlow.app. To build the optimized configuration with the script:
 
@@ -38,7 +38,7 @@ In the standard layout, select the checklist tab to open Todos. Use Open and Don
 
 Data is read and saved directly through Apple's EventKit store; there is no separate task database or account login. Cloud synchronization follows the account configured in Apple Reminders. Undated reminders are included. Read-only lists remain visible, and creation uses a writable list. The panel refreshes after saves, when EventKit reports a change, and when the app becomes active.
 
-Use **Settings > Tabs & Features > Tabs** to control visibility and order; the Features segment enables the underlying tools. The tab bar is part of Standard UI; if Minimalistic UI is enabled, switch back to Standard to use it. Existing calendar/reminder live activities are retained.
+Use **Settings > Tabs & Features > Tabs** to control visibility and order; the Features segment enables the underlying tools. The tab bar is part of Standard UI; if Minimalistic UI is enabled, switch back to Standard to use it. The Todos tab and the separate upcoming-reminder activity are off by default. Enable either one explicitly; disabling the activity removes reminder takeovers from the closed notch without affecting Apple Reminders data.
 
 The Allow button brings NotchFlow forward for the macOS prompt. It shows a waiting state, reports refusals/errors, and offers Open Privacy Settings and Check Access even if the prompt stalls. If access is denied, open **System Settings > Privacy & Security > Reminders**, grant access and choose Check Access. If no lists exist, create one in Apple Reminders first. Errors stay visible and failed saves do not hide reminder rows.
 
@@ -93,7 +93,7 @@ Compact keeps Clipboard and Todos at Music's original panel size. Spacious and C
 
 ## Verification
 
-GitHub's **NotchFlow Native Build** workflow compiles Debug on macOS 15 and Release on macOS 26 with Xcode 26+ and pinned packages, checks privacy declarations, and runs isolated Reminders/date-parser/clipboard/timer/tab-order/input-region/system-media regression executables. A separate Swift/Linux job compiles and runs the pure Foundation date, clipboard, timer, tab-order and system-media checks independently of macOS runner capacity. Build logs and Xcode result bundles are retained as workflow artifacts. These are compile and logic checks, not a claim of visual or account-sync validation.
+GitHub's **NotchFlow Native Build** workflow compiles Debug on macOS 15 and Release on macOS 26 with Xcode 26+ and pinned packages, checks privacy declarations, and runs isolated Reminders/date-parser/clipboard/timer/tab-order/Shelf-cleanup/input-region/system-media regression executables. A separate Swift/Linux job compiles and runs the pure Foundation date, clipboard, timer, tab-order, Shelf-cleanup and system-media checks independently of macOS runner capacity. Build logs and Xcode result bundles are retained as workflow artifacts. These are compile and logic checks, not a claim of visual or account-sync validation.
 
 The regression checks use a fake service and never request access to real reminder data. To run them manually on a Mac:
 
@@ -135,6 +135,8 @@ The editing environment is Linux. It cannot provide a real notch screenshot or v
 ## Communications prototype
 
 Enable **Settings > Communications > Enable Communications**, select notification/call apps, then use **Allow Access** to grant macOS Accessibility access. Return and choose **Check Access**. This feature is off by default. Notification permission for NotchFlow's own alerts does not grant access to other apps' notifications.
+
+Accessibility belongs to the exact bundle identifier and signing identity, not the visible app name. Debug and Release now share one NotchFlow bundle identifier, and a one-time migration preserves missing settings from the former `.dev` preference domain. If Privacy & Security shows duplicate NotchFlow rows or Check Access remains unavailable, choose **Repair Stale Entries** in Communications settings (or **Repair** in the Notifications tab), approve the new macOS prompt for the currently running copy, and return to NotchFlow. **Reveal This NotchFlow** locates that copy in Finder. Repair resets only the current and former NotchFlow Accessibility records; it does not change other applications' permissions.
 
 A Notifications tab joins the existing icon strip (and can be hidden/reordered in Tabs & Features). It keeps up to 20 observed notifications in memory until cleared or the app quits. Native Notification Center cards must be exposed and visible; this does not import private notification databases, encrypted message histories or every background push. Reply/Open/Dismiss are advertised only for live exposed actions. Historical cards offer Open app. Reply uses the native card's editor and Send action after the same source/sender/body is revalidated; no coordinate clicks, keyboard injection or automatic replies are used. Some native layouts do not expose Reply or an editable field; Open app remains the fallback. Instagram/browser notifications are conditional on a recognizable native app header.
 

@@ -29,6 +29,8 @@ final class AccessibilityPermissionStore: ObservableObject {
     static let shared = AccessibilityPermissionStore()
 
     @Published private(set) var isAuthorized: Bool = AccessibilityPermissionStore.isAccessibilityAuthorized()
+    @Published private(set) var isRepairing = false
+    @Published private(set) var recoveryMessage: String?
 
     private var pollingTask: Task<Void, Never>?
 
@@ -43,12 +45,66 @@ final class AccessibilityPermissionStore: ObservableObject {
     }
 
     func requestAuthorizationPrompt() {
+        recoveryMessage = nil
 #if canImport(ApplicationServices)
         let promptKey = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
         let options: CFDictionary = [promptKey: true] as CFDictionary
         _ = AXIsProcessTrustedWithOptions(options)
 #endif
         beginPollingForStatusChanges()
+    }
+
+    /// Removes only NotchFlow's current/legacy Accessibility records, then asks
+    /// macOS to register the exact copy that is currently running. This is an
+    /// explicit recovery action for stale rows left by older local builds.
+    func repairAuthorization() async {
+        guard !isRepairing else { return }
+        isRepairing = true
+        recoveryMessage = nil
+        defer { isRepairing = false }
+
+#if os(macOS)
+        let identifiers = Set([
+            Bundle.main.bundleIdentifier,
+            "com.dhruvv620.NotchFlowFresh",
+            "com.dhruvv620.NotchFlowFresh.dev",
+        ].compactMap { $0 })
+        let failures = await Task.detached(priority: .userInitiated) {
+            var failed: [String] = []
+            for identifier in identifiers {
+                let process = Process()
+                process.executableURL = URL(fileURLWithPath: "/usr/bin/tccutil")
+                process.arguments = ["reset", "Accessibility", identifier]
+                process.standardOutput = FileHandle.nullDevice
+                process.standardError = FileHandle.nullDevice
+                do {
+                    try process.run()
+                    process.waitUntilExit()
+                    if process.terminationStatus != 0 { failed.append(identifier) }
+                } catch {
+                    failed.append(identifier)
+                }
+            }
+            return failed
+        }.value
+
+        refreshStatus()
+        if failures.isEmpty {
+            requestAuthorizationPrompt()
+            recoveryMessage = "Old NotchFlow Accessibility entries were reset. Approve the prompt for this running copy."
+        } else {
+            recoveryMessage = "macOS could not reset the stale entry. Remove every NotchFlow row in Accessibility settings, add this app again, then choose Check Access."
+            openSystemSettings()
+        }
+#else
+        refreshStatus()
+#endif
+    }
+
+    func revealRunningApplication() {
+#if os(macOS)
+        NSWorkspace.shared.activateFileViewerSelecting([Bundle.main.bundleURL])
+#endif
     }
 
     func openSystemSettings() {
@@ -79,6 +135,9 @@ final class AccessibilityPermissionStore: ObservableObject {
     private func updateAuthorizationStatus(to newValue: Bool) {
         guard newValue != isAuthorized else { return }
         isAuthorized = newValue
+        if newValue {
+            recoveryMessage = nil
+        }
         if !newValue {
             beginPollingForStatusChanges()
         }

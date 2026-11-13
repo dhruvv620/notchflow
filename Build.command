@@ -66,6 +66,12 @@ printf '\nChecking timer modes, tab ordering and visible input regions...\n'
     "$SOURCE_DIR/tests/NotchInputRegionRegression.swift" -o "$BUILD_ROOT/NotchInputRegionRegression"
 "$BUILD_ROOT/NotchInputRegionRegression"
 
+printf '\nChecking Shelf cleanup reconciliation...\n'
+/usr/bin/xcrun swiftc -swift-version 5 -parse-as-library \
+    "$SOURCE_DIR/DynamicIsland/components/Shelf/Models/ShelfCleanupPolicy.swift" \
+    "$SOURCE_DIR/tests/ShelfCleanupRegression.swift" -o "$BUILD_ROOT/ShelfCleanupRegression"
+"$BUILD_ROOT/ShelfCleanupRegression"
+
 printf '\nChecking live system media updates...\n'
 /usr/bin/xcrun swiftc -swift-version 5 -parse-as-library \
     "$SOURCE_DIR/DynamicIsland/models/PlaybackState.swift" \
@@ -108,22 +114,58 @@ BUNDLE_ID="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$BUILT_APP/
 /usr/libexec/PlistBuddy -c "Set :com.apple.security.temporary-exception.mach-lookup.global-name:0 $BUNDLE_ID-spks" "$LOCAL_ENTITLEMENTS"
 /usr/libexec/PlistBuddy -c "Set :com.apple.security.temporary-exception.mach-lookup.global-name:1 $BUNDLE_ID-spki" "$LOCAL_ENTITLEMENTS"
 
+# Accessibility grants are tied to a code identity, not merely the visible app
+# name. Reusing an installed development identity prevents each local rebuild
+# from looking like another NotchFlow copy to TCC. Fall back to ad-hoc signing
+# only on Macs without any usable code-signing identity.
+SIGNING_IDENTITY="${NOTCHFLOW_SIGNING_IDENTITY:-}"
+if [ -z "$SIGNING_IDENTITY" ]; then
+    SIGNING_IDENTITY="$(/usr/bin/security find-identity -v -p codesigning 2>/dev/null \
+        | /usr/bin/awk '/"Apple Development:/{print $2; exit}' || true)"
+fi
+if [ -z "$SIGNING_IDENTITY" ]; then
+    SIGNING_IDENTITY="$(/usr/bin/security find-identity -v -p codesigning 2>/dev/null \
+        | /usr/bin/awk '/"Developer ID Application:/{print $2; exit}' || true)"
+fi
+if [ -z "$SIGNING_IDENTITY" ]; then
+    SIGNING_IDENTITY='-'
+    printf '\nWarning: no stable code-signing identity was found; using ad-hoc signing.\n'
+    printf 'Accessibility may need to be granted again after a rebuild. Add an Apple Development certificate in Xcode Accounts to make the grant stable.\n'
+else
+    printf '\nSigning with a stable local identity: %s\n' "$SIGNING_IDENTITY"
+fi
+
 while IFS= read -r -d '' item; do
     if /usr/bin/file -b "$item" | /usr/bin/grep -q 'Mach-O'; then
-        /usr/bin/codesign --force --sign - "$item"
+        /usr/bin/codesign --force --sign "$SIGNING_IDENTITY" "$item"
     fi
 done < <(/usr/bin/find "$BUILT_APP/Contents" -type f -print0)
 while IFS= read -r -d '' item; do
-    /usr/bin/codesign --force --sign - "$item"
+    /usr/bin/codesign --force --sign "$SIGNING_IDENTITY" "$item"
 done < <(/usr/bin/find "$BUILT_APP/Contents" -depth -type d \
     \( -name '*.framework' -o -name '*.xpc' -o -name '*.app' \) -print0)
-/usr/bin/codesign --force --sign - --options runtime --entitlements "$LOCAL_ENTITLEMENTS" "$BUILT_APP"
+/usr/bin/codesign --force --sign "$SIGNING_IDENTITY" --options runtime --entitlements "$LOCAL_ENTITLEMENTS" "$BUILT_APP"
 /usr/bin/codesign --verify --deep --strict "$BUILT_APP"
 
 INSTALL_APP="$HOME/Applications/NotchFlow.app"
+BACKUP_ROOT="$HOME/Library/Application Support/NotchFlow/Build Backups"
 mkdir -p "$HOME/Applications"
+mkdir -p "$BACKUP_ROOT"
+
+# Older versions placed runnable backup bundles directly in ~/Applications.
+# Keep those backups, but move them out of the application search path so
+# macOS does not present several indistinguishable NotchFlow permission rows.
+while IFS= read -r -d '' legacy_backup; do
+    legacy_name="$(/usr/bin/basename "$legacy_backup")"
+    destination="$BACKUP_ROOT/$legacy_name"
+    if [ -e "$destination" ]; then
+        destination="$BACKUP_ROOT/${legacy_name%.app}-$(date +%Y%m%d-%H%M%S).app"
+    fi
+    /bin/mv "$legacy_backup" "$destination"
+done < <(/usr/bin/find "$HOME/Applications" -maxdepth 1 -type d -name 'NotchFlow Backup *.app' -print0)
+
 if [ -e "$INSTALL_APP" ]; then
-    BACKUP_APP="$HOME/Applications/NotchFlow Backup $(date +%Y%m%d-%H%M%S).app"
+    BACKUP_APP="$BACKUP_ROOT/NotchFlow Backup $(date +%Y%m%d-%H%M%S).app"
     /bin/mv "$INSTALL_APP" "$BACKUP_APP"
     printf 'Previous app saved as %s\n' "$BACKUP_APP"
 fi

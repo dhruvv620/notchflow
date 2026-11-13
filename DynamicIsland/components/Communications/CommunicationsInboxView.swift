@@ -5,6 +5,7 @@ import SwiftUI
 struct CommunicationsInboxView: View {
     @EnvironmentObject private var vm: DynamicIslandViewModel
     @ObservedObject private var manager = CommunicationsManager.shared
+    @ObservedObject private var accessibilityPermission = AccessibilityPermissionStore.shared
     @Default(.communicationsEnabled) private var enabled
     @Default(.communicationShowPreviews) private var showPreviews
     @State private var replyTarget: CommunicationNotification?
@@ -21,9 +22,11 @@ struct CommunicationsInboxView: View {
                     Button("Enable Communications") { enabled = true; manager.refreshAccess() }
                 }
             } else if !manager.accessGranted {
-                state("Accessibility access is needed", detail: "Allow access to read visible notifications and use their native actions.") {
+                state("Accessibility access is needed", detail: permissionDetail) {
                     Button("Allow Access", action: manager.requestAccess)
                     Button("Check Access", action: manager.refreshAccess)
+                    Button("Repair") { Task { await accessibilityPermission.repairAuthorization() } }
+                        .disabled(accessibilityPermission.isRepairing)
                 }
             } else {
                 ScrollView {
@@ -152,6 +155,10 @@ struct CommunicationsInboxView: View {
             Text(detail).font(.caption2).foregroundStyle(.secondary).multilineTextAlignment(.center)
             HStack(spacing: 8, content: actions).controlSize(.small)
         }.padding(.vertical, 6).frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+    private var permissionDetail: String {
+        accessibilityPermission.recoveryMessage
+            ?? "Grant access to this exact NotchFlow copy. If macOS shows duplicate NotchFlow rows, choose Repair and approve the new prompt."
     }
     private func cancelReply() { replyTarget = nil; draft = ""; replyFocused = false }
     private func updateSuppression() {

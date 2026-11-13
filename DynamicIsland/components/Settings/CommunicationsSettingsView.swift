@@ -5,6 +5,7 @@ import SwiftUI
 
 struct CommunicationsSettingsView: View {
     @ObservedObject private var manager = CommunicationsManager.shared
+    @ObservedObject private var accessibilityPermission = AccessibilityPermissionStore.shared
     @EnvironmentObject private var highlightCoordinator: SettingsHighlightCoordinator
     @Default(.communicationsEnabled) private var enabled
     @Default(.communicationNotificationApps) private var notificationApps
@@ -38,10 +39,21 @@ struct CommunicationsSettingsView: View {
                                 if !manager.accessGranted { Button("Allow Access", action: manager.requestAccess) }
                                 Button("Check Access", action: manager.refreshAccess)
                             }
-                            Button("Open Accessibility Settings") {
-                                if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") { NSWorkspace.shared.open(url) }
+                            HStack {
+                                Button("Open Accessibility Settings", action: accessibilityPermission.openSystemSettings)
+                                Button("Reveal This NotchFlow", action: accessibilityPermission.revealRunningApplication)
+                                if !manager.accessGranted {
+                                    Button(accessibilityPermission.isRepairing ? "Repairing…" : "Repair Stale Entries") {
+                                        Task { await accessibilityPermission.repairAuthorization() }
+                                    }
+                                    .disabled(accessibilityPermission.isRepairing)
+                                }
                             }.font(.caption)
                             Text(manager.statusText).font(.caption).foregroundStyle(.secondary)
+                            if !manager.accessGranted {
+                                Text(accessibilityPermission.recoveryMessage ?? "Accessibility is tied to the exact signed app copy. Duplicate NotchFlow rows usually belong to older local builds; reveal this copy or reset the stale entries before approving it again.")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
                             if let error = manager.lastError { Text(error).font(.caption).foregroundStyle(.orange) }
                         }.padding(6)
                     }

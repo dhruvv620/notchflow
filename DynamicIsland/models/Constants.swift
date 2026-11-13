@@ -1139,7 +1139,10 @@ extension Defaults.Keys {
     
     
     // MARK: Reminder Live Activity
-    static let enableReminderLiveActivity = Key<Bool>("enableReminderLiveActivity", default: true)
+    // Upcoming reminders take over the closed notch, so this must be an
+    // explicit opt-in rather than appearing merely because Reminders access
+    // was granted for the Todos tab.
+    static let enableReminderLiveActivity = Key<Bool>("enableReminderLiveActivity", default: false)
     static let reminderPresentationStyle = Key<ReminderPresentationStyle>("reminderPresentationStyle", default: .ringCountdown)
     static let reminderLeadTime = Key<Int>("reminderLeadTime", default: 5)
     static let reminderSneakPeekDuration = Key<Double>("reminderSneakPeekDuration", default: 5)
@@ -1296,7 +1299,9 @@ extension Defaults.Keys {
     static let showLiveCanvasInDynamicIsland = Key<Bool>("showLiveCanvasInDynamicIsland", default: false)
     
     // MARK: Notes Feature
-    static let enableRemindersFeature = Key<Bool>("enableRemindersFeature", default: true)
+    // The Todos tab is optional.  Keep it out of the notch until the user
+    // deliberately enables it from Tabs & Features or Calendar settings.
+    static let enableRemindersFeature = Key<Bool>("enableRemindersFeature", default: false)
     static let enableNotes = Key<Bool>("enableNotes", default: false)
     static let enableNotePinning = Key<Bool>("enableNotePinning", default: true)
     static let enableNoteSearch = Key<Bool>("enableNoteSearch", default: false)

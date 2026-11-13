@@ -14,6 +14,7 @@ struct NotchTabOrderRegression {
         let order = ["todos", "clipboard", "music", "timers", "calendar"]
         let available = ["music", "timers", "clipboard", "todos"]
         try require(NotchTabOrderPolicy.visibleIDs(order: order, hidden: ["clipboard"], available: available, fallback: "music") == ["todos", "music", "timers"], "Visibility/order was not shared with available feature tabs")
+        try require(NotchTabOrderPolicy.visibleIDs(order: order, hidden: ["todos"], available: available, fallback: "music") == ["clipboard", "music", "timers"], "Hiding Todos did not remove its icon from the notch")
         try require(NotchTabOrderPolicy.visibleIDs(order: order, hidden: available, available: available, fallback: "music") == ["music"], "All-hidden choices did not preserve a usable Music fallback")
         try require(NotchTabOrderPolicy.visibleIDs(order: [], hidden: [], available: [], fallback: "music").isEmpty, "Empty catalog created a phantom tab")
         try require(NotchTabOrderPolicy.moving("music", before: "todos", in: order) == ["music", "todos", "clipboard", "timers", "calendar"], "Drag reorder lost relative order")

@@ -36,6 +36,10 @@ jobs:
           /tmp/timer-mode-tests
           swiftc -swift-version 5 -parse-as-library DynamicIsland/helpers/NotchTabOrderPolicy.swift tests/NotchTabOrderRegression.swift -o /tmp/tab-order-tests
           /tmp/tab-order-tests
+      - name: Check Shelf cleanup reconciliation
+        run: |
+          swiftc -swift-version 5 -parse-as-library DynamicIsland/components/Shelf/Models/ShelfCleanupPolicy.swift tests/ShelfCleanupRegression.swift -o /tmp/shelf-cleanup-tests
+          /tmp/shelf-cleanup-tests
       - name: Check live system media snapshots and streams
         run: |
           swiftc -swift-version 5 -parse-as-library DynamicIsland/models/PlaybackState.swift DynamicIsland/helpers/SystemNowPlayingSnapshot.swift DynamicIsland/helpers/JSONLinesPipeHandler.swift tests/SystemMediaRegression.swift -o /tmp/system-media-tests
@@ -128,6 +132,15 @@ jobs:
             DynamicIsland/helpers/NotchInputRegionPolicy.swift DynamicIsland/components/Notch/NotchShape.swift \
             tests/NotchInputRegionRegression.swift -o "$RUNNER_TEMP/NotchInputRegionRegression"
           "$RUNNER_TEMP/NotchInputRegionRegression"
+
+      - name: Check Shelf cleanup reconciliation
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcrun swiftc -swift-version 5 -parse-as-library \
+            DynamicIsland/components/Shelf/Models/ShelfCleanupPolicy.swift \
+            tests/ShelfCleanupRegression.swift -o "$RUNNER_TEMP/ShelfCleanupRegression"
+          "$RUNNER_TEMP/ShelfCleanupRegression"
 
       - name: Check Reminders with fake service
         shell: bash

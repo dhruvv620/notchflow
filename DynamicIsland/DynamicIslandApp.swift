@@ -26,6 +26,10 @@ import SkyLightWindow
 
 @main
 struct DynamicNotchApp: App {
+    // This is deliberately declared before the delegate adaptor: AppDelegate
+    // constructs managers that read Defaults, so the old `.dev` domain must be
+    // copied before any of those managers are initialized.
+    private let preferencesMigration: Void = LegacyPreferencesMigrator.migrateIfNeeded()
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @Default(.menubarIcon) var showMenuBarIcon
     @Environment(\.openWindow) var openWindow
@@ -154,6 +158,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidBecomeActive(_ notification: Notification) {
         installTopMenuItemsIfNeeded()
+        AccessibilityPermissionStore.shared.refreshStatus()
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {

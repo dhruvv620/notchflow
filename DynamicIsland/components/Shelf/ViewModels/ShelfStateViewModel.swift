@@ -124,21 +124,40 @@ final class ShelfStateViewModel: ObservableObject {
     func cleanupInvalidItems() {
         Task { [weak self] in
             guard let self else { return }
-            var keep: [ShelfItem] = []
-            for item in self.items {
-                switch item.kind {
-                case .file(let data):
-                    let bookmark = Bookmark(data: data)
-                    if await bookmark.validate() {
-                        keep.append(item)
-                    } else {
-                        item.cleanupStoredData()
-                    }
-                default:
-                    keep.append(item)
-                }
+            let candidates: [(id: ShelfItem.ID, bookmark: Data)] = self.items.compactMap { item in
+                guard case .file(let data) = item.kind else { return nil }
+                return (item.id, data)
             }
-            await MainActor.run { self.items = keep }
+
+            var invalidCandidates: [ShelfItem.ID: Data] = [:]
+            for candidate in candidates where !(await Bookmark(data: candidate.bookmark).validate()) {
+                invalidCandidates[candidate.id] = candidate.bookmark
+            }
+
+            guard !invalidCandidates.isEmpty else { return }
+
+            // Validation suspends. Reconcile the result with the *current* shelf
+            // instead of replacing it with the snapshot captured above. The old
+            // implementation could resurrect an item that the user removed while
+            // validation was running. Matching the source bookmark also prevents
+            // a stale validation result from deleting an item whose bookmark was
+            // refreshed or renamed in the meantime.
+            let currentBookmarks: [ShelfItem.ID: Data] = Dictionary(
+                uniqueKeysWithValues: self.items.compactMap { item in
+                    guard case .file(let data) = item.kind else { return nil }
+                    return (item.id, data)
+                }
+            )
+            let removableIDs = ShelfCleanupPolicy.removableIDs(
+                invalidCandidates: invalidCandidates,
+                currentBookmarks: currentBookmarks
+            )
+            guard !removableIDs.isEmpty else { return }
+
+            let removedItems = self.items.filter { removableIDs.contains($0.id) }
+            removedItems.forEach { $0.cleanupStoredData() }
+            self.items.removeAll { removableIDs.contains($0.id) }
+            self.invalidateURLCache()
         }
     }
 
