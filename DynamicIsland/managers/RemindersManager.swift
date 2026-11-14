@@ -110,7 +110,15 @@ final class RemindersManager: ObservableObject {
             let snapshot = try await service.snapshot(includeCompleted: showCompleted)
             guard id == refreshID else { return }
             lists = snapshot.lists
-            reminders = snapshot.reminders
+            var next = snapshot.reminders
+            if !showCompleted {
+                // An incomplete-only EventKit fetch intentionally omits the row
+                // the user just completed. Retain completed rows already seen in
+                // this session so switching to Done never loses that action.
+                let fetchedIDs = Set(next.map(\.id))
+                next.append(contentsOf: reminders.filter { $0.isCompleted && !fetchedIDs.contains($0.id) })
+            }
+            reminders = ReminderPolicy.sorted(next)
             defaultListID = snapshot.defaultListID
             if let selectedListID, !lists.contains(where: { $0.id == selectedListID }) { self.selectedListID = nil }
         } catch {
@@ -146,6 +154,20 @@ final class RemindersManager: ObservableObject {
         defer { pendingIDs.remove(item.id) }
         do {
             try service.setCompleted(id: item.id, completed: completed)
+            if let index = reminders.firstIndex(where: { $0.id == item.id }) {
+                let previous = reminders[index]
+                reminders[index] = ReminderItem(
+                    id: previous.id,
+                    title: previous.title,
+                    listID: previous.listID,
+                    isCompleted: completed,
+                    dueDate: previous.dueDate,
+                    hasDueTime: previous.hasDueTime,
+                    allowsChanges: previous.allowsChanges,
+                    completionDate: completed ? Date() : nil
+                )
+                reminders = ReminderPolicy.sorted(reminders)
+            }
             await refresh()
         } catch {
             access = service.access

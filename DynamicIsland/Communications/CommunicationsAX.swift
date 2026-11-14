@@ -10,9 +10,11 @@ enum CommunicationsAX {
         let element: AXUIElement
         let parentIndex: Int?
         let role: String
+        let subrole: String
         let identifier: String
         let title: String
         let description: String
+        let attributedDescription: String
         let value: String
         let labels: [String]
         let isEnabled: Bool
@@ -22,6 +24,13 @@ enum CommunicationsAX {
         var value: CFTypeRef?
         guard AXUIElementCopyAttributeValue(element, attribute as CFString, &value) == .success else { return nil }
         return value as? String
+    }
+    static func attributedString(_ element: AXUIElement, _ attribute: String) -> String? {
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, attribute as CFString, &value) == .success,
+              let value else { return nil }
+        if let string = value as? String { return string }
+        return (value as? NSAttributedString)?.string
     }
     static func children(_ element: AXUIElement) -> [AXUIElement] {
         let visible = elements(element, "AXVisibleChildren")
@@ -96,14 +105,18 @@ enum CommunicationsAX {
             func read(_ attribute: String) -> String {
                 Date() < deadline ? (string(element, attribute) ?? "") : ""
             }
+            let subrole = read(kAXSubroleAttribute)
             let identifier = read(kAXIdentifierAttribute)
             let title = read(kAXTitleAttribute)
             let description = read(kAXDescriptionAttribute)
+            let attributedDescription = Date() < deadline
+                ? (attributedString(element, "AXAttributedDescription") ?? "") : ""
             let value = read(kAXValueAttribute)
             let labels = [title, description, value].filter { !$0.isEmpty }
             let index = result.count
-            result.append(Node(element: element, parentIndex: parent, role: role, identifier: identifier,
-                               title: title, description: description, value: value, labels: labels,
+            result.append(Node(element: element, parentIndex: parent, role: role, subrole: subrole,
+                               identifier: identifier, title: title, description: description,
+                               attributedDescription: attributedDescription, value: value, labels: labels,
                                isEnabled: Date() < deadline && enabled(element),
                                actionNames: Date() < deadline ? actions(element) : []))
             guard depth < maxDepth, Date() < deadline else { continue }

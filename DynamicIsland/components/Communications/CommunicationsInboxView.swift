@@ -32,7 +32,7 @@ struct CommunicationsInboxView: View {
                 ScrollView {
                     if let target = replyTarget { composer(target) }
                     else if manager.notifications.isEmpty {
-                        state("Your recent notifications appear here", detail: "Only notifications exposed by selected apps can be collected. Recent items stay on this Mac until cleared or the app quits.") { EmptyView() }
+                        state("Waiting for notifications", detail: emptyInboxDetail) { EmptyView() }
                     } else {
                         LazyVStack(spacing: 5) {
                             ForEach(manager.notifications) { item in row(item) }
@@ -159,6 +159,10 @@ struct CommunicationsInboxView: View {
     private var permissionDetail: String {
         accessibilityPermission.recoveryMessage
             ?? "Grant access to this exact NotchFlow copy. If macOS shows duplicate NotchFlow rows, choose Repair and approve the new prompt."
+    }
+    private var emptyInboxDetail: String {
+        manager.notificationDiagnostics.message
+            + " Send a new test message while NotchFlow is running; macOS only exposes rendered banners, not another app's private message history."
     }
     private func cancelReply() { replyTarget = nil; draft = ""; replyFocused = false }
     private func updateSuppression() {

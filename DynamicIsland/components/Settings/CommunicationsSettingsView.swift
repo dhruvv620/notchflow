@@ -84,6 +84,8 @@ struct CommunicationsSettingsView: View {
                     Toggle("Respect Focus for notification alerts", isOn: $respectFocus)
                     Text("Reply appears only when the source exposes a native reply action. Otherwise, use Open app. Visible browser notifications may provide fewer actions than desktop apps.")
                         .font(.caption).foregroundStyle(.secondary)
+                    Text(manager.notificationDiagnostics.message)
+                        .font(.caption).foregroundStyle(.secondary)
                     HStack {
                         Text("\(manager.notifications.count) recent items · maximum 20").font(.caption).foregroundStyle(.secondary)
                         Spacer()

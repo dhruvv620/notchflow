@@ -93,18 +93,20 @@ struct NotchRemindersView: View {
             todoHeader(now: now)
             HStack(spacing: 6) {
                 statusPill("Open", count: scopedReminders.filter { !$0.isCompleted }.count, done: false)
-                statusPill("Done", count: nil, done: true)
+                statusPill("Done", count: showingDone ? items.count : nil, done: true)
                 Spacer(minLength: 0)
-                HStack(spacing: 5) {
-                    Button { page = max(0, currentPage - 1) } label: { Image(systemName: "chevron.left") }
-                        .disabled(currentPage == 0).help("Previous todos page")
-                    Text("\(currentPage + 1)/\(pageCount)").monospacedDigit().frame(minWidth: 25)
-                    Button { page = min(pageCount - 1, currentPage + 1) } label: { Image(systemName: "chevron.right") }
-                        .disabled(currentPage + 1 >= pageCount).help("Next todos page")
+                if !showingDone {
+                    HStack(spacing: 5) {
+                        Button { page = max(0, currentPage - 1) } label: { Image(systemName: "chevron.left") }
+                            .disabled(currentPage == 0).help("Previous todos page")
+                        Text("\(currentPage + 1)/\(pageCount)").monospacedDigit().frame(minWidth: 25)
+                        Button { page = min(pageCount - 1, currentPage + 1) } label: { Image(systemName: "chevron.right") }
+                            .disabled(currentPage + 1 >= pageCount).help("Next todos page")
+                    }
+                    .font(.system(size: 10, weight: .medium)).buttonStyle(.plain)
+                    .padding(.horizontal, 9).padding(.vertical, 5)
+                    .background(Color.white.opacity(0.05), in: Capsule())
                 }
-                .font(.system(size: 10, weight: .medium)).buttonStyle(.plain)
-                .padding(.horizontal, 9).padding(.vertical, 5)
-                .background(Color.white.opacity(0.05), in: Capsule())
                 Button(action: beginComposing) {
                     Label("Add", systemImage: "plus").font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(Color.accentColor)
@@ -119,6 +121,17 @@ struct NotchRemindersView: View {
                 ProgressView("Loading todos…").controlSize(.small).frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if items.isEmpty {
                 emptyState
+            } else if showingDone {
+                ScrollView(.vertical) {
+                    LazyVStack(spacing: 4) {
+                        ForEach(items) { item in reminderRow(item, now: now) }
+                    }
+                    .padding(.vertical, 1)
+                }
+                .scrollIndicators(.visible)
+                .onHover { hovering in
+                    vm.setScrollGestureSuppression(hovering, token: interactionToken)
+                }
             } else {
                 VStack(spacing: 4) {
                     ForEach(Array(items[lower..<upper])) { item in reminderRow(item, now: now) }
@@ -205,6 +218,12 @@ struct NotchRemindersView: View {
     }
 
     private func dueLabel(_ item: ReminderItem, now: Date) -> String? {
+        if item.isCompleted, let completed = item.completionDate {
+            if Calendar.current.isDate(completed, inSameDayAs: now) {
+                return "Done " + completed.formatted(date: .omitted, time: .shortened)
+            }
+            return "Done " + completed.formatted(date: .abbreviated, time: .omitted)
+        }
         guard let date = item.dueDate else { return nil }
         let calendar = Calendar.current
         let time = item.hasDueTime ? " " + date.formatted(date: .omitted, time: .shortened) : ""

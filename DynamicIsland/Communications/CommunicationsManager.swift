@@ -27,6 +27,7 @@ final class CommunicationsManager: ObservableObject {
     @Published private(set) var isRefreshing = false
     @Published private(set) var pendingCallActionIDs = Set<String>()
     @Published private(set) var latestNotification: CommunicationNotification?
+    @Published private(set) var notificationDiagnostics = NotificationBridgeDiagnostics.off
     private let notificationBridge = NativeNotificationBridge()
     private let callBridge = NativeCallBridge()
     private let accessibilityPermission = AccessibilityPermissionStore.shared
@@ -74,6 +75,14 @@ final class CommunicationsManager: ObservableObject {
             }
             Task { await notificationBridge.stop(); await callBridge.stop() }
         }
+        if !enabled {
+            notificationDiagnostics = .off
+        } else if !granted {
+            notificationDiagnostics = NotificationBridgeDiagnostics(
+                state: .permissionRequired, processCount: 0, windowCount: 0,
+                candidateCount: 0, recognizedCount: 0
+            )
+        }
         let text = !enabled ? "Communications is off" : (granted ? "Watching exposed notifications and call controls" : "Accessibility access is required")
         if statusText != text { statusText = text }
     }
@@ -87,6 +96,7 @@ final class CommunicationsManager: ObservableObject {
         refreshAccess()
         if !enabled {
             notifications = []; calls = []; latestNotification = nil
+            notificationDiagnostics = .off
             notificationIDs = []; hiddenNotificationIDs = []; callLastSeen = [:]; endingCalls = [:]; answeringCalls = [:]
             alertTask?.cancel()
             Task { await notificationBridge.stop(); await callBridge.stop() }
@@ -111,9 +121,11 @@ final class CommunicationsManager: ObservableObject {
         let callApps = Set(Defaults[.communicationCallApps].compactMap(CommunicationApp.init(rawValue:)))
         async let observedNotifications = notificationBridge.scan(allowedApps: notificationApps)
         async let observedCalls = callBridge.scan(allowedApps: callApps)
-        let (capturedMessages, observed) = await (observedNotifications, observedCalls)
+        let (notificationScan, observed) = await (observedNotifications, observedCalls)
         refreshAccess()
         guard enabled, accessGranted, version == generation, !Task.isCancelled else { return }
+        notificationDiagnostics = notificationScan.diagnostics
+        let capturedMessages = notificationScan.notifications
         let now = Date()
         hiddenNotificationIDs.formIntersection(Set(capturedMessages.map(\.id)))
         let messages = capturedMessages.filter { !hiddenNotificationIDs.contains($0.id) }

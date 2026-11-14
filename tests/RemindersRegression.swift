@@ -54,7 +54,8 @@ private final class FakeRemindersService: RemindersServiceProviding {
         items = items.map {
             $0.id == id
                 ? ReminderItem(id: $0.id, title: $0.title, listID: $0.listID, isCompleted: completed,
-                               dueDate: $0.dueDate, hasDueTime: $0.hasDueTime, allowsChanges: $0.allowsChanges)
+                               dueDate: $0.dueDate, hasDueTime: $0.hasDueTime, allowsChanges: $0.allowsChanges,
+                               completionDate: completed ? Date() : nil)
                 : $0
         }
     }
@@ -86,12 +87,15 @@ private struct RemindersRegression {
         let undated = ReminderItem(id: "none", title: "Undated", listID: "writable", isCompleted: false,
                                    dueDate: nil, hasDueTime: false, allowsChanges: true)
         let completed = ReminderItem(id: "complete", title: "Done", listID: "writable", isCompleted: true,
-                                     dueDate: morning, hasDueTime: true, allowsChanges: true)
+                                     dueDate: morning, hasDueTime: true, allowsChanges: true, completionDate: afternoon)
+        let olderCompleted = ReminderItem(id: "older-complete", title: "Older", listID: "writable", isCompleted: true,
+                                          dueDate: nil, hasDueTime: false, allowsChanges: true, completionDate: morning)
         try require(!allDay.isOverdue(at: afternoon, calendar: calendar), "Today's date-only reminder became overdue before the day ended")
         try require(atTime.isOverdue(at: afternoon, calendar: calendar), "Past timed reminder was not overdue")
         try require(!undated.isOverdue(at: afternoon, calendar: calendar) && !completed.isOverdue(at: afternoon, calendar: calendar), "Undated/completed reminder marked overdue")
-        let sorted = ReminderPolicy.sorted([completed, undated, atTime])
-        try require(sorted.map(\.id) == ["time", "none", "complete"], "Sorting lost undated reminders or promoted completed items")
+        let sorted = ReminderPolicy.sorted([olderCompleted, completed, undated, atTime])
+        try require(sorted.map(\.id) == ["time", "none", "complete", "older-complete"],
+                    "Sorting lost open reminders or did not put newest completions first")
 
         let service = FakeRemindersService()
         let manager = RemindersManager(service: service)
@@ -116,6 +120,14 @@ private struct RemindersRegression {
         service.failCompletion = false
         await manager.setCompleted(item, completed: true)
         try require(!manager.visibleReminders.contains(where: { $0.id == item.id }), "Successful completion did not refresh the list")
+        try require(manager.reminders.contains(where: { $0.id == item.id && $0.isCompleted && $0.completionDate != nil }),
+                    "Successful completion disappeared before the Done section could display it")
+        manager.showCompleted = true
+        await manager.refresh()
+        try require(manager.visibleReminders.contains(where: { $0.id == item.id && $0.isCompleted }),
+                    "Completed todo did not appear after switching to Done")
+        manager.showCompleted = false
+        await manager.refresh()
         service.failCreate = true
         let failed = await manager.create(title: "Draft", listID: "writable", dueDate: nil, includesTime: false)
         try require(!failed && !manager.isSaving && manager.errorMessage != nil, "Failed creation did not reset busy/error state")

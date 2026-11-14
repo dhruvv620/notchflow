@@ -152,6 +152,41 @@ BACKUP_ROOT="$HOME/Library/Application Support/NotchFlow/Build Backups"
 mkdir -p "$HOME/Applications"
 mkdir -p "$BACKUP_ROOT"
 
+# Never rename an application bundle while its executable is still running.
+# Doing so changes the path macOS associates with the live process (for example,
+# to "NotchFlow Backup …") and leaves Accessibility attached to the wrong copy.
+# Production, former `.dev`, and timestamped backup bundles all use the same
+# CFBundleExecutable, so one exact process-name check covers every local copy.
+CURRENT_USER_ID="$(/usr/bin/id -u)"
+running_notchflow_pids() {
+    /usr/bin/pgrep -u "$CURRENT_USER_ID" -x NotchFlow 2>/dev/null || true
+}
+
+RUNNING_NOTCHFLOW_PIDS="$(running_notchflow_pids)"
+if [ -n "$RUNNING_NOTCHFLOW_PIDS" ]; then
+    printf '\nClosing the currently running NotchFlow before installing this build...\n'
+    while IFS= read -r pid; do
+        case "$pid" in
+            ''|*[!0-9]*) continue ;;
+        esac
+        /bin/kill -TERM "$pid" 2>/dev/null || true
+    done <<< "$RUNNING_NOTCHFLOW_PIDS"
+
+    # Give AppKit time to terminate and release its bundle before any move.
+    for ((attempt = 0; attempt < 40; attempt++)); do
+        [ -z "$(running_notchflow_pids)" ] && break
+        /bin/sleep 0.25
+    done
+
+    RUNNING_NOTCHFLOW_PIDS="$(running_notchflow_pids)"
+    if [ -n "$RUNNING_NOTCHFLOW_PIDS" ]; then
+        printf 'NotchFlow is still running (PID(s): %s).\n' "$(printf '%s' "$RUNNING_NOTCHFLOW_PIDS" | /usr/bin/tr '\n' ' ')"
+        printf 'Quit every NotchFlow copy from the menu bar or Activity Monitor, then rerun Build.command.\n'
+        printf 'The installed app and its backups were not moved.\n'
+        exit 1
+    fi
+fi
+
 # Older versions placed runnable backup bundles directly in ~/Applications.
 # Keep those backups, but move them out of the application search path so
 # macOS does not present several indistinguishable NotchFlow permission rows.
@@ -170,6 +205,6 @@ if [ -e "$INSTALL_APP" ]; then
     printf 'Previous app saved as %s\n' "$BACKUP_APP"
 fi
 /usr/bin/ditto "$BUILT_APP" "$INSTALL_APP"
-printf '\nInstalled %s\nQuit the old notch app before opening this build.\n' "$INSTALL_APP"
+printf '\nInstalled %s\nAny previous running copy was stopped before its bundle was backed up.\n' "$INSTALL_APP"
 printf 'Reminders is a tab in Standard UI. Liquid Glass is in Settings > Appearance.\n'
 /usr/bin/open -R "$INSTALL_APP"

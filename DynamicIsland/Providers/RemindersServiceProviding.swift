@@ -94,7 +94,8 @@ final class EventKitRemindersService: RemindersServiceProviding {
                 listID: calendar.calendarIdentifier, isCompleted: reminder.isCompleted,
                 dueDate: due.flatMap { ($0.calendar ?? Calendar.current).date(from: $0) },
                 hasDueTime: due?.hour != nil,
-                allowsChanges: calendar.allowsContentModifications
+                allowsChanges: calendar.allowsContentModifications,
+                completionDate: reminder.completionDate
             )
         }
         return ReminderSnapshot(
@@ -127,6 +128,8 @@ final class EventKitRemindersService: RemindersServiceProviding {
         }
         guard reminder.calendar?.allowsContentModifications == true else { throw ReminderServiceError.readOnly }
         reminder.isCompleted = completed
+        // EventKit owns `completionDate` and updates it when `isCompleted` is
+        // saved; the property is read-only to clients.
         try store.save(reminder, commit: true)
     }
 }

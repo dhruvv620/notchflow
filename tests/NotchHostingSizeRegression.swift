@@ -54,6 +54,52 @@ struct NotchHostingSizeRegression {
             try require(hosting.frame.size == window.contentRect(forFrameRect: target).size,
                         "Hosting content stopped following the parent frame")
         }
-        print("Native hosting size ownership and animated-layout checks passed")
+
+        // Display changes used to destroy every notch panel while SwiftUI was
+        // in an animated layout pass. Exercise the safe ownership sequence used
+        // for a removed display: keep the surviving panel alive, detach the
+        // removed panel's hosted tree, and only then close it. Repeating this
+        // also catches AppKit layout feedback that only appears after several
+        // open/close cycles.
+        for index in 0..<20 {
+            model.expanded.toggle()
+            let secondaryModel = HostingContentSize()
+            let secondaryHosting = FirstMouseHostingView(
+                rootView: ChangingHostingContent(model: secondaryModel)
+            )
+            let secondaryWindow = NSPanel(
+                contentRect: NSRect(x: 900, y: 300, width: 640, height: 240),
+                styleMask: [.borderless, .nonactivatingPanel],
+                backing: .buffered,
+                defer: false
+            )
+            secondaryWindow.isReleasedWhenClosed = false
+            secondaryWindow.contentView = secondaryHosting
+            secondaryWindow.orderFrontRegardless()
+
+            secondaryModel.expanded = true
+            secondaryWindow.setFrame(
+                NSRect(x: 900, y: 280, width: 720, height: 280),
+                display: false
+            )
+            secondaryWindow.layoutIfNeeded()
+            window.layoutIfNeeded()
+            RunLoop.main.run(until: Date().addingTimeInterval(0.01))
+
+            secondaryWindow.contentView = nil
+            secondaryWindow.orderOut(nil)
+            secondaryWindow.close()
+            RunLoop.main.run(until: Date().addingTimeInterval(0.01))
+
+            try require(secondaryWindow.contentView == nil,
+                        "Removed-display panel retained its SwiftUI hosting tree")
+            try require(window.contentView === hosting,
+                        "Removing one display disturbed the surviving panel")
+            try require(window.isVisible,
+                        "Removing one display closed the surviving panel")
+            try require(!index.isMultiple(of: 5) || hosting.sizingOptions.isEmpty,
+                        "Repeated panel churn restored implicit hosting sizing")
+        }
+        print("Native hosting size ownership, animated layout, and repeated panel teardown checks passed")
     }
 }
