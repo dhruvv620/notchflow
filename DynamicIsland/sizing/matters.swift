@@ -24,15 +24,37 @@ import Defaults
 import Foundation
 import SwiftUI
 
+/// Navigation sits below the physical camera, on the same continuous surface.
+func notchCameraClearance(for screenName: String?) -> CGFloat {
+    let screen = NSScreen.screens.first { $0.localizedName == screenName } ?? NSScreen.main
+    return screen?.safeAreaInsets.top ?? 0
+}
+
+func notchExpandedHeaderHeight(for screenName: String?, closedHeight: CGFloat, minimalistic: Bool) -> CGFloat {
+    if minimalistic { return shouldUseDynamicIslandMode(for: screenName) ? 0 : max(24, closedHeight) }
+    return notchCameraClearance(for: screenName) + 32
+}
+
 let downloadSneakSize: CGSize = .init(width: 65, height: 1)
 let batterySneakSize: CGSize = .init(width: 160, height: 1)
 
 var openNotchSize: CGSize {
-    let storedWidth = Defaults[.openNotchWidth]
-    let minWidth = currentRecommendedMinimumNotchWidth()
     let maxWidth = maxAllowedNotchWidth()
-    let width = min(max(storedWidth, minWidth), maxWidth)
-    return .init(width: width, height: 200)
+    let minWidth = Defaults[.notchSizePreset] == .custom ? min(480, maxWidth) : currentRecommendedMinimumNotchWidth()
+    let desiredWidth: CGFloat
+    let height: CGFloat
+    switch Defaults[.notchSizePreset] {
+    case .compact:
+        desiredWidth = minWidth
+        height = 200
+    case .spacious:
+        desiredWidth = max(minWidth, 720)
+        height = 240
+    case .custom:
+        desiredWidth = Defaults[.openNotchWidth]
+        height = CGFloat(min(max(Defaults[.notchCustomHeight], 200), 420))
+    }
+    return .init(width: min(max(desiredWidth, minWidth), maxWidth), height: height)
 }
 
 /// Maximum notch width based on the current screen's point width.
@@ -83,9 +105,12 @@ func enabledStandardTabCount() -> Int {
     }
 
     // Notes / Clipboard tab
-    if Defaults[.enableNotes] || (Defaults[.enableClipboardManager] && Defaults[.clipboardDisplayMode] == .separateTab) {
+    if Defaults[.enableNotes] {
         count += 1
     }
+
+    // Compact Reminders and Clipboard share the existing header budget.
+    // Tab overflow uses a menu instead of enlarging the panel.
 
     // Terminal tab
     if Defaults[.enableTerminalFeature] {
@@ -104,16 +129,17 @@ func recommendedMinimumNotchWidth(forTabCount count: Int) -> CGFloat {
 
 /// Returns the recommended minimum notch width for the current tab configuration.
 func currentRecommendedMinimumNotchWidth() -> CGFloat {
-    recommendedMinimumNotchWidth(forTabCount: enabledStandardTabCount())
+    // Header overflow and the tab chooser handle extra tabs without widening content.
+    640
 }
 
-/// Enforces the minimum notch width based on current tab count.
+/// Enforces the selected preset’s minimum width independently of tab count.
 /// Also clamps to screen width so the notch never exceeds the display.
 /// Only adjusts when not in minimalistic mode.
 func enforceMinimumNotchWidth() {
     guard !Defaults[.enableMinimalisticUI] else { return }
-    let minWidth = currentRecommendedMinimumNotchWidth()
     let maxWidth = maxAllowedNotchWidth()
+    let minWidth = Defaults[.notchSizePreset] == .custom ? min(480, maxWidth) : currentRecommendedMinimumNotchWidth()
     var width = Defaults[.openNotchWidth]
     if width < minWidth { width = minWidth }
     if width > maxWidth { width = maxWidth }
@@ -138,6 +164,18 @@ func minimalisticOpenNotchSize(isDynamicIslandMode: Bool) -> CGSize {
     if isDynamicIslandMode {
         size.width = 340 // Reduced from 420 for a narrower pill
         size.height = 144 // Exact height of the minimalistic music player view
+    }
+
+    let maxWidth = maxAllowedNotchWidth()
+    switch Defaults[.notchSizePreset] {
+    case .compact:
+        break // Keep the upstream compact dimensions for each display style.
+    case .spacious:
+        size.width = min(size.width + 80, maxWidth)
+        size.height += 40
+    case .custom:
+        size.width = min(max(Defaults[.openNotchWidth], min(480, maxWidth)), maxWidth)
+        size.height = CGFloat(min(max(Defaults[.notchCustomHeight], 200), 420))
     }
 
     if Defaults[.enableLyrics] {
@@ -180,9 +218,7 @@ func notchTerminalBottomCornerRadii(
     if isDynamicIslandMode {
         let outer: CGFloat
         if notchState == .open {
-            outer = enableMinimalisticUI
-                ? minimalisticCornerRadiusInsets.opened.top
-                : dynamicIslandPillCornerRadiusInsets.opened
+            outer = CGFloat(Defaults[.notchCornerRadius])
         } else {
             outer = max(closedNotchHeight / 2, dynamicIslandPillCornerRadiusInsets.closed.standard)
         }
@@ -196,7 +232,7 @@ func notchTerminalBottomCornerRadii(
     }()
     let outerBottom: CGFloat
     if notchState == .open && cornerRadiusScaling {
-        outerBottom = active.opened.bottom
+        outerBottom = CGFloat(Defaults[.notchCornerRadius])
     } else {
         outerBottom = active.closed.bottom
     }
@@ -231,7 +267,7 @@ func statsAdjustedNotchSize(
 
     var adjustedSize = baseSize
     let extraHeight = (statsSecondRowContentHeight + statsGridSpacingHeight) * clampedProgress
-    adjustedSize.height += extraHeight
+    adjustedSize.height += min(extraHeight, 40)
     return adjustedSize
 }
 

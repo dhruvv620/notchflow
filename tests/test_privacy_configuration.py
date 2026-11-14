@@ -8,6 +8,9 @@ ENTITLEMENTS = ROOT / "DynamicIsland" / "DynamicIsland.entitlements"
 PROJECT = ROOT / "DynamicIsland.xcodeproj" / "project.pbxproj"
 RELEASE_WORKFLOW = ROOT / ".github" / "workflows" / "release.yml"
 CI_WORKFLOW = ROOT / ".github" / "workflows" / "ci.yml"
+MEDIA_KEY_INTERCEPTOR = ROOT / "DynamicIsland" / "managers" / "MediaKeyInterceptor.swift"
+SYSTEM_CHANGES_OBSERVER = ROOT / "DynamicIsland" / "managers" / "SystemChangesObserver.swift"
+SYSTEM_HUD_MANAGER = ROOT / "DynamicIsland" / "managers" / "SystemHUDManager.swift"
 
 
 class PrivacyConfigurationTests(unittest.TestCase):
@@ -73,6 +76,33 @@ class PrivacyConfigurationTests(unittest.TestCase):
         workflow = CI_WORKFLOW.read_text()
 
         self.assertIn("python3 -m unittest tests.test_privacy_configuration", workflow)
+
+    def test_media_key_startup_never_prompts_for_accessibility(self):
+        source = MEDIA_KEY_INTERCEPTOR.read_text()
+
+        self.assertNotIn("AXIsProcessTrustedWithOptions", source)
+        self.assertNotIn("kAXTrustedCheckOptionPrompt", source)
+        self.assertIn("AXIsProcessTrusted()", source)
+
+    def test_native_hud_is_suppressed_only_after_interception_is_ready(self):
+        observer_source = SYSTEM_CHANGES_OBSERVER.read_text()
+        manager_source = SYSTEM_HUD_MANAGER.read_text()
+
+        self.assertIn(
+            "func startObserving(volumeEnabled: Bool, brightnessEnabled: Bool, keyboardBacklightEnabled: Bool) -> Bool",
+            observer_source,
+        )
+        readiness_check = manager_source.index("guard interceptionReady else")
+        suppression = manager_source.index("suppressNativeSystemHUDIfNeeded()", readiness_check)
+        self.assertLess(readiness_check, suppression)
+        self.assertIn("restoreNativeSystemHUDIfNeeded()", manager_source[readiness_check:suppression])
+
+    def test_failed_interception_retries_after_app_activation(self):
+        source = SYSTEM_HUD_MANAGER.read_text()
+
+        self.assertIn("NSApplication.didBecomeActiveNotification", source)
+        self.assertIn("self.changesObserver == nil", source)
+        self.assertIn("AccessibilityPermissionStore.shared.$isAuthorized", source)
 
 
 if __name__ == "__main__":

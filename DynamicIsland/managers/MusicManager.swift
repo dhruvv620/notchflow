@@ -448,16 +448,15 @@ class MusicManager: ObservableObject {
     private var debounceIdleTask: Task<Void, Never>?
     @MainActor private var pendingOptimisticPlayState: Bool?
 
-    // Helper to check if macOS has removed support for NowPlayingController
+    // Compatibility flag for existing settings; the system-hosted adapter is not
+    // excluded by the OS version restrictions on in-app MediaRemote access.
     public private(set) var isNowPlayingDeprecated: Bool = false
-    private let mediaChecker = MediaChecker()
+    @Published private(set) var selectedMediaSource: MediaControllerType = .nowPlaying
+    @Published private(set) var mediaSourceError: String?
 
     // Active controller
     private var activeController: (any MediaControllerProtocol)?
 
-    // Pear Desktop auto-detection
-    private static let pearDesktopBundleID = YouTubeMusicConfiguration.default.bundleIdentifier
-    private var isPearDesktopAutoSwitched: Bool = false
 
     // Published properties for UI
     @Published var songTitle: String = "I'm Handsome"
@@ -562,81 +561,30 @@ class MusicManager: ObservableObject {
 
     // MARK: - Initialization
     init() {
-        // Listen for changes to the default controller preference
-        NotificationCenter.default.publisher(for: Notification.Name.mediaControllerChanged)
+        NotificationCenter.default.publisher(for: .mediaControllerChanged)
+            .receive(on: RunLoop.main)
             .sink { [weak self] _ in
-                self?.isPearDesktopAutoSwitched = false
-                self?.setActiveControllerBasedOnPreference()
-            }
-            .store(in: &cancellables)
-
+                Task { @MainActor in self?.setActiveControllerBasedOnPreference() }
+            }.store(in: &cancellables)
         Defaults.publisher(.enableLyrics)
             .receive(on: RunLoop.main)
-            .sink { [weak self] change in
-                self?.handleLyricsPreferenceChange(isEnabled: change.newValue)
-            }
+            .sink { [weak self] change in self?.handleLyricsPreferenceChange(isEnabled: change.newValue) }
             .store(in: &cancellables)
-
-        // Observe Pear Desktop launch/terminate for auto-detection
-        setupPearDesktopAutoDetection()
-
-        // Initialize deprecation check asynchronously
         Task { @MainActor in
-            do {
-                self.isNowPlayingDeprecated = try await self.mediaChecker.checkDeprecationStatus()
-                print("Deprecation check completed: \(self.isNowPlayingDeprecated)")
-            } catch {
-                print("Failed to check deprecation status: \(error). Defaulting to false.")
-                self.isNowPlayingDeprecated = false
+            // This upgrade restores system-wide media once; later source choices persist.
+            if !Defaults[.notchSystemMediaMigration] {
+                Defaults[.mediaController] = .nowPlaying
+                Defaults[.notchSystemMediaMigration] = true
+                Defaults[.useMusicVisualizer] = true
+                self.coordinator.musicLiveActivityEnabled = true
             }
-            
-            // Check if Pear Desktop is already running at startup
-            let pearDesktopRunning = NSWorkspace.shared.runningApplications.contains {
-                $0.bundleIdentifier == Self.pearDesktopBundleID
-            }
-            
-            if pearDesktopRunning {
-                print("[MusicManager] Pear Desktop detected at startup, auto-switching to YouTubeMusicController")
-                self.isPearDesktopAutoSwitched = true
-                if let controller = self.createController(for: .youtubeMusic) {
-                    self.setActiveController(controller)
-                }
-            } else {
-                // Initialize the active controller after deprecation check
-                self.setActiveControllerBasedOnPreference()
-            }
+            self.setActiveControllerBasedOnPreference()
         }
     }
 
-    // MARK: - Pear Desktop Auto-Detection
-    private func setupPearDesktopAutoDetection() {
-        NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didLaunchApplicationNotification)
-            .sink { [weak self] notification in
-                guard let self = self,
-                      let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
-                      app.bundleIdentifier == Self.pearDesktopBundleID else { return }
-
-                print("[MusicManager] Pear Desktop launched, auto-switching to YouTubeMusicController")
-                self.isPearDesktopAutoSwitched = true
-                if let controller = self.createController(for: .youtubeMusic) {
-                    self.setActiveController(controller)
-                }
-            }
-            .store(in: &cancellables)
-
-        NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didTerminateApplicationNotification)
-            .sink { [weak self] notification in
-                guard let self = self,
-                      let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
-                      app.bundleIdentifier == Self.pearDesktopBundleID else { return }
-
-                print("[MusicManager] Pear Desktop terminated, reverting to preferred controller")
-                if self.isPearDesktopAutoSwitched {
-                    self.isPearDesktopAutoSwitched = false
-                    self.setActiveControllerBasedOnPreference()
-                }
-            }
-            .store(in: &cancellables)
+    @MainActor func selectMediaSource(_ source: MediaControllerType) {
+        Defaults[.mediaController] = source
+        NotificationCenter.default.post(name: .mediaControllerChanged, object: nil)
     }
 
     deinit {
@@ -652,15 +600,17 @@ class MusicManager: ObservableObject {
         controllerCancellables.removeAll()
         transitionWorkItem?.cancel()
 
-        // Release active controller
+        // Release the streaming helper before discarding its controller.
+        activeController?.stop()
         activeController = nil
     }
 
     // MARK: - Setup Methods
-    private func createController(for type: MediaControllerType) -> (any MediaControllerProtocol)? {
+    @MainActor private func createController(for type: MediaControllerType) -> (any MediaControllerProtocol)? {
         // Cleanup previous controller
         if activeController != nil {
             controllerCancellables.removeAll()
+            activeController?.stop()
             activeController = nil
         }
 
@@ -668,12 +618,7 @@ class MusicManager: ObservableObject {
 
         switch type {
         case .nowPlaying:
-            // Only create NowPlayingController if not deprecated on this macOS version
-            if !self.isNowPlayingDeprecated {
-                newController = NowPlayingController()
-            } else {
-                return nil
-            }
+            newController = NowPlayingController()
         case .appleMusic:
             newController = AppleMusicController()
         case .spotify:
@@ -698,31 +643,27 @@ class MusicManager: ObservableObject {
                 .store(in: &controllerCancellables)
         }
 
+        if let system = newController as? NowPlayingController {
+            system.$lastError.receive(on: RunLoop.main)
+                .sink { [weak self] in self?.mediaSourceError = $0 }
+                .store(in: &controllerCancellables)
+        }
         return newController
     }
 
-    private func setActiveControllerBasedOnPreference() {
-        let preferredType = Defaults[.mediaController]
-        print("Preferred Media Controller: \(preferredType)")
-
-        // If NowPlaying is deprecated but that's the preference, use Apple Music instead
-        let controllerType = (self.isNowPlayingDeprecated && preferredType == .nowPlaying)
-            ? .appleMusic
-            : preferredType
-
-        if let controller = createController(for: controllerType) {
-            setActiveController(controller)
-        } else if controllerType != .appleMusic, let fallbackController = createController(for: .appleMusic) {
-            // Fallback to Apple Music if preferred controller couldn't be created
-            setActiveController(fallbackController)
+    @MainActor private func setActiveControllerBasedOnPreference() {
+        let preferred = Defaults[.mediaController]
+        selectedMediaSource = preferred
+        mediaSourceError = nil
+        guard let controller = createController(for: preferred) else {
+            mediaSourceError = "This media source is unavailable. Choose another source."
+            return
         }
-    }
-
-    private func setActiveController(_ controller: any MediaControllerProtocol) {
-        // Set new active controller
         activeController = controller
-
-        // Get current state from active controller
+        updateFromPlaybackState(SystemNowPlayingSnapshot.empty())
+        isPlayerIdle = true
+        albumArt = defaultImage
+        usingAppIconForArtwork = false
         forceUpdate()
     }
 
@@ -742,8 +683,16 @@ class MusicManager: ObservableObject {
     }
 
     // MARK: - Update Methods
+    @MainActor func excludeCallPlaybackIfNeeded() {
+        guard selectedMediaSource == .nowPlaying,
+              CommunicationsManager.shared.isCallMediaSource(bundleIdentifier ?? "") else { return }
+        updateFromPlaybackState(SystemNowPlayingSnapshot.empty())
+        isPlayerIdle = true
+    }
+
     @MainActor
     private func updateFromPlaybackState(_ state: PlaybackState) {
+        if selectedMediaSource == .nowPlaying && CommunicationsManager.shared.isCallMediaSource(state.bundleIdentifier) { return }
         // Check for playback state changes (playing/paused)
         let eventIsPlaying = state.isPlaying
         let expectedState = pendingOptimisticPlayState
@@ -865,7 +814,7 @@ class MusicManager: ObservableObject {
         }
 
         if state.bundleIdentifier != self.bundleIdentifier {
-            self.bundleIdentifier = state.bundleIdentifier
+            self.bundleIdentifier = state.bundleIdentifier.isEmpty ? nil : state.bundleIdentifier
         }
 
         if repeatModeChanged {
@@ -1122,7 +1071,7 @@ class MusicManager: ObservableObject {
         workItem = DispatchWorkItem { [weak self] in
             withAnimation(.smooth) {
                 self?.albumArt = newAlbumArt
-                if Defaults[.coloredSpectrogram] {
+                if Defaults[.coloredSpectrogram] || Defaults[.notchAccentMode] == .adaptive || Defaults[.notchBackgroundStyle] == .dynamic {
                     self?.calculateAverageColor()
                 }
             }

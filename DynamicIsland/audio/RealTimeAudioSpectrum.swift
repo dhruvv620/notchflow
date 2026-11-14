@@ -137,6 +137,13 @@ class RealTimeAudioSpectrum: NSView {
         }
     }
     
+    func setColor(_ color: NSColor) {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        for bar in barLayers { bar.fillColor = color.cgColor }
+        CATransaction.commit()
+    }
+
     func setPlaying(_ playing: Bool) {
         isPlaying = playing
         if isPlaying {
@@ -149,16 +156,22 @@ class RealTimeAudioSpectrum: NSView {
 
 /// SwiftUI wrapper for RealTimeAudioSpectrum
 struct RealTimeAudioSpectrumView: NSViewRepresentable {
+    @ObservedObject private var appearance = NotchAppearanceModel.shared
+    @Default(.notchReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+    private var shouldAnimate: Bool { isPlaying && !reduceMotion && !systemReduceMotion }
     @Binding var isPlaying: Bool
     
     func makeNSView(context: Context) -> RealTimeAudioSpectrum {
         let spectrum = RealTimeAudioSpectrum()
-        spectrum.setPlaying(isPlaying)
+        spectrum.setColor(NSColor(appearance.accentColor))
+        spectrum.setPlaying(shouldAnimate)
         return spectrum
     }
     
     func updateNSView(_ nsView: RealTimeAudioSpectrum, context: Context) {
-        nsView.setPlaying(isPlaying)
+        nsView.setColor(NSColor(appearance.accentColor))
+        nsView.setPlaying(shouldAnimate)
     }
 
     static func dismantleNSView(_ nsView: RealTimeAudioSpectrum, coordinator: ()) {

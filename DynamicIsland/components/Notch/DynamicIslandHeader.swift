@@ -31,6 +31,7 @@ struct DynamicIslandHeader: View {
     @State private var showClipboardPopover = false
     @State private var showColorPickerPopover = false
     @State private var showTimerPopover = false
+    @State private var cameraPopoverToken = UUID()
     @Default(.enableTimerFeature) var enableTimerFeature
     @Default(.timerDisplayMode) var timerDisplayMode
     @Default(.showClipboardIcon) var showClipboardIcon
@@ -40,9 +41,14 @@ struct DynamicIslandHeader: View {
     @Default(.showBatteryPercentInside) var showBatteryPercentInside
     @Default(.showMinimalisticBatteryIndicator) var showMinimalisticBatteryIndicator
     @Default(.enableMinimalisticUI) var enableMinimalisticUI
+    @Default(.showMirror) private var showMirror
     
     var body: some View {
-        HStack(spacing: 0) {
+        VStack(spacing: 0) {
+            if !enableMinimalisticUI {
+                Color.clear.frame(height: notchCameraClearance(for: vm.screen))
+            }
+            HStack(spacing: 6) {
             HStack {
                 if !enableMinimalisticUI {
                     let shouldShowTabs = coordinator.alwaysShowTabs || vm.notchState == .open || !shelfState.items.isEmpty
@@ -56,27 +62,16 @@ struct DynamicIslandHeader: View {
             .blur(radius: vm.notchState == .closed ? 20 : 0)
             .animation(.smooth.delay(0.1), value: vm.notchState)
             .zIndex(2)
-            .padding(8)
-
-            if vm.notchState == .open {
-                let spacerWidth = min(vm.closedNotchSize.width, 300)
-                Rectangle()
-                    .fill(enableMinimalisticUI ? .clear : (NSScreen.screens
-                        .first(where: { $0.localizedName == coordinator.selectedScreen })?.safeAreaInsets.top ?? 0 > 0 ? .black : .clear))
-                    .frame(width: spacerWidth)
-                    .mask {
-                        NotchShape()
-                    }
-            }
+            .padding(.vertical, 1)
 
             HStack(spacing: 4) {
                 if vm.notchState == .open && !enableMinimalisticUI {
-                    if Defaults[.showMirror] {
+                    if showMirror {
                         Button(action: {
                             vm.toggleCameraPreview()
                         }) {
                             Capsule()
-                                .fill(.black)
+                                .fill(Color.white.opacity(0.055))
                                 .frame(width: 30, height: 30)
                                 .overlay {
                                     Image(systemName: "web.camera")
@@ -86,6 +81,25 @@ struct DynamicIslandHeader: View {
                                 }
                         }
                         .buttonStyle(PlainButtonStyle())
+                        .help("Mirror")
+                        .popover(isPresented: $vm.isCameraExpanded, arrowEdge: .bottom) {
+                            VStack(spacing: 10) {
+                                HStack {
+                                    Text("Mirror").font(.headline)
+                                    Spacer()
+                                    Button { vm.isCameraExpanded = false } label: {
+                                        Image(systemName: "xmark.circle.fill")
+                                    }
+                                    .buttonStyle(.plain)
+                                    .accessibilityLabel("Close mirror")
+                                }
+                                CameraPreviewView(webcamManager: webcamManager)
+                                    .frame(width: 220, height: 220)
+                                    .environmentObject(vm)
+                            }
+                            .padding(12)
+                            .frame(width: 244)
+                        }
                     }
                     
                     if Defaults[.enableClipboardManager]
@@ -103,7 +117,7 @@ struct DynamicIslandHeader: View {
                             }
                         }) {
                             Capsule()
-                                .fill(.black)
+                                .fill(Color.white.opacity(0.055))
                                 .frame(width: 30, height: 30)
                                 .overlay {
                                     Image(systemName: "doc.on.clipboard")
@@ -144,7 +158,7 @@ struct DynamicIslandHeader: View {
                             }
                         }) {
                             Capsule()
-                                .fill(.black)
+                                .fill(Color.white.opacity(0.055))
                                 .frame(width: 30, height: 30)
                                 .overlay {
                                     Image(systemName: "eyedropper")
@@ -176,7 +190,7 @@ struct DynamicIslandHeader: View {
                             }
                         }) {
                             Capsule()
-                                .fill(.black)
+                                .fill(Color.white.opacity(0.055))
                                 .frame(width: 30, height: 30)
                                 .overlay {
                                     Image(systemName: "timer")
@@ -204,7 +218,7 @@ struct DynamicIslandHeader: View {
                             SettingsWindowController.shared.showWindow()
                         }) {
                             Capsule()
-                                .fill(.black)
+                                .fill(Color.white.opacity(0.055))
                                 .frame(width: 30, height: 30)
                                 .overlay {
                                     Image(systemName: "gear")
@@ -265,14 +279,30 @@ struct DynamicIslandHeader: View {
                 }
             }
             .font(.system(.headline, design: .rounded))
-            .frame(maxWidth: .infinity, alignment: .trailing)
+            .frame(maxWidth: enableMinimalisticUI ? .infinity : nil, alignment: .trailing)
+            .fixedSize(horizontal: !enableMinimalisticUI, vertical: false)
             .opacity(vm.notchState == .closed ? 0 : 1)
             .blur(radius: vm.notchState == .closed ? 20 : 0)
             .animation(.smooth.delay(0.1), value: vm.notchState)
             .zIndex(2)
         }
+            }
         .foregroundColor(.gray)
         .environmentObject(vm)
+        .onChange(of: vm.isCameraExpanded) { _, visible in
+            vm.setAutoCloseSuppression(visible, token: cameraPopoverToken)
+            if !visible {
+                webcamManager.stopSession()
+                vm.shouldRecheckHover.toggle()
+            }
+        }
+        .onChange(of: vm.notchState) { _, state in
+            if state == .closed { dismissCameraPreview() }
+        }
+        .onChange(of: showMirror) { _, enabled in
+            if !enabled { dismissCameraPreview() }
+        }
+        .onDisappear { dismissCameraPreview() }
         .onChange(of: coordinator.shouldToggleClipboardPopover) { _ in
             // Only toggle if clipboard is enabled
             if Defaults[.enableClipboardManager] {
@@ -312,6 +342,16 @@ struct DynamicIslandHeader: View {
 }
 
 private extension DynamicIslandHeader {
+    func dismissCameraPreview() {
+        guard vm.isCameraExpanded else {
+            vm.setAutoCloseSuppression(false, token: cameraPopoverToken)
+            return
+        }
+        vm.isCameraExpanded = false
+        vm.setAutoCloseSuppression(false, token: cameraPopoverToken)
+        webcamManager.stopSession()
+    }
+
     var shouldSuppressStatusIndicators: Bool {
         Defaults[.settingsIconInNotch]
             && Defaults[.enableClipboardManager]

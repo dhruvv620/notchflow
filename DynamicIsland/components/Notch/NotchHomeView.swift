@@ -122,6 +122,8 @@ private struct DynamicIslandArtworkVideoView: NSViewRepresentable {
 }
 
 struct DynamicIslandArtworkSourceView: View {
+    @Default(.notchReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @ObservedObject private var musicManager = MusicManager.shared
     @Default(.showLiveCanvasInDynamicIsland) private var showLiveCanvasInDynamicIsland
 
@@ -129,7 +131,7 @@ struct DynamicIslandArtworkSourceView: View {
     let contentMode: ContentMode
 
     private var liveCanvasURL: URL? {
-        guard showLiveCanvasInDynamicIsland else { return nil }
+        guard showLiveCanvasInDynamicIsland, !reduceMotion, !systemReduceMotion else { return nil }
         return musicManager.videoArtworkURL
     }
 
@@ -166,115 +168,31 @@ struct MusicPlayerView: View {
 struct AlbumArtView: View {
     @ObservedObject var musicManager = MusicManager.shared
     @ObservedObject var vm: DynamicIslandViewModel
-    @Default(.showLiveCanvasInDynamicIsland) private var showLiveCanvasInDynamicIsland
     let albumArtNamespace: Namespace.ID
 
-    private var usesLiveCanvasArtwork: Bool {
-        showLiveCanvasInDynamicIsland && musicManager.videoArtworkURL != nil
-    }
-
-    private var albumArtCornerRadius: CGFloat {
-        Defaults[.cornerRadiusScaling]
-            ? musicManager.albumArt.size.width / musicManager.albumArt.size.height > 1.0
-                ? MusicPlayerImageSizes.cornerRadiusInset.opened / 3
-                : MusicPlayerImageSizes.cornerRadiusInset.opened
-            : musicManager.albumArt.size.width / musicManager.albumArt.size.height > 1.0
-                ? MusicPlayerImageSizes.cornerRadiusInset.closed / 3
-                : MusicPlayerImageSizes.cornerRadiusInset.closed
-    }
-
     var body: some View {
-        ZStack(alignment: .bottomTrailing) {
-            if Defaults[.lightingEffect] {
-                albumArtBackground
-            }
-            albumArtButton
-        }
-    }
-
-    private var albumArtBackground: some View {
-        Color.clear
-            .aspectRatio(1, contentMode: .fit)
-            .background(
-                DynamicIslandArtworkSourceView(
-                    cornerRadius: albumArtCornerRadius,
-                    contentMode: .fill
-                )
-            )
-            .clipped()
-            .scaleEffect(x: 1.3, y: 1.4)
-            .rotationEffect(.degrees(92))
-            .blur(radius: 40)
-            .opacity(
-                usesLiveCanvasArtwork
-                    ? (musicManager.isPlaying ? 0.62 : 0.18)
-                    : (musicManager.isPlaying ? 0.5 : 0)
-            )
-            .shadow(
-                color: Color(nsColor: musicManager.avgColor).opacity(usesLiveCanvasArtwork ? 0.24 : 0.16),
-                radius: usesLiveCanvasArtwork ? 22 : 14,
-                x: 0,
-                y: 0
-            )
-    }
-
-    private var albumArtButton: some View {
-        ZStack {
-            Button {
-                musicManager.openMusicApp()
-            } label: {
-                ZStack(alignment:.bottomTrailing) {
-                    albumArtImage
-                    appIconOverlay
+        Button { musicManager.openMusicApp() } label: {
+            DynamicIslandArtworkSourceView(cornerRadius: 12, contentMode: .fill)
+                .frame(width: 84, height: 84)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .overlay(alignment: .bottomTrailing) {
+                    if !musicManager.usingAppIconForArtwork, let identifier = musicManager.bundleIdentifier {
+                        AppIcon(for: identifier).resizable().scaledToFit()
+                            .frame(width: 16, height: 16).padding(3)
+                            .background(.black.opacity(0.55), in: RoundedRectangle(cornerRadius: 6))
+                            .padding(3)
+                    }
                 }
-                .albumArtFlip(angle: musicManager.flipAngle)
-                .parallax3D()
-                .padding(.bottom, -5)
-
-            }
-            .buttonStyle(PlainButtonStyle())
-            .scaleEffect(musicManager.isPlaying ? 1 : 0.85)
-            
-            albumArtDarkOverlay
         }
-    }
-
-    private var albumArtDarkOverlay: some View {
-        Rectangle()
-            .aspectRatio(1, contentMode: .fit)
-            .foregroundColor(Color.black)
-            .opacity(musicManager.isPlaying ? 0 : 0.8)
-            .blur(radius: 50)
-    }
-
-    private var albumArtImage: some View {
-        Color.clear
-            .aspectRatio(1, contentMode: .fit)
-            .overlay {
-                DynamicIslandArtworkSourceView(
-                    cornerRadius: albumArtCornerRadius,
-                    contentMode: .fit
-                )
-            }
-            .matchedGeometryEffect(id: "albumArt", in: albumArtNamespace)
-        .clipped()
-    }
-
-    @ViewBuilder
-    private var appIconOverlay: some View {
-        if vm.notchState == .open && !musicManager.usingAppIconForArtwork {
-            AppIcon(for: musicManager.bundleIdentifier ?? "com.apple.Music")
-                .resizable()
-                .scaledToFill()
-                .frame(width: 36, height: 36)
-                .offset(x: 10, y: 10)
-                .transition(.scale.combined(with: .opacity).animation(.bouncy.delay(0.3)))
-                .zIndex(2)
-        }
+        .buttonStyle(.plain)
+        .frame(width: 84, height: 84)
+        .accessibilityLabel("Open media app")
     }
 }
 
 struct MusicControlsView: View {
+    @Default(.notchElementStyle) private var elementStyle
+    @ObservedObject private var appearance = NotchAppearanceModel.shared
     @EnvironmentObject var vm: DynamicIslandViewModel
     @ObservedObject var musicManager = MusicManager.shared
     @ObservedObject var coordinator = DynamicIslandViewCoordinator.shared
@@ -293,7 +211,7 @@ struct MusicControlsView: View {
     private let skipMagnitude: CGFloat = 6
 
     var body: some View {
-        VStack(alignment: .leading) {
+        VStack(alignment: .leading, spacing: 6) {
             songInfoAndSlider
             if shouldShowControlHUDRow {
                 controlHUDRow
@@ -308,23 +226,23 @@ struct MusicControlsView: View {
     private var songInfoAndSlider: some View {
         GeometryReader { geo in
             VStack(alignment: .leading, spacing: 4) {
-                songInfo(width: geo.size.width)
+                songInfo(width: geo.size.width, showsLyrics: geo.size.height >= 82)
                     .zIndex(1) // Ensure it draws above the waveform scrubber
                 musicSlider
                     .zIndex(0)
             }
         }
-        .padding(.top, 10)
+        .padding(.top, 2)
         .padding(.leading, 5)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func songInfo(width: CGFloat) -> some View {
+    private func songInfo(width: CGFloat, showsLyrics: Bool) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             MusicTitleMarqueeView(
                 text: musicManager.songTitle,
                 isExplicit: musicManager.isCurrentTrackExplicit,
-                font: .headline,
+                font: .system(size: 13, weight: .semibold),
                 nsFont: .headline,
                 textColor: .white,
                 frameWidth: width,
@@ -332,15 +250,14 @@ struct MusicControlsView: View {
             )
             MarqueeText(
                 $musicManager.artistName,
-                font: .headline,
-                nsFont: .headline,
-                textColor: Defaults[.playerColorTinting] ? Color(nsColor: musicManager.avgColor)
-                    .ensureMinimumBrightness(factor: 0.6) : .gray,
+                font: .system(size: 12, weight: .medium),
+                nsFont: .subheadline,
+                textColor: appearance.accentColor.opacity(0.85),
                 frameWidth: width
             )
             .fontWeight(.medium)
             // Lyrics shown under the author name (same font size as author) when enabled in settings
-            if enableLyrics {
+            if enableLyrics && showsLyrics {
                 let transition = AnyTransition.asymmetric(
                     insertion: .move(edge: .bottom).combined(with: .opacity),
                     removal: .move(edge: .top).combined(with: .opacity)
@@ -389,13 +306,18 @@ struct MusicControlsView: View {
                 elapsedTime: musicManager.elapsedTime,
                 playbackRate: musicManager.playbackRate,
                 isPlaying: musicManager.isPlaying,
-                isLiveStream: musicManager.isLiveStream
-            ) { newValue in
-                guard !musicManager.isLiveStream else { return }
-                MusicManager.shared.seek(to: newValue)
-            }
-            .padding(.top, 5)
-            .frame(height: 36)
+                isLiveStream: musicManager.isLiveStream,
+                onValueChange: { newValue in
+                    guard !musicManager.isLiveStream else { return }
+                    MusicManager.shared.seek(to: newValue)
+                },
+                labelLayout: .inline,
+                trailingLabel: .remaining,
+                restingTrackHeight: 4,
+                draggingTrackHeight: 8
+            )
+            .padding(.top, 3)
+            .frame(height: 20)
         }
     }
 
@@ -406,6 +328,7 @@ struct MusicControlsView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .center)
+
     }
 
     private var shouldShowControlHUDRow: Bool {
@@ -461,7 +384,7 @@ struct MusicControlsView: View {
                     }
                 ),
                 range: 0...1,
-                color: .white,
+                color: appearance.accentColor,
                 dragging: $hudDragging,
                 lastDragged: $hudLastDragged,
                 onValueChange: { newValue in
@@ -523,9 +446,7 @@ struct MusicControlsView: View {
         }
     }
 
-    private var brandAccentColor: Color {
-        musicManager.brandAccentColor
-    }
+    private var brandAccentColor: Color { appearance.accentColor }
 
     private var repeatIcon: String {
         switch musicManager.repeatMode {
@@ -541,7 +462,7 @@ struct MusicControlsView: View {
     private var repeatIconColor: Color {
         switch musicManager.repeatMode {
         case .off:
-            return .white
+            return appearance.accentColor.opacity(0.65)
         case .all, .one:
             return brandAccentColor
         }
@@ -573,7 +494,8 @@ struct MusicControlsView: View {
         case .playPause:
             HoverButton(
                 icon: musicManager.isPlaying ? (musicManager.isLiveStream ? "stop.fill" : "pause.fill") : "play.fill",
-                scale: .large
+                iconColor: appearance.accentColor,
+                scale: .medium
             ) {
                 MusicManager.shared.togglePlay()
             }
@@ -612,7 +534,7 @@ struct MusicControlsView: View {
         case .shuffle:
             HoverButton(
                 icon: "shuffle",
-                iconColor: musicManager.isShuffled ? brandAccentColor : .white,
+                iconColor: musicManager.isShuffled ? brandAccentColor : appearance.accentColor.opacity(0.65),
                 scale: .medium
             ) {
                 MusicManager.shared.toggleShuffle()
@@ -632,7 +554,7 @@ struct MusicControlsView: View {
         case .lyrics:
             HoverButton(
                 icon: enableLyrics ? "quote.bubble.fill" : "quote.bubble",
-                iconColor: enableLyrics ? brandAccentColor : .white,
+                iconColor: enableLyrics ? brandAccentColor : appearance.accentColor.opacity(0.65),
                 scale: .medium
             ) {
                 enableLyrics.toggle()
@@ -653,6 +575,7 @@ struct MusicControlsView: View {
     ) -> some View {
         HoverButton(
             icon: icon,
+            iconColor: appearance.accentColor,
             scale: .medium,
             pressEffect: press,
             externalTriggerToken: trigger?.token,
@@ -684,8 +607,6 @@ struct MusicControlsView: View {
 
 struct NotchHomeView: View {
     @EnvironmentObject var vm: DynamicIslandViewModel
-    @ObservedObject var webcamManager = WebcamManager.shared
-    @ObservedObject var batteryModel = BatteryStatusViewModel.shared
     @ObservedObject var coordinator = DynamicIslandViewCoordinator.shared
     @ObservedObject private var extensionNotchExperienceManager = ExtensionNotchExperienceManager.shared
     @ObservedObject private var musicManager = MusicManager.shared
@@ -704,11 +625,11 @@ struct NotchHomeView: View {
                 mainContent
             }
         }
-        .transition(.opacity.combined(with: .blurReplace))
+
     }
 
     private var mainContent: some View {
-        HStack(alignment: .top, spacing: 20) {
+        Group {
             if Defaults[.enableMinimalisticUI] {
                 if let overridePayload = minimalisticOverridePayload {
                     ExtensionMinimalisticExperienceView(
@@ -719,42 +640,41 @@ struct NotchHomeView: View {
                     MinimalisticMusicPlayerView(albumArtNamespace: albumArtNamespace)
                 }
             } else {
-                // Normal mode: Show full music player with optional calendar and webcam
-                if shouldShowMusicPlayer {
-                    MusicPlayerView(albumArtNamespace: albumArtNamespace)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                
-                if Defaults[.showCalendar] {
-                    Group {
-                        if shouldShowMusicPlayer {
-                            CalendarView()
-                        } else {
-                            StandaloneCalendarView()
+                VStack(alignment: .leading, spacing: 6) {
+                    nowPlayingHeader
+                    if shouldShowMusicPlayer {
+                        MusicPlayerView(albumArtNamespace: albumArtNamespace)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    } else {
+                        VStack(spacing: 5) {
+                            Image(systemName: "music.note")
+                            Text(showStandardMediaControls ? "Play audio to see it here" : "Music controls are off")
+                                .font(.system(size: 12, weight: .medium))
                         }
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .onHover { isHovering in
-                        vm.isHoveringCalendar = isHovering
-                    }
-                    .environmentObject(vm)
                 }
-                
-                if Defaults[.showMirror],
-                   webcamManager.cameraAvailable,
-                   vm.notchState == .open {
-                    CameraPreviewView(webcamManager: webcamManager)
-                        .scaledToFit()
-                        .opacity(vm.notchState == .closed ? 0 : 1)
-                        .blur(radius: vm.notchState == .closed ? 20 : 0)
-                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
             }
         }
-        .transition(.opacity.animation(.smooth.speed(0.9))
-            .combined(with: .blurReplace.animation(.smooth.speed(0.9)))
-            .combined(with: .move(edge: .top)))
-        .blur(radius: vm.notchState == .closed ? 30 : 0)
-        .padding(Defaults[.enableMinimalisticUI] ? 0 : 8) //Putting the main padding for home view here for consistency
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private var nowPlayingHeader: some View {
+        HStack {
+            Text("Now Playing")
+                .font(.system(size: 12, weight: .semibold))
+            if musicManager.hasActiveSession {
+                AudioSpectrumView(isPlaying: $musicManager.isPlaying)
+                    .frame(width: CGFloat(Defaults[.visualizerBarCount]) * 4, height: 14)
+                    .accessibilityLabel(musicManager.isPlaying ? "Playing" : "Paused")
+            }
+            Spacer(minLength: 8)
+            MediaSourcePicker()
+        }
+        .frame(height: 14)
     }
 
     private var minimalisticOverridePayload: ExtensionNotchExperiencePayload? {
@@ -763,6 +683,7 @@ struct NotchHomeView: View {
 }
 
 struct MusicSliderView: View {
+    @ObservedObject private var appearance = NotchAppearanceModel.shared
     @Binding var sliderValue: Double
     @Binding var duration: Double
     @Binding var lastDragged: Date
@@ -904,22 +825,11 @@ struct MusicSliderView: View {
         )
     }
 
-    private var sliderTint: Color {//
-        switch Defaults[.sliderColor] {
-        case .albumArt:
-            return Color(nsColor: color).ensureMinimumBrightness(factor: 0.6)
-        case .accent:
-            return .accentColor
-        case .white:
-            return .white
-        }
-    }
+    // The notch-wide accent is authoritative for playback chrome. The input
+    // color remains part of this view's initializer for existing callers.
+    private var sliderTint: Color { appearance.accentColor }
 
-    private var timeLabelColor: Color {
-        Defaults[.playerColorTinting]
-            ? Color(nsColor: color).ensureMinimumBrightness(factor: 0.6)
-            : .gray
-    }
+    private var timeLabelColor: Color { appearance.accentColor.opacity(0.82) }
 
     private var trailingTimeText: String {
         switch trailingLabel {
@@ -1035,6 +945,7 @@ struct CustomSlider: View {
 }
 
 private struct MediaOutputPickerButton: View {
+    @ObservedObject private var appearance = NotchAppearanceModel.shared
     @ObservedObject private var routeManager = AudioRouteManager.shared
     @StateObject private var volumeModel = MediaOutputVolumeViewModel()
     @State private var isPopoverPresented = false
@@ -1042,7 +953,7 @@ private struct MediaOutputPickerButton: View {
     @EnvironmentObject private var vm: DynamicIslandViewModel
 
     var body: some View {
-        HoverButton(icon: buttonIcon, iconColor: .white, scale: .medium) {
+        HoverButton(icon: buttonIcon, iconColor: appearance.accentColor, scale: .medium) {
             isPopoverPresented.toggle()
             if isPopoverPresented {
                 routeManager.refreshDevices()
@@ -1087,6 +998,7 @@ private struct MediaOutputPickerButton: View {
 }
 
 private struct AirPlayPickerButton: View {
+    @ObservedObject private var appearance = NotchAppearanceModel.shared
     @ObservedObject private var musicManager = MusicManager.shared
     @ObservedObject private var airPlayManager = AppleMusicAirPlayManager.shared
     @State private var isPopoverPresented = false
@@ -1098,7 +1010,7 @@ private struct AirPlayPickerButton: View {
     }
 
     var body: some View {
-        HoverButton(icon: "airplayaudio", iconColor: .white, scale: .medium) {
+        HoverButton(icon: "airplayaudio", iconColor: appearance.accentColor, scale: .medium) {
             isPopoverPresented.toggle()
             if isPopoverPresented {
                 Task { await airPlayManager.refreshDevices() }

@@ -23,6 +23,9 @@
 import Cocoa
 
 class DynamicIslandWindow: NSPanel {
+    private var inputController: NotchWindowInputController?
+    private var inputRefreshScheduled = false
+
     override init(
         contentRect: NSRect,
         styleMask: NSWindow.StyleMask,
@@ -42,6 +45,10 @@ class DynamicIslandWindow: NSPanel {
         titleVisibility = .hidden
         titlebarAppearsTransparent = true
         backgroundColor = .clear
+        // Start pass-through until the visible surface publishes its native
+        // input region; the hosting window may be much larger than that surface.
+        ignoresMouseEvents = true
+        acceptsMouseMovedEvents = true
         isMovable = false
         
         collectionBehavior = [
@@ -58,6 +65,45 @@ class DynamicIslandWindow: NSPanel {
         ScreenCaptureVisibilityManager.shared.register(self, scope: .entireInterface)
     }
     
+    func installInputRegion(_ probe: NotchInputRegionProbe) {
+        if inputController == nil { inputController = NotchWindowInputController(window: self) }
+        inputController?.install(probe)
+    }
+    func removeInputRegion(_ probe: NotchInputRegionProbe) { inputController?.remove(probe) }
+    func refreshInputRegion() { inputController?.refresh() }
+    func containsInteractivePoint(_ point: NSPoint) -> Bool { inputController?.contains(screenPoint: point) == true }
+
+    override func setFrame(_ frameRect: NSRect, display flag: Bool) {
+        super.setFrame(frameRect, display: flag)
+        // AppKit may call this while laying out its hosting view. Keep native
+        // event-property writes out of that window display/constraint cycle.
+        // Probe state updates still clamp the collapsed region immediately.
+        guard !inputRefreshScheduled else { return }
+        inputRefreshScheduled = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.inputRefreshScheduled = false
+            self.inputController?.refresh()
+        }
+    }
+
+    override var alphaValue: CGFloat {
+        didSet { inputController?.refresh() }
+    }
+
+    override func orderFrontRegardless() {
+        super.orderFrontRegardless()
+        inputController?.resume()
+    }
+    override func orderOut(_ sender: Any?) {
+        inputController?.suspend()
+        super.orderOut(sender)
+    }
+    override func close() {
+        inputController?.suspend()
+        super.close()
+    }
+
     override var canBecomeKey: Bool {
         true
     }

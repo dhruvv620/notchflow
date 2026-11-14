@@ -34,7 +34,7 @@ struct TabModel: Identifiable {
     let accentColor: Color?
 
     init(label: String, icon: String, view: NotchViews, experienceID: String? = nil, accentColor: Color? = nil) {
-        self.id = experienceID.map { "extension-\($0)" } ?? "system-\(view)-\(label)"
+        self.id = experienceID.map { "extension-\($0)" } ?? NotchBuiltinTab.identifier(for: view)
         self.label = label
         self.icon = icon
         self.view = view
@@ -44,6 +44,8 @@ struct TabModel: Identifiable {
 }
 
 struct TabSelectionView: View {
+    @ObservedObject private var preferences = NotchTabPreferences.shared
+    @ObservedObject private var appearance = NotchAppearanceModel.shared
     @ObservedObject var coordinator = DynamicIslandViewCoordinator.shared
     @ObservedObject private var extensionNotchExperienceManager = ExtensionNotchExperienceManager.shared
     @StateObject private var quickShareService = QuickShareService.shared
@@ -51,6 +53,8 @@ struct TabSelectionView: View {
     @State private var showQuickSharePopover = false
     @Default(.enableTimerFeature) var enableTimerFeature
     @Default(.enableStatsFeature) var enableStatsFeature
+    @Default(.enableRemindersFeature) private var enableRemindersFeature
+    @Default(.enableClipboardManager) private var enableClipboardManager
     @Default(.enableColorPickerFeature) var enableColorPickerFeature
     @Default(.timerDisplayMode) var timerDisplayMode
     @Default(.enableThirdPartyExtensions) private var enableThirdPartyExtensions
@@ -62,19 +66,19 @@ struct TabSelectionView: View {
     @Default(.enableMinimalisticUI) private var enableMinimalisticUI
     @Namespace var animation
     
-    private var tabs: [TabModel] {
+    private var tabs: [TabModel] { Self.availableTabs }
+
+    static var candidateTabs: [TabModel] {
         var tabsArray: [TabModel] = []
 
-        if homeTabVisible {
-            tabsArray.append(TabModel(label: "Home", icon: "house.fill", view: .home))
-        }
+        tabsArray.append(TabModel(label: "Music", icon: "music.note", view: .home))
 
         if Defaults[.dynamicShelf] {
             tabsArray.append(TabModel(label: "Shelf", icon: "tray.fill", view: .shelf))
         }
         
-        if enableTimerFeature && timerDisplayMode == .tab {
-            tabsArray.append(TabModel(label: "Timer", icon: "timer", view: .timer))
+        if Defaults[.enableTimerFeature] && Defaults[.timerDisplayMode] == .tab {
+            tabsArray.append(TabModel(label: "Timers", icon: "timer", view: .timer))
         }
 
         // Stats tab only shown when stats feature is enabled
@@ -87,16 +91,26 @@ struct TabSelectionView: View {
             tabsArray.append(TabModel(label: "Usage", icon: "chart.bar.doc.horizontal", view: .llmUsage))
         }
 
-        if Defaults[.enableNotes] || (Defaults[.enableClipboardManager] && Defaults[.clipboardDisplayMode] == .separateTab) {
-            let label = Defaults[.enableNotes] ? "Notes" : "Clipboard"
-            let icon = Defaults[.enableNotes] ? "note.text" : "doc.on.clipboard"
-            tabsArray.append(TabModel(label: label, icon: icon, view: .notes))
+        if Defaults[.enableNotes] {
+            tabsArray.append(TabModel(label: "Notes", icon: "note.text", view: .notes))
+        }
+        if Defaults[.enableClipboardManager] {
+            tabsArray.append(TabModel(label: "Clipboard", icon: "doc.on.clipboard", view: .clipboard))
         }
         if Defaults[.enableTerminalFeature] {
             tabsArray.append(TabModel(label: "Terminal", icon: "apple.terminal", view: .terminal))
         }
-        if extensionTabsEnabled {
-            for payload in extensionTabPayloads {
+        if Defaults[.enableRemindersFeature] {
+            tabsArray.append(TabModel(label: "Todos", icon: "checklist", view: .reminders))
+        }
+        if Defaults[.communicationsEnabled] {
+            tabsArray.append(TabModel(label: "Notifications", icon: "bell.badge", view: .notifications))
+        }
+        if Defaults[.showCalendar] {
+            tabsArray.append(TabModel(label: "Calendar", icon: "calendar", view: .calendar))
+        }
+        if Defaults[.enableThirdPartyExtensions] && Defaults[.enableExtensionNotchExperiences] && Defaults[.enableExtensionNotchTabs] {
+            for payload in ExtensionNotchExperienceManager.shared.activeExperiences.filter({ $0.descriptor.tab != nil }) {
                 guard let tab = payload.descriptor.tab else { continue }
                 let accent = payload.descriptor.accentColor.swiftUIColor
                 let iconName = tab.iconSymbolName ?? "puzzlepiece.extension"
@@ -113,42 +127,90 @@ struct TabSelectionView: View {
         }
         return tabsArray
     }
+    static var availableTabs: [TabModel] {
+        let candidates = candidateTabs
+        if Defaults[.enableMinimalisticUI] { return Array(candidates.filter { $0.view == .home }.prefix(1)) }
+        let ids = NotchTabOrderPolicy.visibleIDs(order: Defaults[.notchTabOrder], hidden: Defaults[.notchHiddenTabs],
+                                               available: candidates.map(\.id), fallback: NotchBuiltinTab.music.rawValue)
+        let lookup = Dictionary(uniqueKeysWithValues: candidates.map { ($0.id, $0) })
+        return ids.compactMap { lookup[$0] }
+    }
+
+    static func validateCurrentSelection() {
+        let tabs = availableTabs
+        let coordinator = DynamicIslandViewCoordinator.shared
+        let selected = tabs.contains { $0.view == coordinator.currentView && ($0.view != .extensionExperience || $0.experienceID == coordinator.selectedExtensionExperienceID) }
+        guard !selected, let first = tabs.first else { return }
+        coordinator.selectedExtensionExperienceID = first.experienceID
+        coordinator.currentView = first.view
+    }
+
+    static func advanceTab(forward: Bool) {
+        let coordinator = DynamicIslandViewCoordinator.shared
+        let tabs = availableTabs
+        guard !tabs.isEmpty else { return }
+        let current = tabs.firstIndex {
+            $0.view == coordinator.currentView && ($0.view != .extensionExperience || $0.experienceID == coordinator.selectedExtensionExperienceID)
+        }
+        let index = current.map { ($0 + (forward ? 1 : tabs.count - 1)) % tabs.count } ?? 0
+        let target = tabs[index]
+        withAnimation(.easeInOut(duration: 0.2)) {
+            coordinator.selectedExtensionExperienceID = target.experienceID
+            coordinator.currentView = target.view
+            coordinator.tabSwitchForward = forward
+        }
+    }
+
     var body: some View {
-        HStack(spacing: 24) {
-            ForEach(Array(tabs.enumerated()), id: \.element.id) { idx, tab in
-                let isSelected = isSelected(tab)
-                let activeAccent = tab.accentColor ?? .white
-
-                // Render the tab button
-                TabButton(label: tab.label, icon: tab.icon, selected: isSelected) {
-                    if tab.view == .extensionExperience {
-                        coordinator.selectedExtensionExperienceID = tab.experienceID
+        ScrollViewReader { reader in
+            ScrollView(.horizontal) {
+                HStack(spacing: 2) {
+                    ForEach(tabs) { tab in
+                        let selected = isSelected(tab)
+                        Button {
+                            coordinator.selectedExtensionExperienceID = tab.experienceID
+                            coordinator.currentView = tab.view
+                            NotificationCenter.default.post(name: .notchTabExplicitSelection, object: nil)
+                        } label: {
+                            Image(systemName: tab.icon)
+                                .font(.system(size: 13, weight: .medium))
+                                .symbolRenderingMode(.hierarchical)
+                                .foregroundStyle(selected ? (tab.accentColor ?? appearance.accentColor) : Color.white.opacity(0.62))
+                                .frame(width: 28, height: 28)
+                                .contentShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .background {
+                            if selected {
+                                Capsule().fill(Color.white.opacity(0.10))
+                                    .matchedGeometryEffect(id: "selection", in: animation)
+                            }
+                        }
+                        .id(tab.id)
+                        .help(tab.label).accessibilityLabel(tab.label)
+                        .accessibilityAddTraits(selected ? .isSelected : [])
                     }
-                    coordinator.currentView = tab.view
                 }
-                .frame(height: 26)
-                .foregroundStyle(isSelected ? activeAccent : .gray)
-                .background {
-                    if isSelected {
-                        Capsule()
-                            .fill((tab.accentColor ?? Color(nsColor: .secondarySystemFill)).opacity(0.25))
-                            .shadow(color: (tab.accentColor ?? .clear).opacity(0.4), radius: 8)
-                            .matchedGeometryEffect(id: "capsule", in: animation)
-                    } else {
-                        Capsule()
-                            .fill(Color.clear)
-                            .matchedGeometryEffect(id: "capsule", in: animation)
-                            .hidden()
-                    }
-                }
-
-                
+                .padding(.horizontal, 2)
+            }
+            .scrollIndicators(.hidden)
+            .frame(height: 30)
+            .onChange(of: coordinator.currentView) { _, _ in
+                revealSelection(using: reader)
+            }
+            .onChange(of: coordinator.selectedExtensionExperienceID) { _, _ in
+                revealSelection(using: reader)
+            }
+            .onAppear { ensureValidSelection(with: tabs); revealSelection(using: reader) }
+            .onReceive(NotificationCenter.default.publisher(for: .notchTabsDidChange)) { _ in
+                Self.validateCurrentSelection(); revealSelection(using: reader)
             }
         }
-        .clipShape(Capsule())
-        .onAppear {
-            ensureValidSelection(with: tabs)
-        }
+    }
+
+    private func revealSelection(using reader: ScrollViewProxy) {
+        guard let selected = tabs.first(where: { isSelected($0) }) else { return }
+        withAnimation(.smooth(duration: 0.28)) { reader.scrollTo(selected.id, anchor: .center) }
     }
 
     private var extensionTabsEnabled: Bool {

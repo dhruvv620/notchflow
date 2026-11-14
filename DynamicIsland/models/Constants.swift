@@ -412,7 +412,7 @@ enum MediaControllerType: String, CaseIterable, Identifiable, Defaults.Serializa
     
     var localizedName: String {
         switch self {
-        case .nowPlaying: return String(localized: "Now Playing")
+        case .nowPlaying: return String(localized: "Automatic (System media)")
         case .appleMusic: return String(localized: "Apple Music")
         case .spotify: return String(localized: "Spotify")
         case .youtubeMusic: return String(localized: "Youtube Music")
@@ -875,6 +875,7 @@ extension Defaults.Keys {
     static let lightingEffect = Key<Bool>("lightingEffect", default: true)
     static let accentColor = Key<Color>("accentColor", default: Color.blue)
     static let enableShadow = Key<Bool>("enableShadow", default: true)
+    static let expandedNotchLiquidGlass = Key<Bool>("expandedNotchLiquidGlass", default: false)
     static let cornerRadiusScaling = Key<Bool>("cornerRadiusScaling", default: true)
     static let useModernCloseAnimation = Key<Bool>("useModernCloseAnimation", default: true)
     static let showNotHumanFace = Key<Bool>("showNotHumanFace", default: false)
@@ -1071,6 +1072,7 @@ extension Defaults.Keys {
     static let enableWobbleAnimation = Key<Bool>("enableWobbleAnimation", default: false)
     
     // MARK: Media Controller
+    static let notchSystemMediaMigration = Key<Bool>("notchSystemMediaMigration", default: false)
     static let mediaController = Key<MediaControllerType>("mediaController", default: defaultMediaController)
     static let spotifySPDCCookie = Key<String>("spotifySPDCCookie", default: "")
     static let spotifyAuthAccessToken = Key<String>("spotifyAuthAccessToken", default: "")
@@ -1137,7 +1139,10 @@ extension Defaults.Keys {
     
     
     // MARK: Reminder Live Activity
-    static let enableReminderLiveActivity = Key<Bool>("enableReminderLiveActivity", default: true)
+    // Upcoming reminders take over the closed notch, so this must be an
+    // explicit opt-in rather than appearing merely because Reminders access
+    // was granted for the Todos tab.
+    static let enableReminderLiveActivity = Key<Bool>("enableReminderLiveActivity", default: false)
     static let reminderPresentationStyle = Key<ReminderPresentationStyle>("reminderPresentationStyle", default: .ringCountdown)
     static let reminderLeadTime = Key<Int>("reminderLeadTime", default: 5)
     static let reminderSneakPeekDuration = Key<Double>("reminderSneakPeekDuration", default: 5)
@@ -1152,9 +1157,9 @@ extension Defaults.Keys {
     
     // MARK: Clipboard Feature
     static let enableClipboardManager = Key<Bool>("enableClipboardManager", default: true)
-    static let clipboardHistorySize = Key<Int>("clipboardHistorySize", default: 3)
+    static let clipboardHistorySize = Key<Int>("clipboardHistorySize", default: 20)
     static let showClipboardIcon = Key<Bool>("showClipboardIcon", default: true)
-    static let clipboardDisplayMode = Key<ClipboardDisplayMode>("clipboardDisplayMode", default: .panel)
+    static let clipboardDisplayMode = Key<ClipboardDisplayMode>("clipboardDisplayMode", default: .separateTab)
     
     // MARK: Screen Assistant Feature
     static let enableScreenAssistant = Key<Bool>("enableScreenAssistant", default: true)
@@ -1294,6 +1299,9 @@ extension Defaults.Keys {
     static let showLiveCanvasInDynamicIsland = Key<Bool>("showLiveCanvasInDynamicIsland", default: false)
     
     // MARK: Notes Feature
+    // The Todos tab is optional.  Keep it out of the notch until the user
+    // deliberately enables it from Tabs & Features or Calendar settings.
+    static let enableRemindersFeature = Key<Bool>("enableRemindersFeature", default: false)
     static let enableNotes = Key<Bool>("enableNotes", default: false)
     static let enableNotePinning = Key<Bool>("enableNotePinning", default: true)
     static let enableNoteSearch = Key<Bool>("enableNoteSearch", default: false)
@@ -1304,15 +1312,10 @@ extension Defaults.Keys {
     static let enableAppleNotesSync = Key<Bool>("enableAppleNotesSync", default: false)
     static let appleNotesLastSyncDate = Key<Date?>("appleNotesLastSyncDate", default: nil)
     
-    // Helper to determine the default media controller based on macOS version
-    static var defaultMediaController: MediaControllerType {
-        if #available(macOS 15.4, *) {
-            return .appleMusic
-        } else {
-            return .nowPlaying
-        }
-    }
+    // The bundled system-hosted adapter works across supported macOS versions.
+    static var defaultMediaController: MediaControllerType { .nowPlaying }
     
+
     // Migration helper to convert from legacy enableGradient Boolean to new ProgressBarStyle enum
     static func migrateProgressBarStyle() {
         // Check if migration is needed by seeing if the old Boolean was set to gradient

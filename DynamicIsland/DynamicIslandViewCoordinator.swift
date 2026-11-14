@@ -105,7 +105,6 @@ class DynamicIslandViewCoordinator: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private var hoverOpenSuppressedUntil: Date = .distantPast
     
-    private static let tabOrder: [NotchViews] = [.home, .shelf, .timer, .stats, .llmUsage, .colorPicker, .notes, .clipboard, .terminal, .extensionExperience]
     
     /// Direction of the most recent tab switch (true = forward/right, false = backward/left)
     @Published var tabSwitchForward: Bool = true
@@ -117,8 +116,9 @@ class DynamicIslandViewCoordinator: ObservableObject {
                 return
             }
             // Track direction before SwiftUI re-renders
-            let oldIdx = Self.tabOrder.firstIndex(of: oldValue) ?? 0
-            let newIdx = Self.tabOrder.firstIndex(of: currentView) ?? 0
+            let order = NotchTabOrderPolicy.normalizedOrder(Defaults[.notchTabOrder], known: NotchBuiltinTab.allCases.map(\.rawValue))
+            let oldIdx = order.firstIndex(of: NotchBuiltinTab.identifier(for: oldValue)) ?? 0
+            let newIdx = order.firstIndex(of: NotchBuiltinTab.identifier(for: currentView)) ?? 0
             tabSwitchForward = newIdx >= oldIdx
             handleStatsTabTransition(from: oldValue, to: currentView)
         }

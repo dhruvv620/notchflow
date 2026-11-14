@@ -176,10 +176,9 @@ class ClipboardManager: ObservableObject {
     private var timer: Timer?
     private var lastChangeCount: Int = 0
     
-    // Use configurable history size from settings
-    private var maxHistoryItems: Int {
-        return Defaults[.clipboardHistorySize]
-    }
+    /// Recent history is deliberately bounded; legacy favorites remain separate.
+    static let historyLimit = 20
+    private var maxHistoryItems: Int { Self.historyLimit }
     
     // Computed properties for filtered lists
     var regularHistory: [ClipboardItem] {
@@ -204,6 +203,10 @@ class ClipboardManager: ObservableObject {
     private init() {
         lastChangeCount = NSPasteboard.general.changeCount
         loadHistoryFromDefaults()
+        if clipboardHistory.count > maxHistoryItems {
+            clipboardHistory = Array(clipboardHistory.prefix(maxHistoryItems))
+            saveHistoryToDefaults()
+        }
         cleanupOldFiles()
     }
     
@@ -228,39 +231,36 @@ class ClipboardManager: ObservableObject {
         timer = nil
     }
     
-    func copyToClipboard(_ item: ClipboardItem) {
+    @discardableResult
+    func copyToClipboard(_ item: ClipboardItem) -> Bool {
         let pasteboard = NSPasteboard.general
+        // Validate file-backed content before replacing the user's current clipboard.
+        let imageData = item.type == .image ? item.getImageData() : nil
+        if item.type == .image && imageData == nil { return false }
+        if item.type == .file && (item.fileURLs ?? []).isEmpty { return false }
         pasteboard.clearContents()
-        
+        let copied: Bool
         switch item.type {
-        case .text, .url:
-            if let stringData = item.stringData {
-                pasteboard.setString(stringData, forType: .string)
-            }
+        case .text, .url, .unknown:
+            copied = item.stringData.map { pasteboard.setString($0, forType: .string) } ?? false
         case .image:
-            if let imageData = item.getImageData() {
-                pasteboard.setData(imageData, forType: .png)
-            }
+            if let imageData, let image = NSImage(data: imageData) {
+                copied = pasteboard.writeObjects([image])
+            } else { copied = false }
         case .file:
-            if let fileURLs = item.fileURLs {
-                let urls = fileURLs.compactMap { URL(string: $0) }
-                pasteboard.writeObjects(urls as [NSPasteboardWriting])
-            }
+            let urls = (item.fileURLs ?? []).compactMap { URL(string: $0) }
+            copied = pasteboard.writeObjects(urls as [NSPasteboardWriting])
         case .rtf:
-            if let rtfData = item.rtfData {
-                pasteboard.setData(rtfData, forType: .rtf)
-            }
-            // Also set plain text as fallback
-            if let stringData = item.stringData {
-                pasteboard.setString(stringData, forType: .string)
-            }
-        case .unknown:
-            if let stringData = item.stringData {
-                pasteboard.setString(stringData, forType: .string)
-            }
+            var wrote = false
+            if let rtfData = item.rtfData { wrote = pasteboard.setData(rtfData, forType: .rtf) }
+            if let text = item.stringData { wrote = pasteboard.setString(text, forType: .string) || wrote }
+            copied = wrote
         }
+        // Copying a history card should not create a new capture or jump pagination.
+        lastChangeCount = pasteboard.changeCount
+        return copied
     }
-    
+
     func deleteItem(_ item: ClipboardItem) {
         // Clean up associated files
         if let fileName = item.imageFileName {
@@ -273,18 +273,11 @@ class ClipboardManager: ObservableObject {
     }
     
     func clearHistory() {
-        // Clean up all associated files
-        for item in clipboardHistory {
-            if let fileName = item.imageFileName {
-                let fileURL = ClipboardManager.clipboardDataDirectory.appendingPathComponent(fileName)
-                try? FileManager.default.removeItem(at: fileURL)
-            }
-        }
-        
         clipboardHistory.removeAll()
+        cleanupOldFiles()
         saveHistoryToDefaults()
     }
-    
+
     func pinItem(_ item: ClipboardItem) {
         // Update the item to be pinned
         var pinnedItem = item
@@ -347,10 +340,8 @@ class ClipboardManager: ObservableObject {
         
         guard let clipboardItem = getCurrentClipboardItem() else { return }
         
-        // Don't add duplicate items
-        if !clipboardHistory.contains(where: { isSameContent($0, clipboardItem) }) {
-            addToHistory(clipboardItem)
-        }
+        // A repeated external copy is recent again; retain one card at the front.
+        addToHistory(clipboardItem)
     }
     
     private func getCurrentClipboardItem() -> ClipboardItem? {
@@ -443,40 +434,14 @@ class ClipboardManager: ObservableObject {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             
-            // Remove any existing items with the same data
-            let itemsToRemove = self.clipboardHistory.filter { existingItem in
-                return self.isSameContent(existingItem, item)
-            }
-            
-            // Clean up files for items being removed
-            for oldItem in itemsToRemove {
-                if let fileName = oldItem.imageFileName {
-                    let fileURL = ClipboardManager.clipboardDataDirectory.appendingPathComponent(fileName)
-                    try? FileManager.default.removeItem(at: fileURL)
-                }
-            }
-            
-            self.clipboardHistory.removeAll { existingItem in
-                return self.isSameContent(existingItem, item)
-            }
-            
-            // Add to beginning of array
+            // Compare before removing any image files, then remove by stable ID.
+            let duplicateIDs = Set(self.clipboardHistory.filter { self.isSameContent($0, item) }.map(\.id))
+            self.clipboardHistory.removeAll { duplicateIDs.contains($0.id) }
             self.clipboardHistory.insert(item, at: 0)
             self.lastCopiedItemDate = item.timestamp
-            
-            // Keep only the most recent items and clean up old files
-            let itemsToDelete = Array(self.clipboardHistory.dropFirst(self.maxHistoryItems))
-            for oldItem in itemsToDelete {
-                if let fileName = oldItem.imageFileName {
-                    let fileURL = ClipboardManager.clipboardDataDirectory.appendingPathComponent(fileName)
-                    try? FileManager.default.removeItem(at: fileURL)
-                }
-            }
-            
-            if self.clipboardHistory.count > self.maxHistoryItems {
-                self.clipboardHistory = Array(self.clipboardHistory.prefix(self.maxHistoryItems))
-            }
-            
+            self.clipboardHistory = Array(self.clipboardHistory.prefix(self.maxHistoryItems))
+            self.cleanupOldFiles()
+
             self.saveHistoryToDefaults()
         }
     }
@@ -492,6 +457,7 @@ class ClipboardManager: ObservableObject {
             // For images, compare the actual data if both are available
             let data1 = item1.getImageData()
             let data2 = item2.getImageData()
+            guard let data1, let data2 else { return false }
             return data1 == data2
         case .file:
             return item1.fileURLs == item2.fileURLs
@@ -504,7 +470,7 @@ class ClipboardManager: ObservableObject {
     private func cleanupOldFiles() {
         guard let files = try? FileManager.default.contentsOfDirectory(at: ClipboardManager.clipboardDataDirectory, includingPropertiesForKeys: nil) else { return }
         
-        let referencedFiles = Set(clipboardHistory.compactMap { $0.imageFileName })
+        let referencedFiles = Set((clipboardHistory + pinnedItems).compactMap { $0.imageFileName })
         
         for file in files {
             let fileName = file.lastPathComponent

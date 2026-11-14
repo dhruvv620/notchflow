@@ -50,6 +50,7 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
     @Published var isStatsPopoverActive: Bool = false
     @Published var isReminderPopoverActive: Bool = false
     @Published var isMediaOutputPopoverActive: Bool = false
+    @Published var isMediaSourcePopoverActive: Bool = false
     @Published var isTimerPopoverActive: Bool = false
     @Published var shouldRecheckHover: Bool = false
     @Published var isScrollGestureActive: Bool = false
@@ -98,9 +99,9 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
         guard Defaults[.clipboardDisplayMode] == .separateTab else { return }
         guard let lastCopyDate = ClipboardManager.shared.lastCopiedItemDate else { return }
         guard Date().timeIntervalSince(lastCopyDate) <= clipboardFocusWindow else { return }
-        guard coordinator.currentView != .notes else { return }
+        guard coordinator.currentView != .clipboard else { return }
         withAnimation(.smooth) {
-            coordinator.currentView = .notes
+            coordinator.currentView = .clipboard
         }
     }
     
@@ -357,13 +358,31 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
         focusClipboardTabIfNeeded()
     }
     
+    func refreshAppearanceSize() {
+        guard notchState == .open else { return }
+        notchSize = calculateDynamicNotchSize()
+    }
+
     private func calculateDynamicNotchSize() -> CGSize {
         let baseSize = Defaults[.enableMinimalisticUI] ? minimalisticOpenNotchSize(isDynamicIslandMode: shouldUseDynamicIslandMode(for: screen)) : openNotchSize
         var adjustedSize = baseSize
 
-        if coordinator.currentView == .notes || coordinator.currentView == .clipboard {
+        if coordinator.currentView == .timer {
+            return CGSize(width: baseSize.width, height: max(baseSize.height, 224))
+        }
+
+        if coordinator.currentView == .reminders {
+            return baseSize
+        }
+
+        if coordinator.currentView == .notes {
             let preferred = coordinator.notesLayoutState.preferredHeight
-            adjustedSize.height = max(adjustedSize.height, preferred)
+            adjustedSize.height = min(max(adjustedSize.height, preferred), baseSize.height + 40)
+            return adjustedSize
+        }
+
+        if coordinator.currentView == .terminal {
+            adjustedSize.height = baseSize.height + 40
             return adjustedSize
         }
 

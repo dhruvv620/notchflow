@@ -39,7 +39,12 @@ struct ContentView: View {
     @EnvironmentObject var vm: DynamicIslandViewModel
     @EnvironmentObject var webcamManager: WebcamManager
 
+    @ObservedObject private var appearance = NotchAppearanceModel.shared
+    @Default(.notchReduceMotion) private var notchReduceMotion
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @ObservedObject var coordinator = DynamicIslandViewCoordinator.shared
+    @ObservedObject private var communications = CommunicationsManager.shared
+    @State private var showCallControls = false
     @ObservedObject var musicManager = MusicManager.shared
     @ObservedObject var timerManager = TimerManager.shared
     @ObservedObject var reminderManager = ReminderLiveActivityManager.shared
@@ -157,27 +162,28 @@ struct ContentView: View {
             }
         }
         
+        if coordinator.currentView == .reminders {
+            return baseSize
+        }
+
         if coordinator.currentView == .timer {
-            return CGSize(width: baseSize.width, height: 250) // Extra height for timer presets
+            return CGSize(width: baseSize.width, height: max(baseSize.height, 224))
         }
         
-        if coordinator.currentView == .notes || coordinator.currentView == .clipboard {
+        if coordinator.currentView == .notes {
             let preferredHeight = coordinator.notesLayoutState.preferredHeight
-            let resolvedHeight = max(baseSize.height, preferredHeight)
+            let resolvedHeight = min(max(baseSize.height, preferredHeight), baseSize.height + 40)
             return CGSize(width: baseSize.width, height: resolvedHeight)
         }
 
         if coordinator.currentView == .terminal {
-            // Dynamic height: up to terminalMaxHeightFraction of screen, min 300pt
-            let screenHeight = NSScreen.main?.visibleFrame.height ?? 800
-            let maxFraction = Defaults[.terminalMaxHeightFraction]
-            let terminalHeight = min(screenHeight * maxFraction, max(300, screenHeight * maxFraction))
+            let terminalHeight = baseSize.height + 40
             return CGSize(width: baseSize.width, height: terminalHeight)
         }
 
         if coordinator.currentView == .extensionExperience {
             if let preferredHeight = extensionTabPreferredHeight(baseSize: baseSize) {
-                return CGSize(width: baseSize.width, height: preferredHeight)
+                return CGSize(width: baseSize.width, height: min(max(baseSize.height, preferredHeight), baseSize.height + 40))
             }
             return baseSize
         }
@@ -185,7 +191,7 @@ struct ContentView: View {
         if enableMinimalisticUI,
            coordinator.currentView == .home,
            let preferredHeight = extensionMinimalisticPreferredHeight(baseSize: baseSize) {
-            return CGSize(width: baseSize.width, height: preferredHeight)
+            return CGSize(width: baseSize.width, height: min(max(baseSize.height, preferredHeight), baseSize.height + 40))
         }
         
         guard coordinator.currentView == .stats else {
@@ -199,7 +205,7 @@ struct ContentView: View {
         
         let additionalRows = max(rows - 1, 0)
         let extraHeight = CGFloat(additionalRows) * statsAdditionalRowHeight
-        return CGSize(width: baseSize.width, height: baseSize.height + extraHeight)
+        return CGSize(width: baseSize.width, height: baseSize.height + min(extraHeight, 40))
     }
     
 
@@ -321,6 +327,33 @@ struct ContentView: View {
         return vm.effectiveClosedNotchHeight == 0 ? zeroHeightHoverPadding : 0
     }
 
+    /// A conservative closing target until the visible background reports its
+    /// measured closed bounds. Include hover growth and the temporary battery
+    /// HUD's real dimensions rather than treating every closed surface as the
+    /// physical camera cutout.
+    private var closedInputFallbackSize: CGSize {
+        let hoverGrowth: CGFloat = isHovering ? 8 : 0
+        let baseHeight = vm.effectiveClosedNotchHeight
+        let closedPadding = activeCornerRadiusInsets.closed.bottom * 2
+        var width = vm.closedNotchSize.width + baseHeight * 2 + closedPadding
+        var height = baseHeight + hoverGrowth
+
+        if isBatteryHUDVisibleOnCurrentScreen, let kind = batteryModel.activeTemporaryHUDKind {
+            let batteryWidth = vm.closedNotchSize.width + hoverGrowth
+            switch (kind, resolvedBatteryNotificationStyle(for: kind)) {
+            case (.charging, _), (.lowBattery, .compact), (.fullBattery, .compact):
+                width = batteryWidth + 180 + closedPadding
+            case (.lowBattery, .standard):
+                width = batteryWidth + 150 + closedPadding
+                height += 75
+            case (.fullBattery, .standard):
+                width = batteryWidth + 140 + closedPadding
+                height += 70
+            }
+        }
+        return CGSize(width: max(0, width), height: max(0, height))
+    }
+
     private var notchBottomPadding: CGFloat {
         currentShadowPadding + bodyHoverAreaPadding
     }
@@ -352,11 +385,11 @@ struct ContentView: View {
     
     // Use minimalistic corner radius ONLY when opened, keep normal when closed
     private var activeCornerRadiusInsets: (opened: (top: CGFloat, bottom: CGFloat), closed: (top: CGFloat, bottom: CGFloat)) {
+        let selectedRadius = CGFloat(Defaults[.notchCornerRadius])
         if enableMinimalisticUI {
-            // Keep normal closed corner radius, use minimalistic when opened
-            return (opened: minimalisticCornerRadiusInsets.opened, closed: cornerRadiusInsets.closed)
+            return (opened: (top: selectedRadius, bottom: selectedRadius), closed: cornerRadiusInsets.closed)
         }
-        return cornerRadiusInsets
+        return (opened: (top: cornerRadiusInsets.opened.top, bottom: selectedRadius), closed: cornerRadiusInsets.closed)
     }
     
     private var currentShadowPadding: CGFloat {
@@ -367,7 +400,7 @@ struct ContentView: View {
         let topRadius = (vm.notchState == .open && Defaults[.cornerRadiusScaling])
             ? activeCornerRadiusInsets.opened.top
             : activeCornerRadiusInsets.closed.top
-        let bottomRadius = (vm.notchState == .open && Defaults[.cornerRadiusScaling])
+        let bottomRadius = (vm.notchState == .open)
             ? activeCornerRadiusInsets.opened.bottom
             : activeCornerRadiusInsets.closed.bottom
         return NotchShape(topCornerRadius: topRadius, bottomCornerRadius: bottomRadius)
@@ -429,9 +462,7 @@ struct ContentView: View {
     private var currentPillShape: DynamicIslandPillShape {
         let radius: CGFloat
         if vm.notchState == .open {
-            radius = enableMinimalisticUI
-                ? minimalisticCornerRadiusInsets.opened.top
-                : dynamicIslandPillCornerRadiusInsets.opened
+            radius = CGFloat(Defaults[.notchCornerRadius])
         } else {
             // Use half the closed height for a true capsule shape
             radius = max(vm.closedNotchSize.height / 2, dynamicIslandPillCornerRadiusInsets.closed.standard)
@@ -472,6 +503,7 @@ struct ContentView: View {
 
 
     private var activeClosedBatterySurfaceShape: AnyShape? {
+        guard visibleCommunicationCall == nil, visibleCommunicationNotification == nil else { return nil }
         guard vm.notchState == .closed else { return nil }
         guard isBatteryHUDVisibleOnCurrentScreen else { return nil }
         guard let kind = batteryModel.activeTemporaryHUDKind else { return nil }
@@ -519,6 +551,14 @@ struct ContentView: View {
 
     var body: some View {
         installRootLifecycleHandlers(on: rootBodyView)
+            .tint(appearance.accentColor)
+            .accentColor(appearance.accentColor)
+            .transaction { transaction in
+                if notchReduceMotion || systemReduceMotion {
+                    transaction.animation = nil
+                    transaction.disablesAnimations = true
+                }
+            }
     }
 
     private var mainLayoutBase: some View {
@@ -526,7 +566,24 @@ struct ContentView: View {
             .frame(alignment: .top)
             .padding(.horizontal, notchHorizontalPadding)
             .padding([.horizontal, .bottom], vm.notchState == .open ? 12 : 0)
-            .background(.black)
+            .background {
+                ExpandedNotchSurface(
+                    shape: resolvedClipShape,
+                    isExpanded: vm.notchState == .open
+                )
+                NotchInputRegionBridge(
+                    shape: resolvedClipShape,
+                    isExpanded: vm.notchState == .open,
+                    enabled: interactionsEnabled,
+                    collapsedSize: closedInputFallbackSize,
+                    onHover: handleHover
+                )
+            }
+            .overlay(alignment: .bottom) {
+                if vm.notchState == .open && !enableMinimalisticUI {
+                    NotchPageIndicators().padding(.bottom, 2)
+                }
+            }
             .clipShape(resolvedClipShape)
             .compositingGroup()
             .shadow(
@@ -543,7 +600,7 @@ struct ContentView: View {
             .accessibilityIdentifier("AtollNotch")
     }
 
-    private var configuredMainLayout: some View {
+    private var animatedMainLayout: some View {
         mainLayoutBase
             .conditionalModifier(!useModernCloseAnimation) { view in
                 let hoverAnimation = Animation.bouncy.speed(1.2)
@@ -564,13 +621,15 @@ struct ContentView: View {
                     .animation(notchAnimation, value: vm.notchState)
                     .animation(.smooth, value: gestureProgress)
             }
+    }
+
+    private var interactiveMainLayout: some View {
+        animatedMainLayout
             .conditionalModifier(interactionsEnabled) { view in
                 view
                     .contentShape(resolvedClipShape)
-                    .onHover { hovering in
-                        handleHover(hovering)
-                    }
                     .onTapGesture {
+                        guard vm.notchState == .closed else { return }
                         if handleClosedMusicWaveformTapIfNeeded() {
                             return
                         }
@@ -584,10 +643,10 @@ struct ContentView: View {
                             .panGesture(direction: .down) { translation, phase in
                                 handleDownGesture(translation: translation, phase: phase)
                             }
-                            .panGesture(direction: .left) { translation, phase in
+                            .panGesture(direction: .left, mouseDragEnabled: vm.notchState == .closed) { translation, phase in
                                 handleSkipGesture(direction: .forward, translation: translation, phase: phase)
                             }
-                            .panGesture(direction: .right) { translation, phase in
+                            .panGesture(direction: .right, mouseDragEnabled: vm.notchState == .closed) { translation, phase in
                                 handleSkipGesture(direction: .backward, translation: translation, phase: phase)
                             }
                     }
@@ -606,6 +665,10 @@ struct ContentView: View {
                 ? -(vm.closedNotchSize.height + pillTopOffset + currentShadowPadding + 10)
                 : 0
             )
+    }
+
+    private var stateConfiguredMainLayout: some View {
+        interactiveMainLayout
             .onAppear(perform: {
                 if coordinator.firstLaunch {
                     // Single open during first launch; closeHello() handles the timed close.
@@ -671,6 +734,10 @@ struct ContentView: View {
                     }
                 }
             }
+    }
+
+    private var configuredMainLayout: some View {
+        stateConfiguredMainLayout
             .onReceive(NotificationCenter.default.publisher(for: .sharingDidFinish)) { _ in
                 runAfter(0.1) {
                     if vm.notchState == .open && !isHovering && !shouldPreventAutoClose() {
@@ -688,7 +755,15 @@ struct ContentView: View {
                     }
                 }
             }
+            .onReceive(NotificationCenter.default.publisher(for: .notchTabsDidChange)) { _ in
+                TabSelectionView.validateCurrentSelection()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .notchTabExplicitSelection)) { _ in showCallControls = false }
+            .onChange(of: communications.calls.map(\.id)) { _, ids in
+                if ids.isEmpty { showCallControls = false; musicManager.forceUpdate() }
+            }
             .onChange(of: coordinator.currentView) { _, newValue in
+                showCallControls = false
                 if enableStatsFeature {
                     let currentViewString = newValue == .stats ? "stats" : "other"
                     statsManager.updateMonitoringState(
@@ -867,7 +942,13 @@ struct ContentView: View {
       func NotchLayout() -> some View {
           VStack(alignment: .leading) {
               VStack(alignment: .leading) {
-                  if coordinator.firstLaunch {
+                  if vm.notchState == .closed, let call = visibleCommunicationCall {
+                      CommunicationCompactActivity(call: call, notification: nil, cameraWidth: vm.closedNotchSize.width,
+                                                   height: vm.effectiveClosedNotchHeight)
+                  } else if vm.notchState == .closed, let notification = visibleCommunicationNotification {
+                      CommunicationCompactActivity(call: nil, notification: notification, cameraWidth: vm.closedNotchSize.width,
+                                                   height: vm.effectiveClosedNotchHeight)
+                  } else if coordinator.firstLaunch {
                       Spacer()
                       HelloAnimation().frame(width: 200, height: 80).onAppear(perform: {
                           vm.closeHello()
@@ -981,7 +1062,7 @@ struct ContentView: View {
                           DynamicIslandFaceAnimation().animation(.interactiveSpring, value: musicManager.isPlayerIdle)
                       } else if vm.notchState == .open {
                           DynamicIslandHeader()
-                              .frame(height: (Defaults[.enableMinimalisticUI] && isDynamicIslandMode) ? nil : max(24, vm.effectiveClosedNotchHeight))
+                              .frame(height: expandedHeaderHeight)
                        } else {
                            Rectangle().fill(.clear).frame(width: vm.closedNotchSize.width - 20, height: vm.effectiveClosedNotchHeight)
                        }
@@ -1078,47 +1159,75 @@ struct ContentView: View {
               }
               .zIndex(2)
               
-              ZStack {
-                  if vm.notchState == .open {
-                      Group {
-                          switch coordinator.currentView {
-                              case .home:
-                                  NotchHomeView(albumArtNamespace: albumArtNamespace)
-                              case .shelf:
-                                  NotchShelfView()
-                              case .timer:
-                                  NotchTimerView()
-                              case .stats:
-                                  NotchStatsView()
-                              case .llmUsage:
-                                  NotchLLMUsageView()
-                              case .colorPicker:
-                                  NotchColorPickerView()
-                            case .notes:
-                                NotchNotesView()
-                            case .clipboard:
-                                NotchNotesView()
-                            case .terminal:
-                                NotchTerminalView()
-                            case .extensionExperience:
-                                if let payload = currentExtensionTabPayload() {
-                                    ExtensionNotchExperienceTabView(payload: payload)
-                                } else {
-                                    NotchHomeView(albumArtNamespace: albumArtNamespace)
-                                }
+              if vm.notchState == .open {
+                  // Both pages receive the same viewport during a slide. Geometry
+                  // changes cannot reflow thumbnail columns while they are moving.
+                  GeometryReader { geometry in
+                      ZStack(alignment: .top) {
+                          expandedTabContent
+                              .frame(width: geometry.size.width, height: geometry.size.height, alignment: .top)
+                              .id(coordinator.currentView)
+                              .transition(tabSwitchTransition)
+                              .opacity(visibleCallOverlay == nil ? 1 : 0)
+                              .allowsHitTesting(visibleCallOverlay == nil)
+                              .accessibilityHidden(visibleCallOverlay != nil)
+                              .disabled(visibleCallOverlay != nil)
+                          if let call = visibleCallOverlay {
+                              CallIslandView(call: call)
+                                  .frame(width: geometry.size.width, height: geometry.size.height)
+                                  .transition(.opacity).zIndex(3)
                           }
                       }
-                      .id(coordinator.currentView)
-                      .transition(tabSwitchTransition)
+                      .frame(width: geometry.size.width, height: geometry.size.height, alignment: .top)
+                      .clipped()
                   }
+                  .frame(height: max(0, dynamicNotchSize.height - expandedHeaderHeight - 8))
+                  .zIndex(1)
+                  .animation(.smooth(duration: 0.28), value: coordinator.currentView)
               }
-              .zIndex(1)
-              .allowsHitTesting(vm.notchState == .open)
-              .blur(radius: abs(gestureProgress) > 0.3 ? min(abs(gestureProgress), 8) : 0)
-              .opacity(abs(gestureProgress) > 0.3 ? min(abs(gestureProgress * 2), 0.8) : 1)
-              .animation(.smooth(duration: 0.3), value: coordinator.currentView)
           }
       }
+
+    private var visibleCommunicationCall: CommunicationCall? {
+        guard communications.enabled, communications.accessGranted, interactionsEnabled else { return nil }
+        if Defaults[.communicationRespectFocus] && doNotDisturbManager.isDoNotDisturbActive && communications.priorityCall?.phase == .incoming { return nil }
+        return communications.priorityCall
+    }
+    private var visibleCommunicationNotification: CommunicationNotification? {
+        guard communications.enabled, communications.accessGranted, interactionsEnabled else { return nil }
+        if Defaults[.communicationRespectFocus] && doNotDisturbManager.isDoNotDisturbActive { return nil }
+        return communications.latestNotification
+    }
+    private var visibleCallOverlay: CommunicationCall? {
+        guard let call = visibleCommunicationCall, call.phase == .incoming || showCallControls else { return nil }
+        return call
+    }
+
+    private var expandedHeaderHeight: CGFloat {
+        notchExpandedHeaderHeight(for: vm.screen, closedHeight: vm.effectiveClosedNotchHeight, minimalistic: enableMinimalisticUI)
+    }
+
+    @ViewBuilder private var expandedTabContent: some View {
+        switch coordinator.currentView {
+        case .home: NotchHomeView(albumArtNamespace: albumArtNamespace)
+        case .shelf: NotchShelfView()
+        case .timer: NotchTimerView()
+        case .reminders: NotchRemindersView()
+        case .notifications: CommunicationsInboxView()
+        case .calendar:
+            NotchScrollableContent { StandaloneCalendarView().padding(.horizontal, 12) }
+        case .stats: NotchScrollableContent { NotchStatsView() }
+        case .llmUsage: NotchScrollableContent { NotchLLMUsageView() }
+        case .colorPicker: NotchColorPickerView()
+        case .notes: NotchNotesView()
+        case .clipboard: CompactClipboardView()
+        case .terminal: NotchTerminalView()
+        case .extensionExperience:
+            if let payload = currentExtensionTabPayload() {
+                NotchScrollableContent { ExtensionNotchExperienceTabView(payload: payload) }
+            } else { NotchHomeView(albumArtNamespace: albumArtNamespace) }
+        }
+    }
 
     private func reminderColor(for reminder: ReminderLiveActivityManager.ReminderEntry, now: Date) -> Color {
         if isReminderCritical(reminder, now: now) {
@@ -1239,7 +1348,7 @@ struct ContentView: View {
                             MusicTitleMarqueeView(
                                 text: musicManager.songTitle,
                                 isExplicit: musicManager.isCurrentTrackExplicit,
-                                textColor: Defaults[.coloredSpectrogram] ? Color(nsColor: musicManager.avgColor) : Color.gray,
+                                textColor: appearance.accentColor,
                                 minDuration: 0.4,
                                 frameWidth: max(0, (effectiveCenterWidth - vm.closedNotchSize.width) / 2 - 12),
                                 badgeHeight: 13
@@ -1250,7 +1359,7 @@ struct ContentView: View {
                             Text(musicManager.artistName)
                                 .lineLimit(1)
                                 .truncationMode(.tail)
-                                .foregroundStyle(Defaults[.coloredSpectrogram] ? Color(nsColor: musicManager.avgColor) : Color.gray)
+                                .foregroundStyle(appearance.accentColor)
                                 .padding(.trailing, 8)
                                 .opacity((coordinator.expandingView.show && coordinator.expandingView.type == .music && Defaults[.enableSneakPeek] && Defaults[.sneakPeekStyles] == .inline) ? 1 : 0)
                         } else if(coordinator.expandingView.show && coordinator.expandingView.type == .timer) {
@@ -1272,7 +1381,7 @@ struct ContentView: View {
                         } else if Defaults[.showSongMetadataInClosedNotch] && isNonNotchScreen && !musicManager.songTitle.isEmpty {
                             MarqueeText(
                                 .constant("\(musicManager.songTitle) • \(musicManager.artistName)"),
-                                textColor: Defaults[.coloredSpectrogram] ? Color(nsColor: musicManager.avgColor) : Color.gray,
+                                textColor: appearance.accentColor,
                                 minDuration: 3,
                                 frameWidth: max(0, effectiveCenterWidth - 16)
                             )
@@ -1545,7 +1654,7 @@ struct ContentView: View {
         let width = CGFloat(Defaults[.visualizerBarCount]) * 4
         if useMusicVisualizer || forceSpectrum {
             Rectangle()
-                .fill((Defaults[.coloredSpectrogram] ? Color(nsColor: musicManager.avgColor) : Color.gray).spectrogramGradient())
+                .fill(LinearGradient(colors: [appearance.accentColor, appearance.accentColor.opacity(0.45)], startPoint: .top, endPoint: .bottom))
                 .frame(width: 50, alignment: .center)
                 .matchedGeometryEffect(id: "spectrum", in: albumArtNamespace)
                 .mask {
@@ -1880,8 +1989,11 @@ struct ContentView: View {
 
     // MARK: - Private Methods
     private func openNotch() {
+        if visibleCommunicationCall != nil { showCallControls = true }
+        let opensNotification = visibleCommunicationCall == nil && visibleCommunicationNotification != nil
         withAnimation(.bouncy.speed(1.2)) {
             vm.open()
+            if opensNotification { coordinator.currentView = .notifications }
         }
     }
 
@@ -2137,14 +2249,14 @@ struct ContentView: View {
     private func isPointInsideNotchWindow(_ point: CGPoint) -> Bool {
         if let appDelegate = AppDelegate.shared {
             if Defaults[.showOnAllDisplays] {
-                return appDelegate.windows.values.contains(where: { $0.frame.contains(point) })
+                return appDelegate.windows.values.contains { ($0 as? DynamicIslandWindow)?.containsInteractivePoint(point) == true }
             }
-            if let window = appDelegate.window {
-                return window.frame.contains(point)
+            if let window = appDelegate.window as? DynamicIslandWindow {
+                return window.containsInteractivePoint(point)
             }
         }
 
-        return NSApp.windows.contains(where: { $0.frame.contains(point) })
+        return NSApp.windows.compactMap { $0 as? DynamicIslandWindow }.contains { $0.containsInteractivePoint(point) }
     }
     
     // Helper function to check if any popovers are active
@@ -2155,6 +2267,7 @@ struct ContentView: View {
          vm.isStatsPopoverActive ||
          vm.isTimerPopoverActive ||
          vm.isMediaOutputPopoverActive ||
+         vm.isMediaSourcePopoverActive ||
          vm.isReminderPopoverActive
     }
 
@@ -2329,6 +2442,19 @@ struct ContentView: View {
     private func handleSkipGesture(direction: MusicManager.SkipDirection, translation: CGFloat, phase: NSEvent.Phase) {
         if phase == .ended {
             skipGestureActiveDirection = nil
+            return
+        }
+
+        if vm.notchState == .open {
+            guard !lockScreenManager.isLocked, !hasAnyActivePopovers() else { return }
+            // One discrete horizontal trackpad gesture changes one visible tab.
+            // Vertical-scroll suppression belongs to the up/down handlers.
+            if skipGestureActiveDirection == nil && translation >= 40 {
+                skipGestureActiveDirection = direction
+                let forward = (direction == .forward) != Defaults[.reverseSwipeGestures]
+                TabSelectionView.advanceTab(forward: forward)
+                if Defaults[.enableHaptics] { triggerHapticIfAllowed() }
+            }
             return
         }
 

@@ -26,6 +26,10 @@ import SkyLightWindow
 
 @main
 struct DynamicNotchApp: App {
+    // This is deliberately declared before the delegate adaptor: AppDelegate
+    // constructs managers that read Defaults, so the old `.dev` domain must be
+    // copied before any of those managers are initialized.
+    private let preferencesMigration: Void = LegacyPreferencesMigrator.migrateIfNeeded()
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @Default(.menubarIcon) var showMenuBarIcon
     @Environment(\.openWindow) var openWindow
@@ -40,11 +44,11 @@ struct DynamicNotchApp: App {
         // The AtollUpdaterDelegate overrides the feed URL at runtime
         // based on the user's selected update channel.
         updaterController = SPUStandardUpdaterController(
-            startingUpdater: !AppRuntimeEnvironment.isUITesting,
+            startingUpdater: false,
             updaterDelegate: updaterDelegate, userDriverDelegate: nil)
 
         // Initialize the settings window controller with the updater controller
-        SettingsWindowController.shared.setUpdaterController(updaterController)
+        // Personal fork: official Atoll updates would replace this build.
     }
 
     var body: some Scene {
@@ -52,9 +56,9 @@ struct DynamicNotchApp: App {
             Button("Settings") {
                 SettingsWindowController.shared.showWindow()
             }
-            CheckForUpdatesView(updater: updaterController.updater)
+            Text("NotchFlow local build")
             Divider()
-            Button("Restart Atoll") {
+            Button("Restart NotchFlow") {
                 guard let bundleIdentifier = Bundle.main.bundleIdentifier else { return }
 
                 let workspace = NSWorkspace.shared
@@ -84,12 +88,6 @@ struct DynamicNotchApp: App {
                 SettingsWindowController.shared.showWindow()
             }
         }
-    }
-}
-
-final class FirstMouseHostingView<Content: View>: NSHostingView<Content> {
-    override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
-        true
     }
 }
 
@@ -130,6 +128,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     // Debouncing mechanism for window size updates
     private var windowSizeUpdateWorkItem: DispatchWorkItem?
+    private var screenConfigurationWorkItem: DispatchWorkItem?
 //    let calendarManager = CalendarManager.shared
 //    let webcamManager = WebcamManager.shared
 //    var closeNotchWorkItem: DispatchWorkItem?
@@ -160,6 +159,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidBecomeActive(_ notification: Notification) {
         installTopMenuItemsIfNeeded()
+        AccessibilityPermissionStore.shared.refreshStatus()
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {
@@ -258,6 +258,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Cancel any pending window size updates
         windowSizeUpdateWorkItem?.cancel()
+        screenConfigurationWorkItem?.cancel()
         NotificationCenter.default.removeObserver(self)
         extensionXPCServiceHost.stop()
         extensionRPCServer.stop()
@@ -316,22 +317,82 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func cleanupWindows(shouldInvert: Bool = false) {
         if shouldInvert ? !Defaults[.showOnAllDisplays] : Defaults[.showOnAllDisplays] {
             for (screen, window) in windows {
-                // Tear down the hosted ContentView before dropping the window
-                // (`.onDisappear` is unreliable for borderless panels).
-                viewModels[screen]?.onViewTeardown?()
-                viewModels[screen]?.onViewTeardown = nil
-                NotchSpaceManager.shared.notchSpace.windows.remove(window)
-                window.close()
+                disposeWindow(window, viewModel: viewModels[screen])
             }
             windows.removeAll()
             viewModels.removeAll()
         } else if let window = window {
-            vm.onViewTeardown?()
-            vm.onViewTeardown = nil
-            NotchSpaceManager.shared.notchSpace.windows.remove(window)
-            window.close()
+            disposeWindow(window, viewModel: vm)
             self.window = nil
         }
+    }
+
+    /// LaunchServices normally keeps one instance per bundle, but locally built
+    /// backup bundles and the former `.dev` identity can run side-by-side. Two
+    /// overlay managers then race to resize/recreate the same notch UI. A backup
+    /// yields to the canonical installed app; a canonical/development build asks
+    /// older NotchFlow instances to terminate before it creates any windows.
+    private func establishSingleNotchFlowInstance() -> Bool {
+        let fileManager = FileManager.default
+        let canonicalURL = fileManager.homeDirectoryForCurrentUser
+            .appendingPathComponent("Applications/NotchFlow.app", isDirectory: true)
+        let bundleURL = Bundle.main.bundleURL.standardizedFileURL
+        let bundleName = bundleURL.deletingPathExtension().lastPathComponent
+
+        if bundleName.hasPrefix("NotchFlow Backup "),
+           fileManager.fileExists(atPath: canonicalURL.path) {
+            NSWorkspace.shared.open(canonicalURL)
+            NSApplication.shared.terminate(nil)
+            return false
+        }
+
+        let identifiers = Set([
+            Bundle.main.bundleIdentifier,
+            "com.dhruvv620.NotchFlowFresh",
+            "com.dhruvv620.NotchFlowFresh.dev",
+        ].compactMap { $0 })
+        let currentPID = ProcessInfo.processInfo.processIdentifier
+        let otherInstances = NSWorkspace.shared.runningApplications.filter {
+            $0.processIdentifier != currentPID
+                && $0.bundleIdentifier.map(identifiers.contains) == true
+        }
+
+        var acceptedEveryTermination = true
+        for application in otherInstances {
+            NSLog("Retiring another NotchFlow instance at %@", application.bundleURL?.path ?? "unknown path")
+            acceptedEveryTermination = application.terminate() && acceptedEveryTermination
+        }
+
+        // `terminate()` only confirms that the request was delivered; it does
+        // not mean the old process has finished tearing down its panels. Let
+        // AppKit service the termination events for a short bounded interval so
+        // the new instance never starts a second overlay manager concurrently.
+        let deadline = Date().addingTimeInterval(2)
+        while acceptedEveryTermination,
+              otherInstances.contains(where: { !$0.isTerminated }),
+              Date() < deadline {
+            _ = RunLoop.main.run(mode: .default, before: Date().addingTimeInterval(0.05))
+        }
+
+        if !acceptedEveryTermination || otherInstances.contains(where: { !$0.isTerminated }) {
+            // Never start a second window manager when an older copy refuses to
+            // quit. The user can quit that copy and reopen the canonical app.
+            NSApplication.shared.terminate(nil)
+            return false
+        }
+        return true
+    }
+
+    /// A borderless panel does not reliably send SwiftUI `onDisappear`, and
+    /// `isReleasedWhenClosed` is intentionally false. Always sever the hosted
+    /// tree and every external window registry before dropping our reference.
+    private func disposeWindow(_ window: NSWindow, viewModel: DynamicIslandViewModel?) {
+        viewModel?.onViewTeardown?()
+        viewModel?.onViewTeardown = nil
+        NotchSpaceManager.shared.notchSpace.windows.remove(window)
+        ScreenCaptureVisibilityManager.shared.unregister(window)
+        window.contentView = nil
+        window.close()
     }
 
     /// Rebuilds the notch's CGSSpace membership from the current hide option and the
@@ -406,12 +467,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let newX = (centerX - (roundedWidth / 2)).rounded()
         let newY = (screenFrame.origin.y + screenFrame.height - roundedHeight).rounded()
 
-        window.setFrame(NSRect(
+        let targetFrame = NSRect(
             x: newX,
             y: newY,
             width: roundedWidth,
             height: roundedHeight
-        ), display: false)
+        )
+        if window.frame != targetFrame {
+            window.setFrame(targetFrame, display: false)
+        }
         
         if changeAlpha {
             window.alphaValue = 1
@@ -496,14 +560,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // Use a consistent height for different view types
         if coordinator.currentView == .timer {
-            baseSize.height = 250 // Extra space for timer presets
-        } else if coordinator.currentView == .notes || coordinator.currentView == .clipboard {
+            baseSize.height = max(baseSize.height, 224)
+        } else if coordinator.currentView == .notes {
             let preferredHeight = coordinator.notesLayoutState.preferredHeight
-            baseSize.height = max(baseSize.height, preferredHeight)
+            baseSize.height = min(max(baseSize.height, preferredHeight), baseSize.height + 40)
         } else if coordinator.currentView == .terminal {
-            let screenHeight = NSScreen.main?.visibleFrame.height ?? 800
-            let maxFraction = Defaults[.terminalMaxHeightFraction]
-            baseSize.height = min(screenHeight * maxFraction, max(300, screenHeight * maxFraction))
+            baseSize.height += 40
         }
         
         let adjustedContentSize = statsAdjustedNotchSize(
@@ -566,6 +628,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let newY = (screenFrame.origin.y + screenFrame.height - clampedHeight).rounded()
         let targetFrame = NSRect(x: newX, y: newY, width: clampedWidth, height: clampedHeight)
 
+        guard window.frame != targetFrame else { return }
         window.setFrame(targetFrame, display: true)
     }
 
@@ -577,6 +640,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     func applicationDidFinishLaunching(_ notification: Notification) {
+        guard establishSingleNotchFlowInstance() else { return }
+
         let userInfo: [String: Any] = [
             AtollDistributedNotifications.UserInfoKey.sourcePID: NSNumber(value: ProcessInfo.processInfo.processIdentifier)
         ]
@@ -589,8 +654,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         LockScreenLiveActivityWindowManager.shared.configure(viewModel: vm)
         LockScreenManager.shared.configure(viewModel: vm)
-        extensionXPCServiceHost.start()
-        extensionRPCServer.start()
+        // Legacy extension servers are not needed by this personal build.
         
         // Migrate legacy progress bar settings
         Defaults.Keys.migrateProgressBarStyle()
@@ -710,8 +774,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self?.debouncedUpdateWindowSize()
         }.store(in: &cancellables)
 
-        Defaults.publisher(.openNotchWidth, options: []).sink { [weak self] _ in
+        Defaults.publisher(.enableRemindersFeature, options: []).sink { [weak self] _ in
             self?.debouncedUpdateWindowSize()
+        }.store(in: &cancellables)
+
+        Publishers.MergeMany([
+            Defaults.publisher(.openNotchWidth, options: []).map { _ in true }.eraseToAnyPublisher(),
+            Defaults.publisher(.notchSizePreset, options: []).map { _ in true }.eraseToAnyPublisher(),
+            Defaults.publisher(.notchCustomHeight, options: []).map { _ in true }.eraseToAnyPublisher()
+        ]).receive(on: RunLoop.main).sink { [weak self] _ in
+            enforceMinimumNotchWidth()
+            guard let self else { return }
+            self.vm.refreshAppearanceSize()
+            for viewModel in self.viewModels.values { viewModel.refreshAppearanceSize() }
+            self.updateWindowSizeForTabSwitch()
         }.store(in: &cancellables)
 
         // Observe terminal settings changes
@@ -815,19 +891,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         )
 
         NotificationCenter.default.addObserver(
-            forName: Notification.Name.selectedScreenChanged, object: nil, queue: nil
+            forName: Notification.Name.selectedScreenChanged, object: nil, queue: .main
         ) { [weak self] _ in
             self?.adjustWindowPosition(changeAlpha: true)
         }
 
         NotificationCenter.default.addObserver(
-            forName: Notification.Name.notchHeightChanged, object: nil, queue: nil
+            forName: Notification.Name.notchHeightChanged, object: nil, queue: .main
         ) { [weak self] _ in
             self?.adjustWindowPosition()
         }
 
         NotificationCenter.default.addObserver(
-            forName: Notification.Name.automaticallySwitchDisplayChanged, object: nil, queue: nil
+            forName: Notification.Name.automaticallySwitchDisplayChanged, object: nil, queue: .main
         ) { [weak self] _ in
             guard let self = self, let window = self.window else { return }
             DispatchQueue.main.async {
@@ -837,15 +913,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         NotificationCenter.default.addObserver(
-            forName: Notification.Name.showOnAllDisplaysChanged, object: nil, queue: nil
+            forName: Notification.Name.showOnAllDisplaysChanged, object: nil, queue: .main
         ) { [weak self] _ in
             guard let self = self else { return }
             self.cleanupWindows(shouldInvert: true)
 
             if !Defaults[.showOnAllDisplays] {
+                guard let targetScreen = NSScreen.main ?? NSScreen.screens.first else {
+                    return
+                }
                 let viewModel = self.vm
                 let window = self.createDynamicIslandWindow(
-                    for: NSScreen.main ?? NSScreen.screens.first!, with: viewModel)
+                    for: targetScreen, with: viewModel)
                 self.window = window
                 self.adjustWindowPosition(changeAlpha: true)
             } else {
@@ -912,13 +991,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         registerOptionalShortcutHandlers()
         updateFeatureShortcutAvailability()
 
-        if !Defaults[.showOnAllDisplays] {
+        if !Defaults[.showOnAllDisplays],
+           let initialScreen = NSScreen.main ?? NSScreen.screens.first {
             let viewModel = self.vm
             let window = createDynamicIslandWindow(
-                for: NSScreen.main ?? NSScreen.screens.first!, with: viewModel)
+                for: initialScreen, with: viewModel)
             self.window = window
             adjustWindowPosition(changeAlpha: true)
-        } else {
+        } else if Defaults[.showOnAllDisplays] {
             adjustWindowPosition(changeAlpha: true)
         }
         
@@ -1246,12 +1326,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             case .separateTab:
                 if vm.notchState == .closed {
                     vm.open()
-                    coordinator.currentView = .notes
+                    coordinator.currentView = .clipboard
                 } else {
-                    if coordinator.currentView == .notes {
+                    if coordinator.currentView == .clipboard {
                         vm.close()
                     } else {
-                        coordinator.currentView = .notes
+                        coordinator.currentView = .clipboard
                     }
                 }
             }
@@ -1355,26 +1435,34 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         previousScreens = currentScreens
         
-        if screensChanged {
-            DispatchQueue.main.async { [weak self] in
-                self?.cleanupWindows()
-                self?.adjustWindowPosition()
-            }
+        guard screensChanged else { return }
+
+        // macOS emits a burst of transient screen configurations while a
+        // display/Space is being attached or removed. Rebuilding every panel
+        // for every intermediate state can close a hosting view during its own
+        // layout pass. Reconcile once after the burst, keeping surviving windows.
+        screenConfigurationWorkItem?.cancel()
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.screenConfigurationWorkItem = nil
+            self.adjustWindowPosition(changeAlpha: true)
+            self.resizeWindows(to: self.calculateRequiredNotchSize(), animated: false, force: true)
         }
+        screenConfigurationWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: workItem)
     }
     
     @objc func adjustWindowPosition(changeAlpha: Bool = false) {
         if Defaults[.showOnAllDisplays] {
             let currentScreens = Set(NSScreen.screens)
-            
-            for screen in windows.keys where !currentScreens.contains(screen) {
-                if let window = windows[screen] {
-                    viewModels[screen]?.onViewTeardown?()
-                    viewModels[screen]?.onViewTeardown = nil
-                    window.close()
-                    windows.removeValue(forKey: screen)
-                    viewModels.removeValue(forKey: screen)
-                }
+
+            // Snapshot keys before mutation. Mutating Dictionary.Keys while
+            // enumerating it can trap during display removal.
+            let removedScreens = windows.keys.filter { !currentScreens.contains($0) }
+            for screen in removedScreens {
+                guard let removedWindow = windows.removeValue(forKey: screen) else { continue }
+                let removedViewModel = viewModels.removeValue(forKey: screen)
+                disposeWindow(removedWindow, viewModel: removedViewModel)
             }
             
             for screen in currentScreens {
