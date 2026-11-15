@@ -15,7 +15,7 @@ extension Notification.Name {
 }
 
 enum NotchBuiltinTab: String, CaseIterable, Identifiable {
-    case music, shelf, timers, stats, usage, notes, clipboard, todos, notifications, calendar, terminal
+    case music, shelf, timers, stats, usage, notes, clipboard, cuely, todos, notifications, calendar, terminal
     var id: String { rawValue }
     var title: String {
         switch self {
@@ -26,6 +26,7 @@ enum NotchBuiltinTab: String, CaseIterable, Identifiable {
         case .usage: return "AI Usage"
         case .notes: return "Notes"
         case .clipboard: return "Clipboard"
+        case .cuely: return "Cuely"
         case .todos: return "Todos"
         case .notifications: return "Notifications"
         case .calendar: return "Calendar"
@@ -41,6 +42,7 @@ enum NotchBuiltinTab: String, CaseIterable, Identifiable {
         case .usage: return "chart.bar.doc.horizontal"
         case .notes: return "note.text"
         case .clipboard: return "doc.on.clipboard"
+        case .cuely: return "text.quote"
         case .todos: return "checklist"
         case .notifications: return "bell.badge"
         case .calendar: return "calendar"
@@ -56,6 +58,7 @@ enum NotchBuiltinTab: String, CaseIterable, Identifiable {
         case .usage: return .llmUsage
         case .notes: return .notes
         case .clipboard: return .clipboard
+        case .cuely: return .cuely
         case .todos: return .reminders
         case .notifications: return .notifications
         case .calendar: return .calendar
@@ -74,6 +77,7 @@ enum NotchBuiltinTab: String, CaseIterable, Identifiable {
         case .usage: return Defaults[.enableLLMUsageFeature]
         case .notes: return Defaults[.enableNotes]
         case .clipboard: return Defaults[.enableClipboardManager]
+        case .cuely: return Defaults[.enableCuelyFeature]
         case .todos: return Defaults[.enableRemindersFeature]
         case .notifications: return Defaults[.communicationsEnabled]
         case .calendar: return Defaults[.showCalendar]
@@ -89,6 +93,7 @@ enum NotchBuiltinTab: String, CaseIterable, Identifiable {
         case .usage: return "stats"
         case .notes: return "notes"
         case .clipboard: return "clipboard"
+        case .cuely: return "tabsAndFeatures"
         case .todos: return "calendar"
         case .notifications: return "communications"
         case .calendar: return "calendar"
@@ -126,6 +131,7 @@ final class NotchTabPreferences: ObservableObject {
         changes.append(Defaults.publisher(.enableLLMUsageFeature, options: []).map { _ in true }.eraseToAnyPublisher())
         changes.append(Defaults.publisher(.enableNotes, options: []).map { _ in true }.eraseToAnyPublisher())
         changes.append(Defaults.publisher(.enableClipboardManager, options: []).map { _ in true }.eraseToAnyPublisher())
+        changes.append(Defaults.publisher(.enableCuelyFeature, options: []).map { _ in true }.eraseToAnyPublisher())
         changes.append(Defaults.publisher(.enableRemindersFeature, options: []).map { _ in true }.eraseToAnyPublisher())
         changes.append(Defaults.publisher(.showCalendar, options: []).map { _ in true }.eraseToAnyPublisher())
         changes.append(Defaults.publisher(.enableTerminalFeature, options: []).map { _ in true }.eraseToAnyPublisher())

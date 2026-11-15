@@ -1160,6 +1160,9 @@ extension Defaults.Keys {
     static let clipboardHistorySize = Key<Int>("clipboardHistorySize", default: 20)
     static let showClipboardIcon = Key<Bool>("showClipboardIcon", default: true)
     static let clipboardDisplayMode = Key<ClipboardDisplayMode>("clipboardDisplayMode", default: .separateTab)
+
+    // MARK: Cuely Feature
+    static let enableCuelyFeature = Key<Bool>("enableCuelyFeature", default: false)
     
     // MARK: Screen Assistant Feature
     static let enableScreenAssistant = Key<Bool>("enableScreenAssistant", default: true)

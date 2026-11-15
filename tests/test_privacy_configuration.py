@@ -5,6 +5,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 ENTITLEMENTS = ROOT / "DynamicIsland" / "DynamicIsland.entitlements"
+INFO_PLIST = ROOT / "DynamicIsland" / "Info.plist"
 PROJECT = ROOT / "DynamicIsland.xcodeproj" / "project.pbxproj"
 RELEASE_WORKFLOW = ROOT / ".github" / "workflows" / "release.yml"
 CI_WORKFLOW = ROOT / ".github" / "workflows" / "ci.yml"
@@ -14,6 +15,24 @@ SYSTEM_HUD_MANAGER = ROOT / "DynamicIsland" / "managers" / "SystemHUDManager.swi
 
 
 class PrivacyConfigurationTests(unittest.TestCase):
+    def test_cuely_microphone_and_speech_permissions_are_declared(self):
+        info = plistlib.loads(INFO_PLIST.read_bytes())
+        entitlements = plistlib.loads(ENTITLEMENTS.read_bytes())
+
+        self.assertTrue(entitlements.get("com.apple.security.device.audio-input"))
+        self.assertTrue(entitlements.get("com.apple.developer.speech-recognition"))
+        project = PROJECT.read_text()
+        self.assertNotIn("ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;", project)
+        self.assertEqual(project.count("ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = YES;"), 2)
+        for key in (
+            "NSMicrophoneUsageDescription",
+            "NSSpeechRecognitionUsageDescription",
+        ):
+            usage_description = info.get(key)
+            self.assertIsInstance(usage_description, str)
+            self.assertIn("NotchFlow", usage_description)
+            self.assertIn("Cuely", usage_description)
+
     def test_camera_capture_is_explicitly_entitled(self):
         entitlements = plistlib.loads(ENTITLEMENTS.read_bytes())
 
@@ -65,6 +84,14 @@ class PrivacyConfigurationTests(unittest.TestCase):
         )
         self.assertIn(
             '/usr/libexec/PlistBuddy -c "Print :com.apple.security.device.camera" "$FINAL_ENTITLEMENTS_PATH" | grep -qx "true"',
+            workflow,
+        )
+        self.assertIn(
+            '/usr/libexec/PlistBuddy -c "Print :com.apple.security.device.audio-input" "$FINAL_ENTITLEMENTS_PATH" | grep -qx "true"',
+            workflow,
+        )
+        self.assertIn(
+            '/usr/libexec/PlistBuddy -c "Print :com.apple.developer.speech-recognition" "$FINAL_ENTITLEMENTS_PATH" | grep -qx "true"',
             workflow,
         )
         self.assertIn(

@@ -132,6 +132,7 @@ struct NotchTabsSettingsView: View {
                     featureToggle("Communications", symbol: "bell.badge", key: .communicationsEnabled, destination: "communications")
                     featureToggle("Todos", symbol: "checklist", key: .enableRemindersFeature, destination: "calendar")
                     featureToggle("Clipboard", symbol: "doc.on.clipboard", key: .enableClipboardManager, destination: "clipboard")
+                    featureToggle("Cuely", symbol: "text.quote", key: .enableCuelyFeature, destination: "tabsAndFeatures")
                     featureToggle("Notes", symbol: "note.text", key: .enableNotes, destination: "notes")
                     featureToggle("Stats", symbol: "chart.xyaxis.line", key: .enableStatsFeature, destination: "stats")
                     featureToggle("AI Usage", symbol: "chart.bar.doc.horizontal", key: .enableLLMUsageFeature, destination: "stats")

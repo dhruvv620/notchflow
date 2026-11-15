@@ -30,6 +30,10 @@ jobs:
         run: |
           swiftc -swift-version 5 -parse-as-library DynamicIsland/helpers/CompactClipboardPolicy.swift tests/CompactClipboardRegression.swift -o /tmp/clipboard-policy-tests
           /tmp/clipboard-policy-tests
+      - name: Check Cuely script validation and persistence
+        run: |
+          swiftc -swift-version 5 -parse-as-library DynamicIsland/models/CuelyScript.swift DynamicIsland/managers/CuelyScriptPersistence.swift tests/CuelyScriptStoreRegression.swift -o /tmp/cuely-script-tests
+          /tmp/cuely-script-tests
       - name: Check timer lifecycle and tab order
         run: |
           swiftc -swift-version 5 -parse-as-library DynamicIsland/helpers/TimerModeLifecycle.swift tests/TimerModeRegression.swift -o /tmp/timer-mode-tests
@@ -152,6 +156,16 @@ jobs:
             DynamicIsland/managers/RemindersManager.swift \
             tests/RemindersRegression.swift -o "$RUNNER_TEMP/RemindersRegression"
           "$RUNNER_TEMP/RemindersRegression"
+
+      - name: Check Cuely script validation and persistence
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcrun swiftc -swift-version 5 -parse-as-library \
+            DynamicIsland/models/CuelyScript.swift \
+            DynamicIsland/managers/CuelyScriptPersistence.swift \
+            tests/CuelyScriptStoreRegression.swift -o "$RUNNER_TEMP/CuelyScriptStoreRegression"
+          "$RUNNER_TEMP/CuelyScriptStoreRegression"
 
       - name: Check live system media snapshots and streams
         run: |

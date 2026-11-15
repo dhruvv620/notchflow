@@ -1,7 +1,7 @@
 # NotchFlow fresh start
 
 This branch starts from **Atoll v2.3.3 stable**, commit `e21cdf7b10e62e82ddbc9c23158e6e8cf5b21cf5`.
-It retains upstream controls and adds compact Music, Todos, Clipboard and timer views, trackpad tab navigation, tab organization, and shared appearance controls. The earlier custom panels, AI chat, Cuely, mascots and gradient themes are not included.
+It retains upstream controls and adds compact Music, Todos, Clipboard, Cuely and timer views, trackpad tab navigation, tab organization, and shared appearance controls. The earlier custom panels, AI chat, mascots and gradient themes are not included.
 
 Original Atoll source, licensing, notices and artwork remain in place. NotchFlow has its own app identity and preference domain, so it starts with upstream defaults rather than old experimental settings. Official Atoll auto-updates and legacy extension servers are disabled in this personal build.
 
@@ -76,6 +76,14 @@ Timers contains **Timer**, **Pomodoro** and **Stopwatch** sections. Drag the rul
 
 Clipboard cards use the native pointing-hand cursor. Slides use one stable clipped viewport, continuous card edges and cached, downsampled high-quality previews; decoded thumbnails do not inherit navigation animations. Originals remain intact for copying.
 
+## Cuely scripts and live transcription
+
+Cuely is an optional compact tab. Enable **Cuely** under **Settings > Tabs & Features > Features**, then show or position it in the Tabs segment. It uses the same compact island dimensions as the other standard tabs. **Scripts** is a local teleprompter with saved-script selection, editing, four reading speeds, adjustable text size and smooth native scrolling. Script editing opens in a popover rather than enlarging the notch. **Live** displays a microphone transcript with Copy, Save and Clear controls; saving a transcript creates a local script.
+
+Scripts are stored as JSON at `~/Library/Application Support/NotchFlow/Cuely/scripts.json`. Microphone and Speech Recognition prompts are raised only after an explicit **Start Listening** action, never when NotchFlow launches or merely when Cuely is enabled. Cuely prefers Apple's on-device recognizer when the current language supports it; otherwise it uses Apple's Speech service and labels the active mode in the panel. Audio is held only for the active recognition session and is not saved by NotchFlow. A live transcript remains temporary until you copy or save it.
+
+Leaving Live, disabling Cuely or disposing the notch window stops microphone capture while preserving the visible transcript. If access was denied or changed, use Cuely's **Privacy** button to open the relevant Microphone or Speech Recognition pane. Both are also available under **System Settings > Privacy & Security**. Return to Cuely and start again after changing either permission.
+
 ## Appearance
 
 Settings > Appearance now contains:
@@ -93,7 +101,7 @@ Compact keeps Clipboard and Todos at Music's original panel size. Spacious and C
 
 ## Verification
 
-GitHub's **NotchFlow Native Build** workflow compiles Debug on macOS 15 and Release on macOS 26 with Xcode 26+ and pinned packages, checks privacy declarations, and runs isolated Reminders/date-parser/clipboard/timer/tab-order/Shelf-cleanup/input-region/system-media regression executables. A separate Swift/Linux job compiles and runs the pure Foundation date, clipboard, timer, tab-order, Shelf-cleanup and system-media checks independently of macOS runner capacity. Build logs and Xcode result bundles are retained as workflow artifacts. These are compile and logic checks, not a claim of visual or account-sync validation.
+GitHub's **NotchFlow Native Build** workflow compiles Debug on macOS 15 and Release on macOS 26 with Xcode 26+ and pinned packages, checks privacy declarations, and runs isolated Reminders/date-parser/clipboard/Cuely-persistence/timer/tab-order/Shelf-cleanup/input-region/system-media regression executables. A separate Swift/Linux job compiles and runs the pure Foundation date, clipboard, Cuely script, timer, tab-order, Shelf-cleanup and system-media checks independently of macOS runner capacity. Build logs and Xcode result bundles are retained as workflow artifacts. These are compile and logic checks, not a claim of visual, account-sync, microphone or Speech-framework validation.
 
 The regression checks use a fake service and never request access to real reminder data. To run them manually on a Mac:
 
@@ -122,8 +130,10 @@ Before merging, verify on an interactive Mac:
 - Hover every clipboard card for a hand cursor; swipe repeatedly between image-heavy Clipboard and Music on Retina displays and verify clean borders and stable columns.
 - Place a clickable control behind the expanded glass: interior clicks must stay in the notch, nested buttons must work, and transparent corners/margins must still pass clicks through.
 - Scrolling remains inside reminder content, typing does not close the composer, permission denial or a slow prompt offers actionable feedback, manual Check Access accepts changed permissions, and sleep/wake/fullscreen do not leave stale panels.
+- Cuely stays at the standard compact size with short and very long scripts; Start/Pause/Reset, all four speeds, manual scroll, end-of-script stopping, editing, duplication, deletion and persistence across restart work without blocking tab swipes outside the text viewport.
+- Cuely asks for Microphone and Speech Recognition only after Start Listening. Verify on-device and Apple-service labels where available, partial/final transcript continuity, Copy/Save/Clear, denial/revocation, rapid start/stop, sleep/wake, input-device removal, tab changes, feature disable and notch-window/display teardown. Confirm the macOS recording indicator clears and no audio file is created.
 
-The editing environment is Linux. It cannot provide a real notch screenshot or verify iCloud synchronization; those remain explicit Mac acceptance checks.
+The editing environment is Linux. It cannot provide a real notch screenshot, verify iCloud synchronization, exercise macOS privacy prompts or test live microphone transcription; those remain explicit Mac acceptance checks.
 
 ## Design and media references
 

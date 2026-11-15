@@ -10,7 +10,11 @@
 	<key>NSAppleMusicUsageDescription</key>
 	<string>Atoll uses Apple Music to fetch animated artwork for the lock screen wallpaper.</string>
 	<key>NSAudioCaptureUsageDescription</key>
-	<string>Atoll needs audio capture permission to display the real-time music waveform visualizer.</string>
+	<string>NotchFlow uses audio capture to display the real-time music waveform visualizer.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>NotchFlow uses the microphone only when you start Cuely live transcription.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>NotchFlow transcribes microphone audio only while you run Cuely. If on-device recognition is unavailable, audio is sent to Apple's speech service.</string>
 	<key>NSScreenCaptureUsageDescription</key>
 	<string>Atoll needs screen recording permission to capture screenshots for the AI assistant feature.</string>
 	<key>SUEnableDownloaderService</key>

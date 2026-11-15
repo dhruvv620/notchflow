@@ -1221,6 +1221,7 @@ struct ContentView: View {
         case .colorPicker: NotchColorPickerView()
         case .notes: NotchNotesView()
         case .clipboard: CompactClipboardView()
+        case .cuely: NotchCuelyView()
         case .terminal: NotchTerminalView()
         case .extensionExperience:
             if let payload = currentExtensionTabPayload() {
@@ -2049,6 +2050,10 @@ struct ContentView: View {
     /// Cancels every long-lived task / event monitor this view owns. Called from
     /// `.onDisappear` and from `vm.onViewTeardown` on window close. Idempotent.
     private func performViewTeardown() {
+        // Borderless panel disposal can skip child SwiftUI `onDisappear`
+        // handlers. Stop Cuely here as well so a display/window rebuild never
+        // leaves its shared audio engine recording without visible controls.
+        CuelyTranscriptionManager.shared.stop()
         hoverTask?.cancel()
         stopHoverClickMonitor()
         removeStickyTerminalClickMonitor()

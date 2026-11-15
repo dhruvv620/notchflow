@@ -51,6 +51,13 @@ printf '\nChecking Reminders behavior without accessing your reminders...\n'
     "$SOURCE_DIR/tests/RemindersRegression.swift" -o "$BUILD_ROOT/RemindersRegression"
 "$BUILD_ROOT/RemindersRegression"
 
+printf '\nChecking Cuely script validation and persistence...\n'
+/usr/bin/xcrun swiftc -swift-version 5 -parse-as-library \
+    "$SOURCE_DIR/DynamicIsland/models/CuelyScript.swift" \
+    "$SOURCE_DIR/DynamicIsland/managers/CuelyScriptPersistence.swift" \
+    "$SOURCE_DIR/tests/CuelyScriptStoreRegression.swift" -o "$BUILD_ROOT/CuelyScriptStoreRegression"
+"$BUILD_ROOT/CuelyScriptStoreRegression"
+
 printf '\nChecking timer modes, tab ordering and visible input regions...\n'
 /usr/bin/xcrun swiftc -swift-version 5 -parse-as-library \
     "$SOURCE_DIR/DynamicIsland/helpers/TimerModeLifecycle.swift" \
@@ -104,7 +111,8 @@ printf '\nChecking native hosting and communications...\n'
 BUILT_APP="$DERIVED_DIR/Build/Products/$CONFIGURATION/NotchFlow.app"
 [ -d "$BUILT_APP" ] || { printf 'Expected app was not produced: %s\n' "$BUILT_APP"; exit 1; }
 
-# Preserve the upstream entitlements needed for Camera, Calendar and Automation.
+# Preserve entitlements needed for Camera, Calendar, Automation, and Cuely's
+# explicitly started microphone/Speech Recognition session.
 # The legacy Mach service is disabled and cannot be signed ad hoc.
 LOCAL_ENTITLEMENTS="$(mktemp "$BUILD_ROOT/local-entitlements.XXXXXX")"
 trap 'rm -f "$LOCAL_ENTITLEMENTS"' EXIT
@@ -207,4 +215,5 @@ fi
 /usr/bin/ditto "$BUILT_APP" "$INSTALL_APP"
 printf '\nInstalled %s\nAny previous running copy was stopped before its bundle was backed up.\n' "$INSTALL_APP"
 printf 'Reminders is a tab in Standard UI. Liquid Glass is in Settings > Appearance.\n'
+printf 'Cuely is off by default; enable it in Settings > Tabs & Features > Features.\n'
 /usr/bin/open -R "$INSTALL_APP"

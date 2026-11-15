@@ -97,6 +97,9 @@ struct TabSelectionView: View {
         if Defaults[.enableClipboardManager] {
             tabsArray.append(TabModel(label: "Clipboard", icon: "doc.on.clipboard", view: .clipboard))
         }
+        if Defaults[.enableCuelyFeature] {
+            tabsArray.append(TabModel(label: "Cuely", icon: "text.quote", view: .cuely))
+        }
         if Defaults[.enableTerminalFeature] {
             tabsArray.append(TabModel(label: "Terminal", icon: "apple.terminal", view: .terminal))
         }
