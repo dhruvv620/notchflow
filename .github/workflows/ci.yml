@@ -18,8 +18,11 @@ jobs:
 
     # Skip CI-generated commits (appcast updates, changelog archives)
     if: >-
+      github.repository == 'Ebullioscopic/Atoll' &&
+      (
       !contains(github.event.head_commit.message, 'ci: update appcast') &&
       !contains(github.event.head_commit.message, 'ci: archive changelog')
+      )
 
     strategy:
       matrix:

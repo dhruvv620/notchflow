@@ -10,7 +10,7 @@ jobs:
   slash_commands:
     runs-on: ubuntu-latest
     # Only run if the commenter is the repository owner or a trusted contributor
-    if: contains(fromJSON(vars.TRUSTED_TRIAGE_USERS), github.event.comment.user.login)
+    if: github.repository == 'Ebullioscopic/Atoll' && contains(fromJSON(vars.TRUSTED_TRIAGE_USERS), github.event.comment.user.login)
     steps:
       - name: Check for /close command
         if: startsWith(github.event.comment.body, '/close')

@@ -17,6 +17,7 @@
  */
 
 import Foundation
+import AppKit
 import Defaults
 import Combine
 
@@ -27,10 +28,52 @@ class SystemHUDManager {
     private weak var coordinator: DynamicIslandViewCoordinator?
     private var isSetupComplete = false
     private var isSystemOperationInProgress = false
+    private var isNativeHUDSuppressed = false
     
     private init() {
         // Set up observer for settings changes
         setupSettingsObserver()
+        setupAccessibilityLifecycleObservers()
+    }
+
+    private func setupAccessibilityLifecycleObservers() {
+        // Returning from System Settings is a safe retry point. A failed event
+        // tap leaves changesObserver nil, so this is a no-op during normal use.
+        NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)
+            .sink { [weak self] _ in
+                guard let self,
+                      self.isSetupComplete,
+                      self.changesObserver == nil,
+                      self.hasEnabledHUD else { return }
+                Task { @MainActor in
+                    await self.startSystemObserver()
+                }
+            }
+            .store(in: &cancellables)
+
+        // AccessibilityPermissionStore is refreshed by the app delegate on
+        // activation and polls after an explicit Allow/Repair action. Reacting
+        // to its state lets an existing tap be torn down on revocation and a
+        // failed tap be retried immediately after access is granted.
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            AccessibilityPermissionStore.shared.$isAuthorized
+                .removeDuplicates()
+                .sink { [weak self] isAuthorized in
+                    guard let self,
+                          self.isSetupComplete,
+                          self.hasEnabledHUD,
+                          self.configurationRequiresAccessibility else { return }
+                    Task { @MainActor in
+                        if isAuthorized {
+                            await self.startSystemObserver()
+                        } else {
+                            await self.stopSystemObserver()
+                        }
+                    }
+                }
+                .store(in: &self.cancellables)
+        }
     }
     
     private func setupSettingsObserver() {
@@ -112,36 +155,27 @@ class SystemHUDManager {
             guard let self = self, self.isSetupComplete, self.requiresSystemToggleHandling else {
                 return
             }
-            let flags = self.resolvedControlFlags()
-            self.changesObserver?.update(
-                volumeEnabled: flags.volume,
-                brightnessEnabled: flags.brightness,
-                keyboardBacklightEnabled: flags.backlight
-            )
+            Task { @MainActor in
+                await self.startSystemObserver()
+            }
         }.store(in: &cancellables)
         
         Defaults.publisher(.enableBrightnessHUD, options: []).sink { [weak self] _ in
             guard let self = self, self.isSetupComplete, self.requiresSystemToggleHandling else {
                 return
             }
-            let flags = self.resolvedControlFlags()
-            self.changesObserver?.update(
-                volumeEnabled: flags.volume,
-                brightnessEnabled: flags.brightness,
-                keyboardBacklightEnabled: flags.backlight
-            )
+            Task { @MainActor in
+                await self.startSystemObserver()
+            }
         }.store(in: &cancellables)
 
         Defaults.publisher(.enableKeyboardBacklightHUD, options: []).sink { [weak self] _ in
             guard let self = self, self.isSetupComplete, self.requiresSystemToggleHandling else {
                 return
             }
-            let flags = self.resolvedControlFlags()
-            self.changesObserver?.update(
-                volumeEnabled: flags.volume,
-                brightnessEnabled: flags.brightness,
-                keyboardBacklightEnabled: flags.backlight
-            )
+            Task { @MainActor in
+                await self.startSystemObserver()
+            }
         }.store(in: &cancellables)
         
         // Observe individual OSD toggles
@@ -149,36 +183,27 @@ class SystemHUDManager {
             guard let self = self, self.isSetupComplete, Defaults[.enableCustomOSD] else {
                 return
             }
-            let flags = self.resolvedControlFlags()
-            self.changesObserver?.update(
-                volumeEnabled: flags.volume,
-                brightnessEnabled: flags.brightness,
-                keyboardBacklightEnabled: flags.backlight
-            )
+            Task { @MainActor in
+                await self.startSystemObserver()
+            }
         }.store(in: &cancellables)
         
         Defaults.publisher(.enableOSDBrightness, options: []).sink { [weak self] _ in
             guard let self = self, self.isSetupComplete, Defaults[.enableCustomOSD] else {
                 return
             }
-            let flags = self.resolvedControlFlags()
-            self.changesObserver?.update(
-                volumeEnabled: flags.volume,
-                brightnessEnabled: flags.brightness,
-                keyboardBacklightEnabled: flags.backlight
-            )
+            Task { @MainActor in
+                await self.startSystemObserver()
+            }
         }.store(in: &cancellables)
         
         Defaults.publisher(.enableOSDKeyboardBacklight, options: []).sink { [weak self] _ in
             guard let self = self, self.isSetupComplete, Defaults[.enableCustomOSD] else {
                 return
             }
-            let flags = self.resolvedControlFlags()
-            self.changesObserver?.update(
-                volumeEnabled: flags.volume,
-                brightnessEnabled: flags.brightness,
-                keyboardBacklightEnabled: flags.backlight
-            )
+            Task { @MainActor in
+                await self.startSystemObserver()
+            }
         }.store(in: &cancellables)
 
         // Restart observer when third-party DDC integration state changes.
@@ -208,6 +233,18 @@ class SystemHUDManager {
 
     private var requiresSystemToggleHandling: Bool {
         Defaults[.enableSystemHUD] || Defaults[.enableVerticalHUD] || Defaults[.enableCircularHUD]
+    }
+
+    private var hasEnabledHUD: Bool {
+        Defaults[.enableSystemHUD]
+            || Defaults[.enableCustomOSD]
+            || Defaults[.enableVerticalHUD]
+            || Defaults[.enableCircularHUD]
+    }
+
+    private var configurationRequiresAccessibility: Bool {
+        let flags = resolvedControlFlags()
+        return flags.volume || flags.brightness || flags.backlight
     }
     
     /// Public property to check if system operations are in progress
@@ -305,17 +342,28 @@ class SystemHUDManager {
         changesObserver?.stopObserving()
         changesObserver = nil
         
-        changesObserver = SystemChangesObserver(coordinator: coordinator)
-
+        let observer = SystemChangesObserver(coordinator: coordinator)
         let flags = resolvedControlFlags()
-        changesObserver?.startObserving(
+        let interceptionReady = observer.startObserving(
             volumeEnabled: flags.volume,
             brightnessEnabled: flags.brightness,
             keyboardBacklightEnabled: flags.backlight
         )
-        
-        // Force disable system HUD to ensure no duplicates
-        SystemOSDManager.disableSystemHUD()
+
+        guard interceptionReady else {
+            observer.stopObserving()
+            restoreNativeSystemHUDIfNeeded()
+            NSLog("⚠️ System observer unavailable; native HUD remains enabled")
+            isSystemOperationInProgress = false
+            return
+        }
+
+        changesObserver = observer
+
+        // Suppress the native HUD only after the configured interception path
+        // is ready. A denied or stale Accessibility grant must never leave the
+        // volume/brightness keys without Apple's fallback UI.
+        suppressNativeSystemHUDIfNeeded()
         
         print("System observer started (HUD: \(Defaults[.enableSystemHUD]), OSD: \(Defaults[.enableCustomOSD]), Vertical: \(Defaults[.enableVerticalHUD]), ThirdPartyDDC: \(Defaults[.enableThirdPartyDDCIntegration]), Provider: \(Defaults[.thirdPartyDDCProvider].displayName), ExternalVolumeListener: \(Defaults[.enableExternalVolumeControlListener]))")
         isSystemOperationInProgress = false
@@ -328,12 +376,23 @@ class SystemHUDManager {
         isSystemOperationInProgress = true
         changesObserver?.stopObserving()
         changesObserver = nil
-        
-        // Re-enable system HUD when we stop observing
-        SystemOSDManager.enableSystemHUD()
+
+        restoreNativeSystemHUDIfNeeded()
         
         print("System observer stopped")
         isSystemOperationInProgress = false
+    }
+
+    private func suppressNativeSystemHUDIfNeeded() {
+        guard !isNativeHUDSuppressed else { return }
+        SystemOSDManager.disableSystemHUD()
+        isNativeHUDSuppressed = true
+    }
+
+    private func restoreNativeSystemHUDIfNeeded() {
+        guard isNativeHUDSuppressed else { return }
+        SystemOSDManager.enableSystemHUD()
+        isNativeHUDSuppressed = false
     }
     
     deinit {

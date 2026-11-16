@@ -1,3 +1,5 @@
+> **NotchFlow fresh branch:** clean Atoll v2.3.3 plus compact Todos, Clipboard, Cuely transcription, timers, tab gestures, and appearance controls. [Build instructions and validation](NotchFlow/README.md).
+
 <p align="center">
   <img src=".github/assets/atoll-logo.png" alt="Atoll logo" width="120">
 </p>
@@ -64,10 +66,10 @@ Atoll turns the MacBook notch into a focused command surface for media, system i
 </p>
 
 ## Requirements
-- macOS 14.0 or later (optimised for macOS 15+).
+- macOS 14.6 or later (optimised for macOS 15+).
 - MacBook with a notch (14/16‑inch MBP across Apple silicon generations).
-- Xcode 15+ to build from source.
-- Permissions as needed: Accessibility, Camera, Calendar, Screen Recording, Music.
+- Xcode 26+ to build this NotchFlow branch from source.
+- Permissions as needed: Accessibility, Camera, Calendar, Screen Recording, Music, Microphone, and Speech Recognition. Cuely requests its two permissions only after **Start Listening**.
 
 ## Installation
 1) Download the latest DMG [here](https://github.com/Ebullioscopic/Atoll/releases/latest).

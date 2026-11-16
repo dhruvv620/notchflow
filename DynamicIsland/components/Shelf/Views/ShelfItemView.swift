@@ -26,6 +26,14 @@ import Defaults
 
 import QuickLook
 
+/// Shared geometry for the hover remove control and the AppKit drag surface's
+/// excluded hit region.
+private enum ShelfRemoveButton {
+    static let size: CGFloat = 20
+    static let inset: CGFloat = 2
+    static let hitRegion: CGFloat = 30
+}
+
 struct ShelfItemView: View {
     let item: ShelfItem
     @EnvironmentObject var vm: DynamicIslandViewModel
@@ -35,6 +43,7 @@ struct ShelfItemView: View {
     @State private var showStack = false
     @State private var cachedPreviewImage: NSImage?
     @State private var debouncedDropTarget = false
+    @State private var isHovering = false
 
     private var isSelected: Bool { viewModel.isSelected }
     private var shouldHideDuringDrag: Bool { selection.isDragging && selection.isSelected(item.id) && false }
@@ -58,10 +67,26 @@ struct ShelfItemView: View {
                 .contentShape(Rectangle())
                 .animation(.easeInOut(duration: 0.1), value: debouncedDropTarget)
                 .animation(.easeInOut(duration: 0.1), value: isSelected)
+                .overlay(alignment: .topTrailing) {
+                    if isHovering {
+                        removeButton
+                    }
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(viewModel.displayName.isEmpty ? Text("Shelf item") : Text(viewModel.displayName))
+                .accessibilityAction(named: Text("Remove from Shelf")) {
+                    ShelfActionService.remove(item)
+                }
 
                 DraggableClickHandler(
                     item: item,
                     viewModel: viewModel,
+                    isHovering: isHovering,
+                    onHoverChange: { hovering in
+                        withAnimation(.smooth(duration: 0.15)) {
+                            isHovering = hovering
+                        }
+                    },
                     cachedPreviewImage: $cachedPreviewImage,
                     dragPreviewContent: {
                         DragPreviewView(thumbnail: viewModel.thumbnail ?? viewModel.icon, displayName: viewModel.displayName)
@@ -128,6 +153,28 @@ struct ShelfItemView: View {
             .frame(height: 30, alignment: .top)
     }
 
+    private var removeButton: some View {
+        Button {
+            ShelfActionService.remove(item)
+        } label: {
+            Circle()
+                .fill(.white)
+                .frame(width: ShelfRemoveButton.size, height: ShelfRemoveButton.size)
+                .overlay {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundStyle(.black)
+                }
+                .shadow(color: .black.opacity(0.4), radius: 2)
+        }
+        .buttonStyle(.plain)
+        .contentShape(Circle())
+        .padding(ShelfRemoveButton.inset)
+        .help("Remove from Shelf")
+        .accessibilityLabel("Remove from Shelf")
+        .transition(.scale.combined(with: .opacity))
+    }
+
     private var backgroundView: some View {
         RoundedRectangle(cornerRadius: 12, style: .continuous)
             .fill(backgroundColor)
@@ -187,6 +234,8 @@ struct ShelfItemView: View {
 private struct DraggableClickHandler<Content: View>: NSViewRepresentable {
     let item: ShelfItem
     let viewModel: ShelfItemViewModel
+    let isHovering: Bool
+    let onHoverChange: (Bool) -> Void
     @Binding var cachedPreviewImage: NSImage?
     @ViewBuilder let dragPreviewContent: () -> Content
     let onRightClick: (NSEvent, NSView) -> Void
@@ -196,6 +245,8 @@ private struct DraggableClickHandler<Content: View>: NSViewRepresentable {
         let view = DraggableClickView()
         view.item = item
         view.viewModel = viewModel
+        view.isHovering = isHovering
+        view.onHoverChange = onHoverChange
         view.dragPreviewImage = cachedPreviewImage ?? renderDragPreview()
         view.onRightClick = onRightClick
         view.onClick = onClick
@@ -205,6 +256,8 @@ private struct DraggableClickHandler<Content: View>: NSViewRepresentable {
     func updateNSView(_ nsView: DraggableClickView, context: Context) {
         nsView.item = item
         nsView.viewModel = viewModel
+        nsView.isHovering = isHovering
+        nsView.onHoverChange = onHoverChange
         // Only update preview if cached version is available
         if let cached = cachedPreviewImage {
             nsView.dragPreviewImage = cached
@@ -232,12 +285,49 @@ private struct DraggableClickHandler<Content: View>: NSViewRepresentable {
         var dragPreviewImage: NSImage?
         var onRightClick: ((NSEvent, NSView) -> Void)?
         var onClick: ((NSEvent, NSView) -> Void)?
+        var onHoverChange: ((Bool) -> Void)?
+        var isHovering = false
 
         private var mouseDownEvent: NSEvent?
         private let dragThreshold: CGFloat = 3.0
         private var draggedURLs: [URL] = []
         private var draggedItems: [ShelfItem] = []
         private var didStartDragSession = false
+
+        override func updateTrackingAreas() {
+            super.updateTrackingAreas()
+            for area in trackingAreas { removeTrackingArea(area) }
+            addTrackingArea(
+                NSTrackingArea(
+                    rect: .zero,
+                    options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+                    owner: self,
+                    userInfo: nil
+                )
+            )
+        }
+
+        override func mouseEntered(with event: NSEvent) {
+            onHoverChange?(true)
+        }
+
+        override func mouseExited(with event: NSEvent) {
+            onHoverChange?(false)
+        }
+
+        override func hitTest(_ point: NSPoint) -> NSView? {
+            if isHovering {
+                let local = convert(point, from: superview)
+                let corner = NSRect(
+                    x: bounds.maxX - ShelfRemoveButton.hitRegion,
+                    y: bounds.maxY - ShelfRemoveButton.hitRegion,
+                    width: ShelfRemoveButton.hitRegion,
+                    height: ShelfRemoveButton.hitRegion
+                )
+                if corner.contains(local) { return nil }
+            }
+            return super.hitTest(point)
+        }
         
         override func rightMouseDown(with event: NSEvent) {
             onRightClick?(event, self)

@@ -105,20 +105,26 @@ class DynamicIslandViewCoordinator: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private var hoverOpenSuppressedUntil: Date = .distantPast
     
-    private static let tabOrder: [NotchViews] = [.home, .shelf, .timer, .stats, .llmUsage, .colorPicker, .notes, .clipboard, .terminal, .extensionExperience]
     
     /// Direction of the most recent tab switch (true = forward/right, false = backward/left)
     @Published var tabSwitchForward: Bool = true
     
     @Published var currentView: NotchViews = .home {
         didSet {
+            if oldValue == .cuely, currentView != .cuely {
+                // Treat leaving Cuely as a hard microphone boundary. The
+                // child view also stops in `onDisappear`, but coordinator
+                // state is the deterministic source of truth for tab exits.
+                Task { @MainActor in CuelyTranscriptionManager.shared.stop() }
+            }
             if Defaults[.enableMinimalisticUI] && currentView != .home {
                 currentView = .home
                 return
             }
             // Track direction before SwiftUI re-renders
-            let oldIdx = Self.tabOrder.firstIndex(of: oldValue) ?? 0
-            let newIdx = Self.tabOrder.firstIndex(of: currentView) ?? 0
+            let order = NotchTabOrderPolicy.normalizedOrder(Defaults[.notchTabOrder], known: NotchBuiltinTab.allCases.map(\.rawValue))
+            let oldIdx = order.firstIndex(of: NotchBuiltinTab.identifier(for: oldValue)) ?? 0
+            let newIdx = order.firstIndex(of: NotchBuiltinTab.identifier(for: currentView)) ?? 0
             tabSwitchForward = newIdx >= oldIdx
             handleStatsTabTransition(from: oldValue, to: currentView)
         }
@@ -186,6 +192,13 @@ class DynamicIslandViewCoordinator: ObservableObject {
             }
             .store(in: &cancellables)
 
+        Defaults.publisher(.enableCuelyFeature)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] change in
+                self?.handleCuelyFeatureToggle(change.newValue)
+            }
+            .store(in: &cancellables)
+
         Defaults.publisher(.enableMinimalisticUI)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] change in
@@ -234,6 +247,7 @@ class DynamicIslandViewCoordinator: ObservableObject {
             Defaults.publisher(.enableStatsFeature).map { _ in () }.eraseToAnyPublisher(),
             Defaults.publisher(.enableNotes).map { _ in () }.eraseToAnyPublisher(),
             Defaults.publisher(.enableClipboardManager).map { _ in () }.eraseToAnyPublisher(),
+            Defaults.publisher(.enableCuelyFeature).map { _ in () }.eraseToAnyPublisher(),
             Defaults.publisher(.clipboardDisplayMode).map { _ in () }.eraseToAnyPublisher(),
             Defaults.publisher(.enableTerminalFeature).map { _ in () }.eraseToAnyPublisher(),
             Defaults.publisher(.enableMinimalisticUI).map { _ in () }.eraseToAnyPublisher()
@@ -274,6 +288,17 @@ class DynamicIslandViewCoordinator: ObservableObject {
         guard !isEnabled, currentView == .timer else { return }
         withAnimation(.smooth) {
             currentView = .home
+        }
+    }
+
+    private func handleCuelyFeatureToggle(_ isEnabled: Bool) {
+        guard !isEnabled else { return }
+        Task { @MainActor [weak self] in
+            CuelyTranscriptionManager.shared.stop()
+            guard self?.currentView == .cuely else { return }
+            withAnimation(.smooth) {
+                self?.currentView = .home
+            }
         }
     }
 

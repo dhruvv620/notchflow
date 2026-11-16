@@ -87,9 +87,6 @@ final class MediaKeyInterceptor {
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
     private var isTapEnabled = false
-#if canImport(ApplicationServices)
-    private var didRequestAccessibilityPrompt = false
-#endif
     private let systemDefinedEventType = CGEventType(rawValue: NX_SYSDEFINED_EVENT_TYPE)
     private let eventTapLocations: [CGEventTapLocation] = [.cghidEventTap, .cgSessionEventTap]
 
@@ -103,13 +100,29 @@ final class MediaKeyInterceptor {
 
     @discardableResult
     func start() -> Bool {
-        guard eventTap == nil else {
+        if let eventTap, CFMachPortIsValid(eventTap) {
             updateTapState()
             return true
         }
 
+        // Discard a tap that macOS invalidated (for example after permission
+        // was revoked) so a later explicit permission grant can retry cleanly.
+        if eventTap != nil {
+            stop()
+        }
+
+        // Third-party DDC integrations can provide all configured events
+        // without a global event tap. Do not require Accessibility in that case.
+        guard shouldEnableTap else { return true }
+
 #if canImport(ApplicationServices)
-        requestAccessibilityPermissionIfNeeded()
+        // Checking trust is passive. Prompting here made every app launch able
+        // to raise the system dialog, including launches of stale local builds.
+        // Only explicit Allow/Repair UI actions may call the prompting API.
+        guard AppRuntimeEnvironment.isUITesting || AXIsProcessTrusted() else {
+            NSLog("⚠️ Accessibility permission missing; media key interception remains disabled")
+            return false
+        }
 #endif
 
         guard let systemDefinedType = systemDefinedEventType else {
@@ -316,16 +329,3 @@ final class MediaKeyInterceptor {
         return .standard
     }
 }
-
-#if canImport(ApplicationServices)
-extension MediaKeyInterceptor {
-    private func requestAccessibilityPermissionIfNeeded() {
-        guard !AXIsProcessTrusted(), !didRequestAccessibilityPrompt else { return }
-        if AppRuntimeEnvironment.isUITesting { return }
-        let promptKey = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
-        let options: CFDictionary = [promptKey: true] as CFDictionary
-        _ = AXIsProcessTrustedWithOptions(options)
-        didRequestAccessibilityPrompt = true
-    }
-}
-#endif

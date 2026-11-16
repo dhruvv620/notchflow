@@ -105,6 +105,14 @@ class FilteredNowPlayingController: ObservableObject, MediaControllerProtocol {
         self.pipeHandler = nil
     }
 
+    func stop() {
+        streamTask?.cancel()
+        if let pipeHandler { Task { await pipeHandler.close() } }
+        if let process, process.isRunning { process.terminate() }
+        process = nil
+        pipeHandler = nil
+    }
+
     func play() async {
         MRMediaRemoteSendCommandFunction(0, nil)
     }

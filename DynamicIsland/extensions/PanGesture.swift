@@ -34,16 +34,19 @@ enum PanDirection {
 }
 
 extension View {
-    func panGesture(direction: PanDirection, threshold: CGFloat = 4, action: @escaping (CGFloat, NSEvent.Phase) -> Void) -> some View {
+    func panGesture(direction: PanDirection, threshold: CGFloat = 4, mouseDragEnabled: Bool = true, action: @escaping (CGFloat, NSEvent.Phase) -> Void) -> some View {
         self
             .gesture(
-                DragGesture(minimumDistance: 0)
+                // A plain click must reach nested controls before a mouse drag begins.
+                // Scroll-wheel/trackpad gestures still use the independent monitor.
+                DragGesture(minimumDistance: max(1, threshold))
                     .onChanged { value in
                         let s = direction.signed(from: value.translation)
                         guard s > 0, s.magnitude >= threshold else { return }
                         action(s.magnitude, .changed)
                     }
-                    .onEnded { _ in action(0, .ended) }
+                    .onEnded { _ in action(0, .ended) },
+                including: mouseDragEnabled ? .all : .subviews
             )
             .background(ScrollMonitor(direction: direction, threshold: threshold, action: action))
     }
@@ -120,9 +123,7 @@ private struct ScrollMonitor: NSViewRepresentable {
         private func handleScroll(_ event: NSEvent) {
             guard lastEventTimestamp != event.timestamp else { return }
             lastEventTimestamp = event.timestamp
-            guard isCursorNearObservedView(using: event) else { return }
-
-            if event.phase == .ended || event.momentumPhase == .ended {
+            if event.phase == .ended || event.phase == .cancelled {
                 if active {
                     action(accumulated.magnitude, .ended)
                 } else {
@@ -133,6 +134,16 @@ private struct ScrollMonitor: NSViewRepresentable {
                 return
             }
 
+            // Momentum is the coast after fingers lift, not another tab swipe.
+            guard event.momentumPhase.isEmpty else { return }
+            guard isCursorNearObservedView(using: event) else { return }
+            if event.phase == .began { accumulated = 0; active = false }
+            if direction.isHorizontal {
+                guard event.hasPreciseScrollingDeltas,
+                      abs(event.scrollingDeltaX) > abs(event.scrollingDeltaY) else { return }
+            } else {
+                guard abs(event.scrollingDeltaY) >= abs(event.scrollingDeltaX) else { return }
+            }
             let s = direction.signed(deltaX: event.scrollingDeltaX, deltaY: event.scrollingDeltaY)
             guard s.magnitude > noiseThreshold else { return }
             accumulated = s > 0 ? accumulated + s : 0

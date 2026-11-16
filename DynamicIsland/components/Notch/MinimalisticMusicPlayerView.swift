@@ -26,6 +26,8 @@ import AppKit
 // Lyrics are shown/hidden only via Defaults[.enableLyrics] in settings. Inline display is used in the player views.
 
 struct MinimalisticMusicPlayerView: View {
+    @Default(.notchElementStyle) private var elementStyle
+    @ObservedObject private var appearance = NotchAppearanceModel.shared
     @EnvironmentObject var vm: DynamicIslandViewModel
     let albumArtNamespace: Namespace.ID
     @Default(.showShuffleAndRepeat) private var showCustomControls
@@ -105,7 +107,7 @@ struct MinimalisticMusicPlayerView: View {
 
                                 Text(musicManager.artistName)
                                     .font(.system(size: 10, weight: .regular))
-                                    .foregroundColor(Defaults[.playerColorTinting] ? Color(nsColor: musicManager.avgColor).ensureMinimumBrightness(factor: 0.6) : .gray)
+                                    .foregroundColor(appearance.accentColor.opacity(0.85))
                                     .lineLimit(1)
 
                             }
@@ -162,6 +164,9 @@ struct MinimalisticMusicPlayerView: View {
     // MARK: - TypingLyricView
 
     struct TypingLyricView: View {
+        @Default(.notchReduceMotion) private var reduceMotion
+        @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+        private var motionReduced: Bool { reduceMotion || systemReduceMotion }
         let text: String
         let color: Color
         let id: Int
@@ -191,6 +196,13 @@ struct MinimalisticMusicPlayerView: View {
                         animateTyping(text)
                     }
                 }
+                .onChange(of: motionReduced) { _, reduced in
+                    if reduced {
+                        animationTask?.cancel()
+                        displayed = text
+                        lastText = text
+                    }
+                }
                 .onAppear {
                     animateTyping(text)
                 }
@@ -201,6 +213,11 @@ struct MinimalisticMusicPlayerView: View {
 
         private func animateTyping(_ newText: String) {
             animationTask?.cancel()
+            if motionReduced {
+                displayed = newText
+                lastText = newText
+                return
+            }
             displayed = ""
             lastText = newText
             let chars = Array(newText)
@@ -234,19 +251,10 @@ struct MinimalisticMusicPlayerView: View {
         coordinator.timerLiveActivityEnabled && timerManager.isExternalTimerActive
     }
 
-    private var brandAccentColor: Color {
-        musicManager.brandAccentColor
-    }
+    private var brandAccentColor: Color { appearance.accentColor }
 
     private var timerCountdownColor: Color {
-        let baseColor: Color
-        if let presetId = timerManager.activePresetId,
-           let preset = timerPresets.first(where: { $0.id == presetId }) {
-            baseColor = preset.color
-        } else {
-            baseColor = timerManager.timerColor
-        }
-        return baseColor.ensureMinimumBrightness(factor: 0.75)
+        timerManager.isOvertime ? .red : appearance.accentColor
     }
 
     private var timerCountdownText: String {
@@ -374,7 +382,7 @@ struct MinimalisticMusicPlayerView: View {
 
                     Text(musicManager.artistName)
                         .font(.system(size: 10, weight: .regular))
-                        .foregroundColor(Defaults[.playerColorTinting] ? Color(nsColor: musicManager.avgColor).ensureMinimumBrightness(factor: 0.6) : .gray)
+                        .foregroundColor(appearance.accentColor.opacity(0.85))
                         .lineLimit(1)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -749,7 +757,7 @@ private struct MinimalisticReminderDetailsView: View {
     private var visualizer: some View {
         let width = CGFloat(Defaults[.visualizerBarCount]) * 4
         return Rectangle()
-            .fill((Defaults[.coloredSpectrogram] ? Color(nsColor: MusicManager.shared.avgColor) : Color.gray).spectrogramGradient())
+            .fill(appearance.accentColor.gradient)
             .mask {
                 AudioVisualizerView(isPlaying: .constant(MusicManager.shared.isPlaying))
                     .frame(width: width, height: 16)
@@ -821,6 +829,9 @@ private struct MinimalisticReminderDetailsView: View {
         }
         .frame(maxWidth: .infinity, alignment: .center)
         .padding(.top, 2)
+        .background {
+            if elementStyle != .subtle { NotchElementSurface(cornerRadius: 12) }
+        }
     }
 
     private var shouldShowControlHUDRow: Bool {
@@ -877,7 +888,7 @@ private struct MinimalisticReminderDetailsView: View {
                     }
                 ),
                 range: 0...1,
-                color: .white,
+                color: appearance.accentColor,
                 dragging: $hudDragging,
                 lastDragged: $hudLastDragged,
                 onValueChange: { newValue in
@@ -946,7 +957,7 @@ private struct MinimalisticReminderDetailsView: View {
             fontWeight: .semibold,
             frameSize: CGSize(width: 54, height: 54),
             cornerRadius: 22,
-            foregroundColor: .white,
+            foregroundColor: appearance.accentColor,
             pressEffect: .none,
             symbolEffectStyle: .replace,
             action: {
@@ -977,7 +988,7 @@ private struct MinimalisticReminderDetailsView: View {
             fontWeight: .medium,
             frameSize: CGSize(width: 36, height: 36),
             cornerRadius: 14,
-            foregroundColor: isActive ? resolvedActiveColor : .white.opacity(0.85),
+            foregroundColor: isActive ? resolvedActiveColor : appearance.accentColor.opacity(0.75),
             pressEffect: pressEffect,
             symbolEffectStyle: symbolEffect,
             externalTriggerToken: trigger?.token,
@@ -1088,6 +1099,7 @@ private struct MinimalisticReminderDetailsView: View {
         }
     }
     private struct MinimalisticMediaOutputButton: View {
+    @ObservedObject private var appearance = NotchAppearanceModel.shared
         @ObservedObject private var routeManager = AudioRouteManager.shared
         @StateObject private var volumeModel = MediaOutputVolumeViewModel()
         @EnvironmentObject private var vm: DynamicIslandViewModel
@@ -1101,7 +1113,7 @@ private struct MinimalisticReminderDetailsView: View {
                 fontWeight: .medium,
                 frameSize: CGSize(width: 36, height: 36),
                 cornerRadius: 14,
-                foregroundColor: .white.opacity(0.85),
+                foregroundColor: appearance.accentColor.opacity(0.85),
                 symbolEffectStyle: .replace
             ) {
                 isPopoverPresented.toggle()
@@ -1144,6 +1156,7 @@ private struct MinimalisticReminderDetailsView: View {
     }
 
     private struct MinimalisticAirPlayButton: View {
+    @ObservedObject private var appearance = NotchAppearanceModel.shared
         @ObservedObject private var musicManager = MusicManager.shared
         @ObservedObject private var airPlayManager = AppleMusicAirPlayManager.shared
         @EnvironmentObject private var vm: DynamicIslandViewModel
@@ -1161,7 +1174,7 @@ private struct MinimalisticReminderDetailsView: View {
                 fontWeight: .medium,
                 frameSize: CGSize(width: 36, height: 36),
                 cornerRadius: 14,
-                foregroundColor: .white.opacity(0.85),
+                foregroundColor: appearance.accentColor.opacity(0.85),
                 symbolEffectStyle: .replace
             ) {
                 isPopoverPresented.toggle()
@@ -1219,9 +1232,11 @@ private struct MinimalisticReminderDetailsView: View {
 // MARK: - Minimalistic Album Art
 
 struct MinimalisticAlbumArtView: View {
+    @ObservedObject private var appearance = NotchAppearanceModel.shared
     @ObservedObject var musicManager = MusicManager.shared
     @ObservedObject var vm: DynamicIslandViewModel
     @Default(.showLiveCanvasInDynamicIsland) private var showLiveCanvasInDynamicIsland
+    @Default(.notchArtworkGlow) private var artworkGlow
     let albumArtNamespace: Namespace.ID
 
     private var usesLiveCanvasArtwork: Bool {
@@ -1234,7 +1249,7 @@ struct MinimalisticAlbumArtView: View {
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
-            if Defaults[.lightingEffect] {
+            if artworkGlow {
                 albumArtBackground
             }
             albumArtButton
@@ -1261,7 +1276,7 @@ struct MinimalisticAlbumArtView: View {
                     : min(0.28, 1 - max(musicManager.albumArt.getBrightness(), 0.3))
             )
             .shadow(
-                color: Color(nsColor: musicManager.avgColor).opacity(usesLiveCanvasArtwork ? 0.14 : 0.08),
+                color: appearance.accentColor.opacity(usesLiveCanvasArtwork ? 0.14 : 0.08),
                 radius: usesLiveCanvasArtwork ? 6 : 4,
                 x: 0,
                 y: 0
@@ -1294,6 +1309,7 @@ struct MinimalisticAlbumArtView: View {
 // MARK: - Hover-highlighted control button
 
 private struct MinimalisticSquircircleButton: View {
+    @ObservedObject private var appearance = NotchAppearanceModel.shared
     let icon: String
     let fontSize: CGFloat
     let fontWeight: Font.Weight
@@ -1347,7 +1363,7 @@ private struct MinimalisticSquircircleButton: View {
                 .frame(width: frameSize.width, height: frameSize.height)
                 .background(
                     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .fill(isHovering ? Color.white.opacity(0.18) : .clear)
+                        .fill(isHovering ? appearance.accentColor.opacity(0.18) : .clear)
                 )
                 .contentShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         }

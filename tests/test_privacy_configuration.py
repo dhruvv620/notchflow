@@ -5,12 +5,34 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 ENTITLEMENTS = ROOT / "DynamicIsland" / "DynamicIsland.entitlements"
+INFO_PLIST = ROOT / "DynamicIsland" / "Info.plist"
 PROJECT = ROOT / "DynamicIsland.xcodeproj" / "project.pbxproj"
 RELEASE_WORKFLOW = ROOT / ".github" / "workflows" / "release.yml"
 CI_WORKFLOW = ROOT / ".github" / "workflows" / "ci.yml"
+MEDIA_KEY_INTERCEPTOR = ROOT / "DynamicIsland" / "managers" / "MediaKeyInterceptor.swift"
+SYSTEM_CHANGES_OBSERVER = ROOT / "DynamicIsland" / "managers" / "SystemChangesObserver.swift"
+SYSTEM_HUD_MANAGER = ROOT / "DynamicIsland" / "managers" / "SystemHUDManager.swift"
 
 
 class PrivacyConfigurationTests(unittest.TestCase):
+    def test_cuely_microphone_and_speech_permissions_are_declared(self):
+        info = plistlib.loads(INFO_PLIST.read_bytes())
+        entitlements = plistlib.loads(ENTITLEMENTS.read_bytes())
+
+        self.assertTrue(entitlements.get("com.apple.security.device.audio-input"))
+        self.assertTrue(entitlements.get("com.apple.developer.speech-recognition"))
+        project = PROJECT.read_text()
+        self.assertNotIn("ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;", project)
+        self.assertEqual(project.count("ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = YES;"), 2)
+        for key in (
+            "NSMicrophoneUsageDescription",
+            "NSSpeechRecognitionUsageDescription",
+        ):
+            usage_description = info.get(key)
+            self.assertIsInstance(usage_description, str)
+            self.assertIn("NotchFlow", usage_description)
+            self.assertIn("Cuely", usage_description)
+
     def test_camera_capture_is_explicitly_entitled(self):
         entitlements = plistlib.loads(ENTITLEMENTS.read_bytes())
 
@@ -65,6 +87,14 @@ class PrivacyConfigurationTests(unittest.TestCase):
             workflow,
         )
         self.assertIn(
+            '/usr/libexec/PlistBuddy -c "Print :com.apple.security.device.audio-input" "$FINAL_ENTITLEMENTS_PATH" | grep -qx "true"',
+            workflow,
+        )
+        self.assertIn(
+            '/usr/libexec/PlistBuddy -c "Print :com.apple.developer.speech-recognition" "$FINAL_ENTITLEMENTS_PATH" | grep -qx "true"',
+            workflow,
+        )
+        self.assertIn(
             '/usr/libexec/PlistBuddy -c "Print :com.apple.security.automation.apple-events" "$FINAL_ENTITLEMENTS_PATH" | grep -qx "true"',
             workflow,
         )
@@ -73,6 +103,33 @@ class PrivacyConfigurationTests(unittest.TestCase):
         workflow = CI_WORKFLOW.read_text()
 
         self.assertIn("python3 -m unittest tests.test_privacy_configuration", workflow)
+
+    def test_media_key_startup_never_prompts_for_accessibility(self):
+        source = MEDIA_KEY_INTERCEPTOR.read_text()
+
+        self.assertNotIn("AXIsProcessTrustedWithOptions", source)
+        self.assertNotIn("kAXTrustedCheckOptionPrompt", source)
+        self.assertIn("AXIsProcessTrusted()", source)
+
+    def test_native_hud_is_suppressed_only_after_interception_is_ready(self):
+        observer_source = SYSTEM_CHANGES_OBSERVER.read_text()
+        manager_source = SYSTEM_HUD_MANAGER.read_text()
+
+        self.assertIn(
+            "func startObserving(volumeEnabled: Bool, brightnessEnabled: Bool, keyboardBacklightEnabled: Bool) -> Bool",
+            observer_source,
+        )
+        readiness_check = manager_source.index("guard interceptionReady else")
+        suppression = manager_source.index("suppressNativeSystemHUDIfNeeded()", readiness_check)
+        self.assertLess(readiness_check, suppression)
+        self.assertIn("restoreNativeSystemHUDIfNeeded()", manager_source[readiness_check:suppression])
+
+    def test_failed_interception_retries_after_app_activation(self):
+        source = SYSTEM_HUD_MANAGER.read_text()
+
+        self.assertIn("NSApplication.didBecomeActiveNotification", source)
+        self.assertIn("self.changesObserver == nil", source)
+        self.assertIn("AccessibilityPermissionStore.shared.$isAuthorized", source)
 
 
 if __name__ == "__main__":

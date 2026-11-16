@@ -39,8 +39,11 @@ jobs:
     # Skip CI-generated commits to prevent infinite loops
     # (appcast/changelog commits pushed by this workflow)
     if: >-
+      github.repository == 'Ebullioscopic/Atoll' &&
+      (
       !contains(github.event.head_commit.message, 'ci: update appcast') &&
       !contains(github.event.head_commit.message, 'ci: archive changelog')
+      )
 
     steps:
       # ─────────────────────────────────────────────────────────────────
@@ -386,6 +389,8 @@ jobs:
           FINAL_ENTITLEMENTS_PATH="$RUNNER_TEMP/${APP_NAME}-final.entitlements"
           codesign -d --entitlements :- "$APP_PATH" > "$FINAL_ENTITLEMENTS_PATH"
           /usr/libexec/PlistBuddy -c "Print :com.apple.security.device.camera" "$FINAL_ENTITLEMENTS_PATH" | grep -qx "true"
+          /usr/libexec/PlistBuddy -c "Print :com.apple.security.device.audio-input" "$FINAL_ENTITLEMENTS_PATH" | grep -qx "true"
+          /usr/libexec/PlistBuddy -c "Print :com.apple.developer.speech-recognition" "$FINAL_ENTITLEMENTS_PATH" | grep -qx "true"
           /usr/libexec/PlistBuddy -c "Print :com.apple.security.automation.apple-events" "$FINAL_ENTITLEMENTS_PATH" | grep -qx "true"
 
       # ─────────────────────────────────────────────────────────────────

@@ -47,6 +47,8 @@ private enum SettingsTabGroup: String, CaseIterable, Identifiable {
 
 private enum SettingsTab: String, CaseIterable, Identifiable {
     case general
+    case tabsAndFeatures
+    case communications
     case liveActivities
     case appearance
     case lockScreen
@@ -73,7 +75,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
     /// Which sidebar group this tab belongs to.
     var group: SettingsTabGroup {
         switch self {
-        case .general, .appearance:                                          return .core
+        case .general, .appearance, .tabsAndFeatures, .communications:                                          return .core
         case .media, .liveActivities, .lockScreen, .devices:                 return .mediaAndDisplay
         case .hudAndOSD, .battery:                                           return .system
         case .timer, .calendar, .notes:                                      return .productivity
@@ -88,6 +90,8 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .general: return String(localized: "General")
+        case .tabsAndFeatures: return String(localized: "Tabs & Features")
+        case .communications: return String(localized: "Communications")
         case .liveActivities: return String(localized: "Live Activities")
         case .appearance: return String(localized: "Appearance")
         case .lockScreen: return String(localized: "Lock Screen")
@@ -114,6 +118,8 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
     var systemImage: String {
         switch self {
         case .general: return "gear"
+        case .tabsAndFeatures: return "rectangle.3.group"
+        case .communications: return "phone.bubble"
         case .liveActivities: return "waveform.path.ecg"
         case .appearance: return "paintpalette"
         case .lockScreen: return "lock.laptopcomputer"
@@ -140,6 +146,8 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
     var tint: Color {
         switch self {
         case .general: return .blue
+        case .tabsAndFeatures: return .indigo
+        case .communications: return .green
         case .liveActivities: return .pink
         case .appearance: return .purple
         case .lockScreen: return .orange
@@ -484,6 +492,8 @@ struct SettingsView: View {
         let ordered: [SettingsTab] = [
             // Core
             .general,
+            .tabsAndFeatures,
+            .communications,
             .appearance,
             // Media & Display
             .media,
@@ -695,6 +705,12 @@ struct SettingsView: View {
 
     private var settingsSearchIndex: [SettingsSearchEntry] {
         [
+            SettingsSearchEntry(tab: .communications, title: "Enable Communications", keywords: ["notifications", "messages", "imessage", "whatsapp", "instagram", "accessibility", "permission"], highlightID: SettingsTab.communications.highlightID(for: "Enable Communications")),
+            SettingsSearchEntry(tab: .communications, title: "Notification apps", keywords: ["reply", "inbox", "message", "notification", "preview", "focus"], highlightID: SettingsTab.communications.highlightID(for: "Notification apps")),
+            SettingsSearchEntry(tab: .communications, title: "Call Island", keywords: ["call", "facetime", "phone", "teams", "zoom", "answer", "decline", "mute"], highlightID: SettingsTab.communications.highlightID(for: "Call Island")),
+            SettingsSearchEntry(tab: .tabsAndFeatures, title: "Tabs & Features", keywords: ["tabs", "features", "notch", "applications", "options"], highlightID: SettingsTab.tabsAndFeatures.highlightID(for: "Tabs & Features")),
+            SettingsSearchEntry(tab: .tabsAndFeatures, title: "Tab visibility and order", keywords: ["reorder", "drag", "drop", "hide", "show", "music", "timers", "todos", "calendar"], highlightID: SettingsTab.tabsAndFeatures.highlightID(for: "Tab visibility and order")),
+            SettingsSearchEntry(tab: .tabsAndFeatures, title: "Notch feature controls", keywords: ["enable", "disable", "clipboard", "stats", "notes", "terminal"], highlightID: SettingsTab.tabsAndFeatures.highlightID(for: "Notch feature controls")),
             // General
             SettingsSearchEntry(tab: .general, title: "Enable Minimalistic UI", keywords: ["minimalistic", "ui mode", "general"], highlightID: SettingsTab.general.highlightID(for: "Enable Minimalistic UI")),
             SettingsSearchEntry(tab: .general, title: "Menubar icon", keywords: ["menu bar", "status bar", "icon"], highlightID: SettingsTab.general.highlightID(for: "Menubar icon")),
@@ -787,6 +803,7 @@ struct SettingsView: View {
             SettingsSearchEntry(tab: .media, title: "Enable album art parallax effect", keywords: ["parallax", "parallax effect", "album art"], highlightID: SettingsTab.media.highlightID(for: "Enable album art parallax effect")),
 
             // Calendar
+            SettingsSearchEntry(tab: .calendar, title: "Enable Todos tab", keywords: ["reminders", "apple reminders", "tasks", "lists", "hide todos"], highlightID: SettingsTab.calendar.highlightID(for: "Show Reminders tab")),
             SettingsSearchEntry(tab: .calendar, title: "Show calendar", keywords: ["calendar", "events"], highlightID: SettingsTab.calendar.highlightID(for: "Show calendar")),
             SettingsSearchEntry(tab: .calendar, title: "Enable reminder live activity", keywords: ["reminder", "live activity"], highlightID: SettingsTab.calendar.highlightID(for: "Enable reminder live activity")),
             SettingsSearchEntry(tab: .calendar, title: "Countdown style", keywords: ["reminder countdown"], highlightID: SettingsTab.calendar.highlightID(for: "Countdown style")),
@@ -817,13 +834,22 @@ struct SettingsView: View {
             // Appearance
             SettingsSearchEntry(tab: .appearance, title: "Main screen style", keywords: ["dynamic island", "pill", "non-notch", "display style", "notch style"], highlightID: SettingsTab.appearance.highlightID(for: "Main screen style")),
             SettingsSearchEntry(tab: .appearance, title: "Settings icon in notch", keywords: ["settings button", "toolbar"], highlightID: SettingsTab.appearance.highlightID(for: "Settings icon in notch")),
+            SettingsSearchEntry(tab: .appearance, title: "Element style", keywords: ["subtle", "graphite", "gradient", "cards"], highlightID: SettingsTab.appearance.highlightID(for: "Element style")),
+            SettingsSearchEntry(tab: .appearance, title: "Island size", keywords: ["compact", "spacious", "custom", "height", "width"], highlightID: SettingsTab.appearance.highlightID(for: "Island size")),
+            SettingsSearchEntry(tab: .appearance, title: "Custom island size", keywords: ["width", "height", "resize"], highlightID: SettingsTab.appearance.highlightID(for: "Custom island size")),
+            SettingsSearchEntry(tab: .appearance, title: "Corner radius", keywords: ["radius", "rounded", "shape"], highlightID: SettingsTab.appearance.highlightID(for: "Corner radius")),
+            SettingsSearchEntry(tab: .appearance, title: "Island background", keywords: ["black", "dynamic", "glass", "liquid", "frosted", "material"], highlightID: SettingsTab.appearance.highlightID(for: "Island background")),
+            SettingsSearchEntry(tab: .appearance, title: "Island outline", keywords: ["border", "stroke", "outline"], highlightID: SettingsTab.appearance.highlightID(for: "Island outline")),
+            SettingsSearchEntry(tab: .appearance, title: "Notch accent color", keywords: ["adaptive", "artwork", "fixed", "system", "accent", "slider", "playback", "visualizer"], highlightID: SettingsTab.appearance.highlightID(for: "Notch accent color")),
+            SettingsSearchEntry(tab: .appearance, title: "Artwork glow", keywords: ["artwork", "glow", "shadow"], highlightID: SettingsTab.appearance.highlightID(for: "Artwork glow")),
+            SettingsSearchEntry(tab: .appearance, title: "Reduce notch motion", keywords: ["animation", "accessibility", "motion"], highlightID: SettingsTab.appearance.highlightID(for: "Reduce notch motion")),
+            SettingsSearchEntry(tab: .appearance, title: "Activity indicators", keywords: ["dots", "icons", "carousel", "indicator"], highlightID: SettingsTab.appearance.highlightID(for: "Activity indicators")),
             SettingsSearchEntry(tab: .appearance, title: "Enable window shadow", keywords: ["shadow", "appearance"], highlightID: SettingsTab.appearance.highlightID(for: "Enable window shadow")),
             SettingsSearchEntry(tab: .appearance, title: "Corner radius scaling", keywords: ["corner radius", "shape"], highlightID: SettingsTab.appearance.highlightID(for: "Corner radius scaling")),
             SettingsSearchEntry(tab: .appearance, title: "Use simpler close animation", keywords: ["close animation", "notch"], highlightID: SettingsTab.appearance.highlightID(for: "Use simpler close animation")),
-            SettingsSearchEntry(tab: .appearance, title: "Notch Width", keywords: ["expanded notch", "width", "resize"], highlightID: SettingsTab.appearance.highlightID(for: "Expanded notch width")),
+            SettingsSearchEntry(tab: .appearance, title: "Closed notch / pill width", keywords: ["closed notch", "pill", "width"], highlightID: SettingsTab.appearance.highlightID(for: "Closed notch / pill width")),
             SettingsSearchEntry(tab: .appearance, title: "Enable colored spectrograms", keywords: ["spectrogram", "audio"], highlightID: SettingsTab.appearance.highlightID(for: "Enable colored spectrograms")),
             SettingsSearchEntry(tab: .appearance, title: "Enable blur effect behind album art", keywords: ["blur", "album art"], highlightID: SettingsTab.appearance.highlightID(for: "Enable blur effect behind album art")),
-            SettingsSearchEntry(tab: .appearance, title: "Slider color", keywords: ["slider", "accent"], highlightID: SettingsTab.appearance.highlightID(for: "Slider color")),
             SettingsSearchEntry(tab: .appearance, title: "Enable Dynamic mirror", keywords: ["mirror", "reflection"], highlightID: SettingsTab.appearance.highlightID(for: "Enable Dynamic mirror")),
             SettingsSearchEntry(tab: .appearance, title: "Mirror shape", keywords: ["mirror shape", "circle", "rectangle"], highlightID: SettingsTab.appearance.highlightID(for: "Mirror shape")),
             SettingsSearchEntry(tab: .appearance, title: "Idle Animation", keywords: ["face animation", "idle", "cool face"], highlightID: SettingsTab.appearance.highlightID(for: "Idle Animation")),
@@ -947,6 +973,18 @@ struct SettingsView: View {
         case .general:
             SettingsForm(tab: .general) {
                 GeneralSettings()
+            }
+        case .tabsAndFeatures:
+            SettingsForm(tab: .tabsAndFeatures) {
+                NotchTabsSettingsView { destination in
+                    if let target = SettingsTab(rawValue: destination), availableTabs.contains(target) {
+                        selectedTab = target
+                    }
+                }
+            }
+        case .communications:
+            SettingsForm(tab: .communications) {
+                CommunicationsSettingsView()
             }
         case .liveActivities:
             SettingsForm(tab: .liveActivities) {
@@ -3174,6 +3212,16 @@ struct CalendarSettings: View {
 
     var body: some View {
         Form {
+            Section {
+                Defaults.Toggle(key: .enableRemindersFeature) {
+                    Text("Enable Todos tab")
+                }
+                .settingsHighlight(id: highlightID("Show Reminders tab"))
+                Text("View and create reminders in your Apple Reminders lists from the notch. This is separate from the upcoming-reminder live activity.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             if !calendarManager.hasCalendarAccess || !calendarManager.hasReminderAccess {
                 Text("Calendar or Reminder access is denied. Please enable it in System Settings.")
                     .foregroundColor(.red)
@@ -3239,7 +3287,7 @@ struct CalendarSettings: View {
 
                 Section(header: Text("Reminder Live Activity")) {
                     Defaults.Toggle(key: .enableReminderLiveActivity) {
-                        Text("Enable reminder live activity")
+                        Text("Show upcoming reminders in the closed notch")
                     }
                     .settingsHighlight(id: highlightID("Enable reminder live activity"))
 
@@ -4269,13 +4317,11 @@ struct Appearance: View {
     @ObservedObject var webcamManager = WebcamManager.shared
     @Default(.mirrorShape) var mirrorShape
     @Default(.selectedCameraID) var selectedCameraID
-    @Default(.sliderColor) var sliderColor
     @Default(.useMusicVisualizer) var useMusicVisualizer
     @Default(.customVisualizers) var customVisualizers
     @Default(.selectedVisualizer) var selectedVisualizer
     @Default(.customAppIcons) private var customAppIcons
     @Default(.selectedAppIconID) private var selectedAppIconID
-    @Default(.openNotchWidth) var openNotchWidth
     @Default(.closedNotchWidth) var closedNotchWidth
     @Default(.customizePhysicalNotchWidth) var customizePhysicalNotchWidth
     @Default(.enableMinimalisticUI) var enableMinimalisticUI
@@ -4304,15 +4350,6 @@ struct Appearance: View {
     private var mainScreenHasPhysicalNotch: Bool {
         guard let screen = NSScreen.main else { return false }
         return screen.safeAreaInsets.top > 0
-    }
-
-    private var notchWidthRange: ClosedRange<Double> {
-        let minW = Double(currentRecommendedMinimumNotchWidth())
-        let maxW = min(900, Double(maxAllowedNotchWidth()))
-        return minW...max(minW, maxW)
-    }
-    private var defaultOpenNotchWidth: CGFloat {
-        currentRecommendedMinimumNotchWidth()
     }
 
     private func highlightID(_ title: String) -> String {
@@ -4352,6 +4389,8 @@ struct Appearance: View {
 
     var body: some View {
         Form {
+            NotchAppearanceSettingsSection(highlightID: highlightID)
+
             Section {
                 Toggle("Always show tabs", isOn: $coordinator.alwaysShowTabs)
                 Defaults.Toggle(key: .settingsIconInNotch) {
@@ -4479,19 +4518,13 @@ struct Appearance: View {
                     Text("Enable colored spectrograms")
                 }
                 .settingsHighlight(id: highlightID("Enable colored spectrograms"))
-                Defaults.Toggle(key: .playerColorTinting) {
-                    Text("Enable colored spectograms")
-                }
                 Defaults.Toggle(key: .lightingEffect) {
                     Text("Enable blur effect behind album art")
                 }
                 .settingsHighlight(id: highlightID("Enable blur effect behind album art"))
-                Picker("Slider color", selection: $sliderColor) {
-                    ForEach(SliderColorEnum.allCases, id: \.self) { option in
-                        Text(option.localizedName)
-                    }
-                }
-                .settingsHighlight(id: highlightID("Slider color"))
+                Text("Playback and visualizer accent colors are managed in the Accent section above.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             } header: {
                 Text("Media")
             }
@@ -4914,107 +4947,28 @@ struct Appearance: View {
         return false
     }
 
-    @ViewBuilder
     private func notchWidthControls() -> some View {
         Section {
-            let recommendedMin = currentRecommendedMinimumNotchWidth()
-            let tabCount = enabledStandardTabCount()
-            let dynamicRange = Double(recommendedMin)...900
-            
-            let closedRange = Double(80)...400
-            let minimalisticRange = Double(250)...600
-
-            let widthBinding = Binding<Double>(
-                get: { Double(openNotchWidth) },
-                set: { newValue in
-                    let clamped = min(max(newValue, dynamicRange.lowerBound), dynamicRange.upperBound)
-                    let value = CGFloat(clamped)
-                    if openNotchWidth != value {
-                        openNotchWidth = value
-                    }
-                }
-            )
-            
-            let closedWidthBinding = Binding<Double>(
+            Defaults.Toggle(key: .customizePhysicalNotchWidth) {
+                Text("Customize physical notch width")
+            }
+            .onChange(of: customizePhysicalNotchWidth) {
+                NotificationCenter.default.post(name: Notification.Name.notchHeightChanged, object: nil)
+            }
+            .settingsHighlight(id: highlightID("Customize physical notch width"))
+            Slider(value: Binding(
                 get: { Double(closedNotchWidth) },
-                set: { newValue in
-                    let clamped = min(max(newValue, closedRange.lowerBound), closedRange.upperBound)
-                    let value = CGFloat(clamped)
-                    if closedNotchWidth != value {
-                        closedNotchWidth = value
-                        NotificationCenter.default.post(name: Notification.Name.notchHeightChanged, object: nil)
-                    }
-                }
-            )
-
-            VStack(alignment: .leading, spacing: 10) {
-                Defaults.Toggle(key: .customizePhysicalNotchWidth) {
-                    Text("Customize physical notch width")
-                }
-                .onChange(of: customizePhysicalNotchWidth) {
-                    NotificationCenter.default.post(name: Notification.Name.notchHeightChanged, object: nil)
-                }
-                .settingsHighlight(id: highlightID("Customize physical notch width"))
-                
-                Slider(
-                    value: closedWidthBinding,
-                    in: closedRange,
-                    step: 5
-                ) {
-                    HStack {
-                        Text("Closed notch / pill width")
-                        Spacer()
-                        Text("\(Int(closedNotchWidth)) px")
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .settingsHighlight(id: highlightID("Closed notch / pill width"))
-
-                Divider().padding(.vertical, 4)
-
-                Slider(
-                    value: widthBinding,
-                    in: dynamicRange,
-                    step: 10
-                ) {
-                    HStack {
-                        Text("Expanded notch width")
-                        Spacer()
-                        Text("\(Int(openNotchWidth)) px")
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .disabled(enableMinimalisticUI)
-                .settingsHighlight(id: highlightID("Expanded notch width"))
-
+                set: { closedNotchWidth = CGFloat($0); NotificationCenter.default.post(name: Notification.Name.notchHeightChanged, object: nil) }
+            ), in: 80...400, step: 5) {
                 HStack {
-                    Text("\(tabCount) tab\(tabCount == 1 ? "" : "s") enabled · min \(Int(recommendedMin)) px")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    Text("Closed notch / pill width")
                     Spacer()
-                    Button("Reset Width") {
-                        openNotchWidth = recommendedMin
-                    }
-                    .disabled(abs(openNotchWidth - recommendedMin) < 0.5)
-                    .buttonStyle(.bordered)
+                    Text("\(Int(closedNotchWidth)) pt").foregroundStyle(.secondary)
                 }
-
-                let description = enableMinimalisticUI
-                ? String(localized: "Expanded width adjustments apply only to the standard notch layout. Disable Minimalistic UI to edit this value.")
-                : String(localized: "Recommended minimum width adjusts automatically based on the number of enabled tabs.")
-
-                Text(description)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
-            .onAppear {
-                enforceMinimumNotchWidth()
-            }
+            .settingsHighlight(id: highlightID("Closed notch / pill width"))
         } header: {
-            HStack {
-                Text("Notch Width")
-                customBadge(text: "Beta")
-            }
+            Text("Closed Notch")
         }
     }
 
@@ -7473,7 +7427,6 @@ struct StatsSettings: View {
 struct ClipboardSettings: View {
     @ObservedObject var clipboardManager = ClipboardManager.shared
     @Default(.enableClipboardManager) var enableClipboardManager
-    @Default(.clipboardHistorySize) var clipboardHistorySize
     @Default(.showClipboardIcon) var showClipboardIcon
     @Default(.clipboardDisplayMode) var clipboardDisplayMode
 
@@ -7524,14 +7477,7 @@ struct ClipboardSettings: View {
                     HStack {
                         Text("History Size")
                         Spacer()
-                        Picker("", selection: $clipboardHistorySize) {
-                            Text("3 items").tag(3)
-                            Text("5 items").tag(5)
-                            Text("7 items").tag(7)
-                            Text("10 items").tag(10)
-                        }
-                        .pickerStyle(.menu)
-                        .frame(minWidth: 100)
+                        Text("20 recent items").foregroundStyle(.secondary)
                     }
                     .settingsHighlight(id: highlightID("History Size"))
 

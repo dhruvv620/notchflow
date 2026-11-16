@@ -37,6 +37,7 @@ class TimerManager: ObservableObject {
     @Published var isOvertime: Bool = false // Timer has gone past 0 and is counting negative
     @Published var lastUpdated: Date = .distantPast
     @Published var activePresetId: UUID?
+    @Published private(set) var activeSessionID: UUID?
     @Published private(set) var activeSource: TimerSource = .none
     
     // Timer progress (0.0 to 1.0, or >1.0 for overtime)
@@ -123,6 +124,7 @@ class TimerManager: ObservableObject {
     }
     
     private var timerInstance: Timer?
+    private var isDeadlineManaged = false
     private var cancellables = Set<AnyCancellable>()
     private var soundPlayer: AVAudioPlayer?
     // MARK: - Initialization
@@ -142,8 +144,11 @@ class TimerManager: ObservableObject {
             endExternalTimer(triggerSmoothClose: false)
         }
 
-        // Stop any existing timer
+        // Stop any existing timer and invalidate delayed work from its session.
         timerInstance?.invalidate()
+        soundPlayer?.stop()
+        isDeadlineManaged = false
+        activeSessionID = UUID()
         
         // Start new timer
         withAnimation(.smooth) {
@@ -162,10 +167,12 @@ class TimerManager: ObservableObject {
         activePresetId = preset?.id
         
         // Start countdown timer
+        let sessionID = activeSessionID
         timerInstance = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             guard let self = self else { return }
             
             Task { @MainActor in
+                guard self.activeSessionID == sessionID, self.isTimerActive, !self.isDeadlineManaged else { return }
                 if !self.isPaused {
                     if self.remainingTime > 0 {
                         // Normal countdown
@@ -189,6 +196,32 @@ class TimerManager: ObservableObject {
         }
     }
     
+    /// Mirrors a deadline-driven session without starting a second countdown clock.
+    func startManagedTimer(duration: TimeInterval, name: String) {
+        startTimer(duration: duration, name: name)
+        timerInstance?.invalidate()
+        timerInstance = nil
+        isDeadlineManaged = true
+    }
+
+    func updateManagedTimer(remaining: TimeInterval, duration: TimeInterval, paused: Bool, name: String) {
+        guard isDeadlineManaged && isTimerActive else { return }
+        timerName = name
+        totalDuration = duration
+        remainingTime = max(0, remaining)
+        elapsedTime = max(0, duration - remainingTime)
+        isPaused = paused
+        isFinished = false
+        isOvertime = false
+        lastUpdated = Date()
+    }
+
+    func playManagedPhaseSound() {
+        playTimerSound()
+        // A phase boundary is a single cue, not the normal timer's looping alarm.
+        soundPlayer?.numberOfLoops = 0
+    }
+
     func startDemoTimer(duration: TimeInterval) {
         startTimer(duration: duration, name: "Demo Timer")
     }
@@ -240,12 +273,15 @@ class TimerManager: ObservableObject {
         guard isTimerActive && isPaused else { return }
         isPaused = false
         lastUpdated = Date()
-        
+        guard !isDeadlineManaged else { return }
+
         // Resume countdown timer with same logic as start timer
+        let sessionID = activeSessionID
         timerInstance = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             guard let self = self else { return }
             
             Task { @MainActor in
+                guard self.activeSessionID == sessionID, self.isTimerActive, !self.isDeadlineManaged else { return }
                 if !self.isPaused {
                     if self.remainingTime > 0 {
                         // Normal countdown
@@ -277,6 +313,8 @@ class TimerManager: ObservableObject {
         soundPlayer?.stop()
 
         activeSource = .external
+        isDeadlineManaged = false
+        activeSessionID = UUID()
 
         let clampedTotal = totalDuration > 0 ? totalDuration : max(totalDuration, remaining)
 
@@ -353,6 +391,8 @@ class TimerManager: ObservableObject {
         isFinished = false
         isOvertime = false
         activePresetId = nil
+        activeSessionID = nil
+        isDeadlineManaged = false
         activeSource = .none
     }
 
@@ -381,8 +421,10 @@ class TimerManager: ObservableObject {
     }
 
     private func scheduleSmoothClose() {
-        // Wait 3 seconds then smoothly close the live activity
+        // A delayed close must never dismiss a replacement timer.
+        let closingSessionID = activeSessionID
         DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+            guard self.activeSessionID == closingSessionID else { return }
             withAnimation(.easeInOut(duration: 1.0)) {
                 self.isTimerActive = false
             }
@@ -431,7 +473,8 @@ class TimerManager: ObservableObject {
         if isOvertime && remainingTime < 0 {
             return "-" + timeString(from: abs(remainingTime))
         } else {
-            return timeString(from: remainingTime)
+            // Deadline-managed phases retain fractional precision internally.
+            return timeString(from: ceil(max(0, remainingTime)))
         }
     }
     

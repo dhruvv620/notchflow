@@ -22,6 +22,7 @@ import Defaults
 // Note: lyrics display is inlined into the main minimalistic view below and is controlled by Defaults[.enableLyrics]
 
 struct MinimalisticMusicView: View {
+    @ObservedObject private var appearance = NotchAppearanceModel.shared
     @EnvironmentObject var vm: DynamicIslandViewModel
     @ObservedObject var musicManager = MusicManager.shared
     @Default(.enableLyrics) var enableLyrics
@@ -113,7 +114,7 @@ struct MinimalisticMusicView: View {
         let width = CGFloat(Defaults[.visualizerBarCount]) * 4
         return HStack {
             Rectangle()
-                .fill((Defaults[.coloredSpectrogram] ? Color(nsColor: musicManager.avgColor) : Color.gray).spectrogramGradient())
+                .fill(appearance.accentColor.gradient)
                 .frame(width: width, alignment: .center)
                 .mask {
                     AudioVisualizerView(isPlaying: $musicManager.isPlaying)

@@ -59,10 +59,28 @@ final class SystemChangesObserver: MediaKeyInterceptorDelegate {
         self.coordinator = coordinator
     }
 
-    func startObserving(volumeEnabled: Bool, brightnessEnabled: Bool, keyboardBacklightEnabled: Bool) {
+    @discardableResult
+    func startObserving(volumeEnabled: Bool, brightnessEnabled: Bool, keyboardBacklightEnabled: Bool) -> Bool {
         self.volumeEnabled = volumeEnabled
         self.brightnessEnabled = brightnessEnabled
         self.keyboardBacklightEnabled = keyboardBacklightEnabled
+
+        // Configure before starting so MediaKeyInterceptor can decide whether
+        // this setup actually needs Accessibility (third-party DDC-only setups
+        // do not). Never start passive HUD observations unless interception is
+        // ready, otherwise both our HUD and the native HUD can appear.
+        mediaKeyInterceptor.delegate = self
+        mediaKeyInterceptor.configuration = MediaKeyConfiguration(
+            interceptVolume: volumeEnabled,
+            interceptBrightness: brightnessEnabled,
+            interceptCommandModifiedBrightness: keyboardBacklightEnabled
+        )
+        guard mediaKeyInterceptor.start() else {
+            mediaKeyInterceptor.configuration = .disabled
+            mediaKeyInterceptor.delegate = nil
+            NSLog("⚠️ Media key interception unavailable; retaining the native system HUD")
+            return false
+        }
 
         volumeController.onVolumeChange = { [weak self] volume, muted in
             guard let self, self.volumeEnabled else { return }
@@ -91,16 +109,7 @@ final class SystemChangesObserver: MediaKeyInterceptorDelegate {
             keyboardBacklightController.start()
         }
 
-        mediaKeyInterceptor.delegate = self
-        let tapStarted = mediaKeyInterceptor.start()
-        if !tapStarted {
-            NSLog("⚠️ Media key interception unavailable; system HUD will remain visible")
-        }
-        mediaKeyInterceptor.configuration = MediaKeyConfiguration(
-            interceptVolume: volumeEnabled,
-            interceptBrightness: brightnessEnabled,
-            interceptCommandModifiedBrightness: keyboardBacklightEnabled
-        )
+        return true
     }
 
     func update(volumeEnabled: Bool, brightnessEnabled: Bool, keyboardBacklightEnabled: Bool) {
