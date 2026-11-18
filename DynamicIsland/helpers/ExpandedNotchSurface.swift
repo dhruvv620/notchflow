@@ -10,6 +10,7 @@ struct ExpandedNotchSurface<Surface: Shape>: View {
     @Default(.notchBackgroundStyle) private var selectedStyle
     @Default(.notchOutline) private var outline
     @Default(.notchArtworkGlow) private var artworkGlow
+    @Default(.notchGlassTone) private var glassTone
     @ObservedObject private var coordinator = DynamicIslandViewCoordinator.shared
     @ObservedObject private var appearance = NotchAppearanceModel.shared
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
@@ -49,16 +50,45 @@ struct ExpandedNotchSurface<Surface: Shape>: View {
         case .glass:
             if #available(macOS 26.0, *) {
                 shape.fill(.clear)
-                    .glassEffect(.regular.tint(.black.opacity(0.12)), in: shape)
-                    .environment(\.colorScheme, .dark)
+                    .glassEffect(glass, in: shape)
+                    .overlay { shape.fill(toneShade) }
+                    .environment(\.colorScheme, toneScheme)
             } else { frosted }
         case .frosted: frosted
         }
     }
     private var frosted: some View {
         NotchFrostedMaterial()
-            .overlay { shape.fill(.black.opacity(0.08)) }
-            .environment(\.colorScheme, .dark)
+            .overlay { shape.fill(frostedOverlay) }
+            .environment(\.colorScheme, toneScheme)
+    }
+
+    // MARK: Glass tone
+
+    @available(macOS 26.0, *)
+    private var glass: Glass {
+        switch glassTone {
+        case .dark: return .regular.tint(.black.opacity(0.12))
+        case .light: return .regular.tint(.white.opacity(0.22))
+        case .tinted: return .regular.tint(appearance.accentColor.opacity(0.25))
+        case .clear: return .clear.tint(.black.opacity(0.04))
+        }
+    }
+
+    /// Light glass keeps a shade behind the text so white labels stay readable.
+    private var toneShade: Color {
+        glassTone == .light ? .black.opacity(0.2) : .clear
+    }
+
+    private var toneScheme: ColorScheme { glassTone == .light ? .light : .dark }
+
+    private var frostedOverlay: Color {
+        switch glassTone {
+        case .dark: return .black.opacity(0.08)
+        case .light: return .black.opacity(0.24)
+        case .tinted: return appearance.accentColor.opacity(0.2)
+        case .clear: return .clear
+        }
     }
 }
 

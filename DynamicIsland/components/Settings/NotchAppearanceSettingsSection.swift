@@ -14,6 +14,7 @@ struct NotchAppearanceSettingsSection: View {
     @Default(.notchCustomHeight) private var customHeight
     @Default(.notchCornerRadius) private var cornerRadius
     @Default(.notchBackgroundStyle) private var backgroundStyle
+    @Default(.notchGlassTone) private var glassTone
     @Default(.notchOutline) private var outline
     @Default(.notchAccentMode) private var accentMode
     @Default(.notchFixedAccentColor) private var fixedAccent
@@ -145,6 +146,15 @@ struct NotchAppearanceSettingsSection: View {
             .settingsHighlight(id: highlightID("Island background"))
             Text(backgroundDescription)
                 .font(.caption).foregroundStyle(.secondary)
+            if backgroundStyle == .glass || backgroundStyle == .frosted {
+                Picker("Glass tone", selection: $glassTone) {
+                    ForEach(NotchGlassTone.allCases) { Text($0.title).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                .settingsHighlight(id: highlightID("Glass tone"))
+                Text("Dark is the classic look, Light a paler frost, Tinted uses the accent color, Clear shows the most of the desktop behind it.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             Toggle("Outline", isOn: $outline).toggleStyle(.switch)
                 .settingsHighlight(id: highlightID("Island outline"))
         } header: { Text("Island") }
