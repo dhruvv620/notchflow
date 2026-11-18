@@ -73,7 +73,39 @@ class DynamicIslandWindow: NSPanel {
     func refreshInputRegion() { inputController?.refresh() }
     func containsInteractivePoint(_ point: NSPoint) -> Bool { inputController?.contains(screenPoint: point) == true }
 
+    /// True while AppKit lays this window out (its display-cycle layout pass).
+    private var isInLayoutPass = false
+    private var deferredFrame: (rect: NSRect, display: Bool)?
+    private var deferredFrameScheduled = false
+
+    override func layoutIfNeeded() {
+        isInLayoutPass = true
+        defer { isInLayoutPass = false }
+        super.layoutIfNeeded()
+    }
+
     override func setFrame(_ frameRect: NSRect, display flag: Bool) {
+        // SwiftUI's hosting view can resize the window from inside the
+        // window's own layout pass (windowDidLayout -> updateAnimatedWindowSize).
+        // Resizing there invalidates the layout of views being laid out, and
+        // AppKit throws ("needs another layout pass") and aborts. Keep the
+        // newest requested frame and apply it right after the pass instead.
+        if isInLayoutPass {
+            guard frameRect != frame else { return }
+            deferredFrame = (frameRect, flag)
+            guard !deferredFrameScheduled else { return }
+            deferredFrameScheduled = true
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.deferredFrameScheduled = false
+                guard let pending = self.deferredFrame else { return }
+                self.deferredFrame = nil
+                self.setFrame(pending.rect, display: pending.display)
+            }
+            return
+        }
+        // A frame applied outside layout supersedes one held from inside it.
+        deferredFrame = nil
         super.setFrame(frameRect, display: flag)
         // AppKit may call this while laying out its hosting view. Keep native
         // event-property writes out of that window display/constraint cycle.
