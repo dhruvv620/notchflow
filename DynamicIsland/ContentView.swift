@@ -65,6 +65,7 @@ struct ContentView: View {
     @ObservedObject var meetingManager = MeetingManager.shared
     @ObservedObject var remindersManager = RemindersManager.shared
     @Default(.showTodayProgressRing) var showTodayProgressRing
+    @Default(.showLyricsUnderNotch) var showLyricsUnderNotch
     
     @Default(.enableStatsFeature) var enableStatsFeature
     @Default(.showCpuGraph) var showCpuGraph
@@ -345,6 +346,19 @@ struct ContentView: View {
             && !isCurrentScreenExpansionVisible
     }
 
+    /// The sung line under the closed notch, while synced lyrics play.
+    private var isClosedLyricsVisible: Bool {
+        Defaults[.enableLyrics]
+            && showLyricsUnderNotch
+            && vm.notchState == .closed
+            && musicManager.isPlaying
+            && !musicManager.syncedLyrics.isEmpty
+            && !vm.hideOnClosed
+            && !lockScreenManager.isLocked
+            && !isSneakPeekVisibleOnCurrentScreen
+            && !enableMinimalisticUI
+    }
+
     private var peekLineWidth: CGFloat {
         max(vm.closedNotchSize.width + 140, 280)
     }
@@ -371,6 +385,9 @@ struct ContentView: View {
         if isPeeking && vm.notchState == .closed {
             width = max(width, peekLineWidth + closedPadding)
             height += NotchPeekLine.height
+        } else if isClosedLyricsVisible {
+            width = max(width, peekLineWidth + closedPadding)
+            height += ClosedNotchLyricsLine.height
         }
 
         if isWhatsAppBannerVisible {
@@ -1136,6 +1153,9 @@ struct ContentView: View {
                       if isPeeking && vm.notchState == .closed && !isSneakPeekVisibleOnCurrentScreen {
                           NotchPeekLine(width: peekLineWidth)
                               .transition(.notchMorph)
+                      } else if isClosedLyricsVisible {
+                          ClosedNotchLyricsLine(width: peekLineWidth)
+                              .transition(.opacity)
                       }
 
                       if isSneakPeekVisibleOnCurrentScreen {

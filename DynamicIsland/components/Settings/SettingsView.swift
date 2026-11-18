@@ -2997,6 +2997,14 @@ struct Media: View {
                     Text("Enable lyrics")
                 }
                 .settingsHighlight(id: highlightID("Enable lyrics"))
+                Defaults.Toggle(key: .showLyricsUnderNotch) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Sing along under the closed notch")
+                        Text("Shows the line being sung, with a highlight that sweeps across it in time with the music.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                .disabled(!Defaults[.enableLyrics])
                 Defaults.Toggle(key: .showLiveCanvasInDynamicIsland) {
                     Text("Show live canvas in Dynamic Island")
                 }
