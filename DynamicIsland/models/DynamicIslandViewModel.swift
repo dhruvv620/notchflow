@@ -428,6 +428,11 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
             return adjustedSize
         }
 
+        if coordinator.currentView == .whatsapp {
+            adjustedSize.height = max(adjustedSize.height, whatsAppNotchTabHeight)
+            return adjustedSize
+        }
+
         adjustedSize = inlineLyricsAdjustedNotchSize(
             from: adjustedSize,
             isHomeTabActive: coordinator.currentView == .home

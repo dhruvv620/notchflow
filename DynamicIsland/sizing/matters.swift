@@ -439,3 +439,9 @@ func getClosedNotchSize(screen: String? = nil) -> CGSize {
 
     return .init(width: notchWidth, height: notchHeight)
 }
+
+// MARK: - WhatsApp tab
+
+/// Height of the open notch while the WhatsApp tab is showing: room for the
+/// chat list, or a conversation with its reply field.
+let whatsAppNotchTabHeight: CGFloat = 270

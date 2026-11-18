@@ -66,6 +66,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
     case shortcuts
     case notes
     case terminal
+    case whatsapp
     case about
 
     var id: String { rawValue }
@@ -80,7 +81,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .clipboard, .screenAssistant, .colorPicker, .shelf,
              .downloads, .shortcuts:                                         return .utilities
         case .stats, .terminal:                                              return .developer
-        case .extensions:                                                    return .integrations
+        case .extensions, .whatsapp:                                         return .integrations
         case .about:                                                         return .info
         }
     }
@@ -107,6 +108,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .shortcuts: return String(localized: "Shortcuts")
         case .notes: return String(localized: "Notes")
         case .terminal: return String(localized: "Terminal")
+        case .whatsapp: return String(localized: "WhatsApp")
         case .about: return String(localized: "About")
         }
     }
@@ -133,6 +135,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .shortcuts: return "keyboard"
         case .notes: return "note.text"
         case .terminal: return "apple.terminal"
+        case .whatsapp: return "message.fill"
         case .about: return "info.circle"
         }
     }
@@ -159,6 +162,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .shortcuts: return .orange
         case .notes: return Color(red: 0.979, green: 0.716, blue: 0.153, opacity: 1.000)
         case .terminal: return Color(red: 0.2, green: 0.8, blue: 0.4)
+        case .whatsapp: return .whatsAppGreen
         case .about: return .secondary
         }
     }
@@ -469,6 +473,9 @@ private enum SettingsSearchIndex {
 
         // Terminal
         SettingsSearchEntry(tab: .terminal, title: "Enable terminal", keywords: ["terminal", "guake", "shell"], highlightID: SettingsTab.terminal.highlightID(for: "Enable terminal")),
+        SettingsSearchEntry(tab: .whatsapp, title: "Show my WhatsApp messages", keywords: ["whatsapp", "messages", "chat", "reply", "qr", "link"], highlightID: SettingsTab.whatsapp.highlightID(for: "Show my WhatsApp messages")),
+        SettingsSearchEntry(tab: .whatsapp, title: "Mute groups", keywords: ["whatsapp", "groups", "mute", "mention"], highlightID: SettingsTab.whatsapp.highlightID(for: "Mute groups")),
+        SettingsSearchEntry(tab: .whatsapp, title: "Mark as read when I open a conversation", keywords: ["whatsapp", "read receipts", "blue ticks"], highlightID: SettingsTab.whatsapp.highlightID(for: "Mark as read when I open a conversation")),
         SettingsSearchEntry(tab: .terminal, title: "Shell path", keywords: ["shell", "zsh", "bash", "terminal"], highlightID: SettingsTab.terminal.highlightID(for: "Shell path")),
         SettingsSearchEntry(tab: .terminal, title: "Font size", keywords: ["terminal", "font", "text size"], highlightID: SettingsTab.terminal.highlightID(for: "Font size")),
         SettingsSearchEntry(tab: .terminal, title: "Terminal opacity", keywords: ["terminal", "opacity", "transparency", "blur", "background"], highlightID: SettingsTab.terminal.highlightID(for: "Terminal opacity")),
@@ -822,6 +829,7 @@ struct SettingsView: View {
             .terminal,
             // Integrations
             .extensions,
+            .whatsapp,
             // Info
             .about
         ]
@@ -1101,6 +1109,10 @@ struct SettingsView: View {
         case .terminal:
             SettingsForm(tab: .terminal) {
                 TerminalSettings()
+            }
+        case .whatsapp:
+            SettingsForm(tab: .whatsapp) {
+                WhatsAppSettings()
             }
         case .about:
             if let controller = updaterController {

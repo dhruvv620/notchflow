@@ -64,6 +64,7 @@ struct ContentView: View {
     @ObservedObject var localSendService = LocalSendService.shared
     @State private var downloadManager = DownloadManager.shared
     @ObservedObject var shelfState = ShelfStateViewModel.shared
+    @ObservedObject var whatsAppManager = WhatsAppManager.shared
     
     @Default(.enableStatsFeature) var enableStatsFeature
     @Default(.showCpuGraph) var showCpuGraph
@@ -1017,6 +1018,13 @@ struct ContentView: View {
                 } else {
                     menuBarLayout.stopTracking()
                 }
+                // Opening the notch while a WhatsApp message is announced goes
+                // straight to that conversation, like tapping a notification.
+                if state == .open, let banner = whatsAppManager.banner, !enableMinimalisticUI {
+                    coordinator.currentView = .whatsapp
+                    whatsAppManager.openChat(banner.chatJID)
+                    whatsAppManager.dismissBanner()
+                }
             }
             .onDisappear {
                 performViewTeardown()
@@ -1132,6 +1140,15 @@ struct ContentView: View {
                       } else if vm.notchState == .closed && capsLockManager.isCapsLockActive && Defaults[.enableCapsLockIndicator] && !vm.hideOnClosed && !lockScreenManager.isLocked {
                           InlineHUD(type: .constant(.capsLock), value: .constant(1.0), icon: .constant(""), hoverAnimation: $isHovering, gestureProgress: $gestureProgress)
                               .transition(AnyTransition.move(edge: .trailing).combined(with: .opacity))
+                      } else if vm.notchState == .closed && !vm.hideOnClosed && !lockScreenManager.isLocked && !isCurrentScreenExpansionVisible, let banner = whatsAppManager.banner {
+                          WhatsAppMessageLiveActivity(banner: banner, isHovering: isHovering) {
+                              coordinator.currentView = .whatsapp
+                              whatsAppManager.openChat(banner.chatJID)
+                              whatsAppManager.dismissBanner()
+                              vm.open()
+                          }
+                          .id("whatsapp-\(banner.id)")
+                          .transition(.blurReplace.animation(.interactiveSpring(dampingFraction: 1.2)))
                       } else if canShowMusicDuringExpansion && musicPairingEligible {
                           MusicLiveActivity(secondary: musicSecondary)
                               .id("closed-music-live-activity")
@@ -1304,6 +1321,8 @@ struct ContentView: View {
                                 NotchClipboardView()
                             case .terminal:
                                 NotchTerminalView()
+                            case .whatsapp:
+                                NotchWhatsAppView()
                             case .extensionExperience:
                                 if let payload = currentExtensionTabPayload() {
                                     ExtensionNotchExperienceTabView(payload: payload)

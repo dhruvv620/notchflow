@@ -1313,7 +1313,23 @@ extension Defaults.Keys {
     static let terminalForegroundColor = Key<Color>("terminalForegroundColor", default: .white)
     static let terminalCursorColor = Key<Color>("terminalCursorColor", default: Color(.selectedControlColor))
     static let terminalStickyMode = Key<Bool>("terminalStickyMode", default: false)
-    
+
+    // MARK: WhatsApp Feature
+    static let enableWhatsAppFeature = Key<Bool>("enableWhatsAppFeature", default: false)
+    /// Version of the GOWA gateway binary Atoll installed, without a leading "v".
+    static let whatsAppGatewayVersion = Key<String>("whatsAppGatewayVersion", default: "")
+    static let whatsAppShowIncomingMessages = Key<Bool>("whatsAppShowIncomingMessages", default: true)
+    static let whatsAppShowMessagePreviews = Key<Bool>("whatsAppShowMessagePreviews", default: true)
+    static let whatsAppMuteGroups = Key<Bool>("whatsAppMuteGroups", default: true)
+    static let whatsAppQuietDuringFocus = Key<Bool>("whatsAppQuietDuringFocus", default: true)
+    static let whatsAppMarkReadOnOpen = Key<Bool>("whatsAppMarkReadOnOpen", default: true)
+    static let whatsAppIgnoredChats = Key<[String]>("whatsAppIgnoredChats", default: [])
+    static let whatsAppIgnoredChatNames = Key<[String: String]>("whatsAppIgnoredChatNames", default: [:])
+    /// Per chat JID, when its messages were last read (seconds since 1970).
+    static let whatsAppLastRead = Key<[String: Double]>("whatsAppLastRead", default: [:])
+    /// When the account was linked. Messages older than this never count as unread.
+    static let whatsAppLinkedAt = Key<Double>("whatsAppLinkedAt", default: 0)
+
     // MARK: Timer Feature
     static let enableTimerFeature = Key<Bool>("enableTimerFeature", default: true)
     static let timerDisplayMode = Key<TimerDisplayMode>("timerDisplayMode", default: .tab)

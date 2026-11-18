@@ -60,6 +60,8 @@ struct TabSelectionView: View {
     @Default(.showMirror) private var showMirror
     @Default(.showStandardMediaControls) private var showStandardMediaControls
     @Default(.enableMinimalisticUI) private var enableMinimalisticUI
+    @Default(.enableWhatsAppFeature) private var enableWhatsAppFeature
+    @ObservedObject private var whatsApp = WhatsAppManager.shared
     @Namespace var animation
     
     private var tabs: [TabModel] {
@@ -95,6 +97,9 @@ struct TabSelectionView: View {
         if Defaults[.enableTerminalFeature] {
             tabsArray.append(TabModel(label: "Terminal", icon: "apple.terminal", view: .terminal))
         }
+        if enableWhatsAppFeature {
+            tabsArray.append(TabModel(label: "WhatsApp", icon: "message.fill", view: .whatsapp))
+        }
         if extensionTabsEnabled {
             for payload in extensionTabPayloads {
                 guard let tab = payload.descriptor.tab else { continue }
@@ -125,6 +130,15 @@ struct TabSelectionView: View {
                         coordinator.selectedExtensionExperienceID = tab.experienceID
                     }
                     coordinator.currentView = tab.view
+                }
+                .overlay(alignment: .topTrailing) {
+                    if tab.view == .whatsapp && whatsApp.totalUnread > 0 {
+                        Circle()
+                            .fill(Color.whatsAppGreen)
+                            .frame(width: 7, height: 7)
+                            .offset(x: 4, y: -2)
+                            .allowsHitTesting(false)
+                    }
                 }
                 .frame(height: 26)
                 .foregroundStyle(isSelected ? activeAccent : .gray)

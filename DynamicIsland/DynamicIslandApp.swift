@@ -307,6 +307,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Restore Lunar's native OSD if integration was active
         LunarManager.shared.appWillTerminate()
+
+        // Stop the WhatsApp gateway child process so it does not outlive Atoll.
+        WhatsAppManager.shared.applicationWillTerminate()
     }
     
     @objc func onScreenLocked(_: Notification) {
@@ -573,6 +576,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         } else if coordinator.currentView == .clipboard {
             // Clipboard has its own fixed height source; don't inherit the notes layout state.
             baseSize.height = max(baseSize.height, NotesLayoutState.list.preferredHeight)
+        } else if coordinator.currentView == .whatsapp {
+            baseSize.height = max(baseSize.height, whatsAppNotchTabHeight)
         } else if coordinator.currentView == .terminal {
             let screenHeight = NSScreen.main?.visibleFrame.height ?? 800
             let maxFraction = Defaults[.terminalMaxHeightFraction]
@@ -875,6 +880,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }.store(in: &cancellables)
 
         MemoryUsageMonitor.shared.startMonitoring()
+
+        WhatsAppManager.shared.start()
 
         ReminderLiveActivityManager.shared.$activeWindowReminders
             .receive(on: RunLoop.main)
