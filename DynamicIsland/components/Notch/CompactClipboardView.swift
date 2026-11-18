@@ -24,7 +24,7 @@ struct CompactClipboardView: View {
         return filter == .all ? recent : recent.filter { kind(of: $0) == filter }
     }
     private func turnPage(_ step: Int, from currentPage: Int, count: Int) {
-        let next = PageSwipeAccumulator.page(currentPage, moved: step, pageCount: count)
+        let next = ClipboardPageSwipe.page(currentPage, moved: step, pageCount: count)
         guard next != currentPage else { return }
         pageDirection = step
         withAnimation(.snappy(duration: 0.28)) { page = next }
@@ -67,10 +67,10 @@ struct CompactClipboardView: View {
                     Spacer(minLength: 2)
                     HStack(spacing: 3) {
                         Button { turnPage(-1, from: currentPage, count: count) } label: { Image(systemName: "chevron.left") }
-                            .disabled(currentPage == 0).help("Previous page (or swipe right on the cards)")
+                            .disabled(currentPage == 0).help("Previous page (or a three-finger swipe right on the cards)")
                         Text("\(currentPage + 1)/\(count)").monospacedDigit().frame(minWidth: 22)
                         Button { turnPage(1, from: currentPage, count: count) } label: { Image(systemName: "chevron.right") }
-                            .disabled(currentPage + 1 >= count).help("Next page (or swipe left on the cards)")
+                            .disabled(currentPage + 1 >= count).help("Next page (or a three-finger swipe left on the cards)")
                     }.font(.system(size: 10, weight: .medium)).buttonStyle(.plain)
                     Button { clearConfirmation = true } label: { Image(systemName: "trash") }
                         .buttonStyle(.plain).font(.system(size: 11))
@@ -98,11 +98,8 @@ struct CompactClipboardView: View {
                     ))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .clipped()
-                    // Swipe sideways on the cards to turn pages, like the timer ruler.
+                    // Three-finger page swipes turn pages; two fingers keep switching tabs.
                     .background(NotchPageSwipeReader { step in turnPage(step, from: currentPage, count: count) })
-                    .onHover { hovering in
-                        vm.setHorizontalSwipeClaim(hovering && count > 1, token: interactionToken)
-                    }
                 }
             }
             .padding(.horizontal, 12).padding(.vertical, 5)
@@ -122,10 +119,7 @@ struct CompactClipboardView: View {
         .onChange(of: clearConfirmation) { _, visible in
             vm.setAutoCloseSuppression(visible, token: interactionToken)
         }
-        .onDisappear {
-            vm.setAutoCloseSuppression(false, token: interactionToken)
-            vm.setHorizontalSwipeClaim(false, token: interactionToken)
-        }
+        .onDisappear { vm.setAutoCloseSuppression(false, token: interactionToken) }
         .confirmationDialog("Clear recent clipboard history?", isPresented: $clearConfirmation) {
             Button("Clear History", role: .destructive) { manager.clearHistory(); page = 0 }
         }

@@ -93,43 +93,13 @@ enum CompactClipboardPolicy {
     }
 }
 
-/// Turns a horizontal trackpad gesture into at most one page step, the way
-/// swiping between pages works in Safari: content follows the fingers, so
-/// moving the content left (negative delta) shows the next page.
-struct PageSwipeAccumulator: Equatable, Sendable {
-    /// Points of horizontal travel before a swipe counts.
-    var threshold: Double = 28
-    private(set) var total: Double = 0
-    private(set) var hasStepped = false
-
-    init(threshold: Double = 28) { self.threshold = threshold }
-
-    /// A new gesture started (fingers touched the trackpad).
-    mutating func begin() {
-        total = 0
-        hasStepped = false
-    }
-
-    /// Adds horizontal travel; returns +1 (next) or -1 (previous) once per gesture.
-    mutating func add(_ deltaX: Double) -> Int? {
-        guard !hasStepped, deltaX.isFinite else { return nil }
-        total += deltaX
-        guard abs(total) >= threshold else { return nil }
-        hasStepped = true
-        return total < 0 ? 1 : -1
-    }
-
-    /// A three-finger page swipe (NSEvent .swipe): positive deltaX goes back.
+/// Page steps for the clipboard's three-finger page swipe. Content follows
+/// the fingers, as in Safari: a swipe to the left shows the next page.
+enum ClipboardPageSwipe {
+    /// NSEvent .swipe: positive deltaX goes back.
     static func step(forSwipeDeltaX deltaX: Double) -> Int? {
         if deltaX > 0 { return -1 }
         if deltaX < 0 { return 1 }
-        return nil
-    }
-
-    /// A scroll wheel click (no gesture phases): one step per notch.
-    static func step(forWheelDeltaX deltaX: Double) -> Int? {
-        if deltaX > 0.5 { return -1 }
-        if deltaX < -0.5 { return 1 }
         return nil
     }
 

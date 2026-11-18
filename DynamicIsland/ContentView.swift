@@ -2677,11 +2677,6 @@ struct ContentView: View {
 
         if vm.notchState == .open {
             guard !lockScreenManager.isLocked, !hasAnyActivePopovers() else { return }
-            // The clipboard pages with this swipe while the pointer is over it.
-            guard !vm.isHorizontalSwipeClaimed else {
-                skipGestureActiveDirection = nil
-                return
-            }
             // One discrete horizontal trackpad gesture changes one visible tab.
             // Vertical-scroll suppression belongs to the up/down handlers.
             if skipGestureActiveDirection == nil && translation >= 40 {
