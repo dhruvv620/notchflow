@@ -62,6 +62,7 @@ struct ContentView: View {
     @State private var downloadManager = DownloadManager.shared
     @ObservedObject var shelfState = ShelfStateViewModel.shared
     @ObservedObject var whatsAppManager = WhatsAppManager.shared
+    @ObservedObject var meetingManager = MeetingManager.shared
     
     @Default(.enableStatsFeature) var enableStatsFeature
     @Default(.showCpuGraph) var showCpuGraph
@@ -321,6 +322,14 @@ struct ContentView: View {
     /// measured closed bounds. Include hover growth and the temporary battery
     /// HUD's real dimensions rather than treating every closed surface as the
     /// physical camera cutout.
+    private var isMeetingActivityVisible: Bool {
+        meetingManager.showsCountdown
+            && vm.notchState == .closed
+            && !vm.hideOnClosed
+            && !lockScreenManager.isLocked
+            && !isCurrentScreenExpansionVisible
+    }
+
     private var peekLineWidth: CGFloat {
         max(vm.closedNotchSize.width + 140, 280)
     }
@@ -339,6 +348,10 @@ struct ContentView: View {
         let closedPadding = activeCornerRadiusInsets.closed.bottom * 2
         var width = vm.closedNotchSize.width + baseHeight * 2 + closedPadding
         var height = baseHeight + hoverGrowth
+
+        if isMeetingActivityVisible {
+            width = max(width, vm.closedNotchSize.width + (MeetingLiveActivity.wingWidth + 6) * 2 + closedPadding)
+        }
 
         if isPeeking && vm.notchState == .closed {
             width = max(width, peekLineWidth + closedPadding)
@@ -1050,6 +1063,9 @@ struct ContentView: View {
                           }
                           .id("whatsapp-\(banner.id)")
                           .transition(.opacity.animation(.smooth(duration: 0.25)))
+                      } else if isMeetingActivityVisible {
+                          MeetingLiveActivity(isHovering: isHovering)
+                              .transition(.opacity.animation(.smooth(duration: 0.25)))
                       } else if canShowMusicDuringExpansion && musicPairingEligible {
                           MusicLiveActivity(secondary: musicSecondary)
                               .id("closed-music-live-activity")

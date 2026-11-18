@@ -3244,6 +3244,24 @@ struct CalendarSettings: View {
     var body: some View {
         Form {
             Section {
+                Defaults.Toggle(key: .enableMeetingCountdown) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Meeting countdown and Join button")
+                        Text("Five minutes before an event with a Zoom, Meet, Teams or Webex link, the notch shows a countdown and Join.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                Defaults.Toggle(key: .pauseMusicDuringMeetings) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Pause music during meetings")
+                        Text("Music pauses when the meeting starts and resumes when it ends, if NotchFlow paused it.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+            } header: {
+                Text("Meetings")
+            }
+            Section {
                 Defaults.Toggle(key: .enableRemindersFeature) {
                     Text("Enable Todos tab")
                 }
