@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Better incoming calls**: the call card shows the caller's photo from Contacts (or colored initials) with a pulse while it rings, their latest message from the last 15 minutes as the likely reason for the call, and a Message menu next to Decline with quick replies or a custom message. Declining with a message sends it through the linked WhatsApp account for WhatsApp calls, or through Messages to the caller's number from the call or Contacts. Contacts access is requested the first time a call needs it.
+
+### Fixed
+- The privacy configuration test still required the speech-recognition entitlement removed in 001435b, and pinned the old AppleScript usage text.
 - **Meetings in the notch** (Settings > Calendar): five minutes before an event with a Zoom, Google Meet, Teams, Webex or similar link (from its conference field, URL, location or notes), the closed notch shows the meeting, a live countdown and a Join button that stays for the first ten minutes. When the meeting starts, playing music pauses, and resumes when it ends if NotchFlow paused it.
 - **Opens on the tab that fits the moment** (Settings > General, on by default): Calendar from five minutes before a meeting until it ends, Timers while one runs, WhatsApp when there are unread messages, Notifications when something arrived since you last looked, Music while something plays, in that order and only among visible tabs. With nothing going on, the usual tab is kept. An announced notification or WhatsApp message still opens on itself.
 - **Peek before opening** (Settings > General, off by default): hovering the closed notch first shows a one-line preview of what matters now (a running timer, the playing song, a meeting within the hour, unread WhatsApp and notifications, or the time and battery). Click to open; with Open notch on hover on, keeping the pointer there for under a second more opens it too. Accidental passes over the notch no longer open the whole panel.

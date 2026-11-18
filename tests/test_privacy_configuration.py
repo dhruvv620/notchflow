@@ -20,7 +20,9 @@ class PrivacyConfigurationTests(unittest.TestCase):
         entitlements = plistlib.loads(ENTITLEMENTS.read_bytes())
 
         self.assertTrue(entitlements.get("com.apple.security.device.audio-input"))
-        self.assertTrue(entitlements.get("com.apple.developer.speech-recognition"))
+        # Removed in 001435b: the restricted speech-recognition entitlement
+        # cannot be signed ad hoc, and the usage description below suffices.
+        self.assertIsNone(entitlements.get("com.apple.developer.speech-recognition"))
         project = PROJECT.read_text()
         self.assertNotIn("ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;", project)
         self.assertEqual(project.count("ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = YES;"), 2)
@@ -54,9 +56,16 @@ class PrivacyConfigurationTests(unittest.TestCase):
         self.assertEqual(
             2,
             project.count(
-                'INFOPLIST_KEY_NSAppleEventsUsageDescription = "Atoll uses AppleScripts to control Spotify, Apple Music, and Notes.";'
+                'INFOPLIST_KEY_NSAppleEventsUsageDescription = "NotchFlow uses AppleScript to control Spotify, Apple Music and Notes, and to send the replies you type in the notch through Messages.";'
             ),
         )
+
+    def test_contacts_access_is_entitled_and_explained(self):
+        project = PROJECT.read_text()
+        entitlements = plistlib.loads(ENTITLEMENTS.read_bytes())
+
+        self.assertTrue(entitlements.get("com.apple.security.personal-information.addressbook"))
+        self.assertEqual(2, project.count("INFOPLIST_KEY_NSContactsUsageDescription ="))
 
     def test_full_access_reminder_api_has_matching_usage_text(self):
         project = PROJECT.read_text()

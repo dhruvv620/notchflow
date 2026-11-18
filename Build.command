@@ -95,6 +95,13 @@ printf '\nChecking native hosting and communications...\n'
 /usr/bin/xcrun swiftc -swift-version 5 -parse-as-library "$SOURCE_DIR/DynamicIsland/Communications/CommunicationModels.swift" "$SOURCE_DIR/DynamicIsland/Communications/NotificationCardPolicy.swift" "$SOURCE_DIR/tests/NotificationCardRegression.swift" -o "$BUILD_ROOT/NotificationCardRegression"
 "$BUILD_ROOT/NotificationCardRegression"
 
+printf '\nChecking call replies...\n'
+/usr/bin/xcrun swiftc -swift-version 5 -parse-as-library \
+    "$SOURCE_DIR/DynamicIsland/Communications/CallReplyPolicy.swift" \
+    "$SOURCE_DIR/DynamicIsland/Communications/NotchNotificationModels.swift" \
+    "$SOURCE_DIR/tests/CallReplyRegression.swift" -o "$BUILD_ROOT/CallReplyRegression"
+"$BUILD_ROOT/CallReplyRegression"
+
 printf '\nChecking meeting timing and join links...\n'
 /usr/bin/xcrun swiftc -swift-version 5 -parse-as-library \
     "$SOURCE_DIR/DynamicIsland/helpers/MeetingPolicy.swift" \
