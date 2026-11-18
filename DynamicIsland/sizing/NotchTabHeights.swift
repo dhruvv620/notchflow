@@ -16,7 +16,7 @@ extension NotchViews {
         case .home:
             // Taller while the lyrics panel is open under the player.
             return .fitsContent(shrinkBy: 0, growBy: MusicLyricsPanel.height + 6)
-        case .shelf, .llmUsage, .colorPicker, .clipboard, .cuely, .reminders, .calendar:
+        case .shelf, .llmUsage, .colorPicker, .clipboard, .cuely, .reminders, .calendar, .copyAction:
             return .preset
         // Stats and extension tabs keep their own row/preferred-height logic.
         case .stats, .extensionExperience:

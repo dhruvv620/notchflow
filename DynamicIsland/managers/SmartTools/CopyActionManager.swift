@@ -34,15 +34,33 @@ struct CopySuggestion: Identifiable, Equatable {
 }
 
 /// Watches the clipboard and, when the copied text is a tracking number,
-/// date, address, flight, e-mail, phone number or a sum, briefly offers the
-/// matching action in the closed notch.
+/// date, address, flight, e-mail, phone number or a sum, offers the matching
+/// action.
+///
+/// Clicking the closed notch opens it, so the closed notch only previews the
+/// copy for a few seconds. The actions live in a temporary Copied tab that the
+/// notch opens on while the copy is fresh; it goes away after `tabLifetime`
+/// (paused while the tab is on screen) or once an action is used.
 @MainActor
 final class CopyActionManager: ObservableObject {
     static let shared = CopyActionManager()
 
-    @Published private(set) var suggestion: CopySuggestion?
+    @Published private(set) var suggestion: CopySuggestion? {
+        didSet {
+            Self.hasLiveSuggestion = suggestion != nil
+            if suggestion == nil, oldValue != nil { leaveCopiedTabIfShowing() }
+        }
+    }
+    /// The preview under the closed notch, shown for the first few seconds.
+    @Published private(set) var showsInClosedNotch = false
 
-    private static let visibleFor: TimeInterval = 9
+    /// Readable from any context (tab lists are built outside the main actor's view updates).
+    nonisolated(unsafe) static var hasLiveSuggestion = false
+
+    static let closedNotchDuration: TimeInterval = 10
+    static let tabLifetime: TimeInterval = 30
+    private var closedWork: DispatchWorkItem?
+    private var isTabVisible = false
     private var timer: AnyCancellable?
     private var lastChangeCount = NSPasteboard.general.changeCount
     private var ownChangeCount: Int?
@@ -119,25 +137,65 @@ final class CopyActionManager: ObservableObject {
     }
 
     private func show(_ suggestion: CopySuggestion) {
-        withAnimation(.smooth(duration: 0.25)) { self.suggestion = suggestion }
-        scheduleHide(after: Self.visibleFor)
+        withAnimation(.smooth(duration: 0.25)) {
+            self.suggestion = suggestion
+            showsInClosedNotch = true
+        }
+        scheduleClosedPreviewEnd(after: Self.closedNotchDuration)
+        scheduleHide(after: Self.tabLifetime)
     }
 
-    /// Keeps the suggestion up while the pointer is over it.
+    /// Keeps the closed-notch preview up while the pointer is over it.
     func holdOpen(_ hovering: Bool) {
-        if hovering { hideWork?.cancel() } else if suggestion != nil { scheduleHide(after: 3) }
+        if hovering { closedWork?.cancel() } else if showsInClosedNotch { scheduleClosedPreviewEnd(after: 3) }
+    }
+
+    /// The Copied tab reports when it is on screen; its countdown pauses meanwhile.
+    func copiedTabVisible(_ visible: Bool) {
+        isTabVisible = visible
+        if visible {
+            hideWork?.cancel()
+            closedWork?.cancel()
+            showsInClosedNotch = false
+        } else if suggestion != nil {
+            scheduleHide(after: 8)
+        }
+    }
+
+    private func scheduleClosedPreviewEnd(after delay: TimeInterval) {
+        closedWork?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            withAnimation(.smooth(duration: 0.25)) { self?.showsInClosedNotch = false }
+        }
+        closedWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
     }
 
     private func scheduleHide(after delay: TimeInterval) {
         hideWork?.cancel()
-        let work = DispatchWorkItem { [weak self] in self?.dismiss() }
+        let work = DispatchWorkItem { [weak self] in
+            guard let self, !self.isTabVisible else { return }
+            self.dismiss()
+        }
         hideWork = work
         DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
     }
 
     func dismiss() {
         hideWork?.cancel()
-        withAnimation(.smooth(duration: 0.25)) { suggestion = nil }
+        closedWork?.cancel()
+        withAnimation(.smooth(duration: 0.25)) {
+            showsInClosedNotch = false
+            suggestion = nil
+        }
+    }
+
+    /// When the Copied tab goes away while it is the open tab, move to the first remaining tab.
+    private func leaveCopiedTabIfShowing() {
+        Task { @MainActor in
+            guard DynamicIslandViewCoordinator.shared.currentView == .copyAction else { return }
+            withAnimation(.smooth(duration: 0.25)) { TabSelectionView.validateCurrentSelection() }
+        }
     }
 
     func perform(_ action: CopySuggestionAction) {

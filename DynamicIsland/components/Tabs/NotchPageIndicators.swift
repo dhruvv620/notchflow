@@ -8,6 +8,7 @@ struct NotchPageIndicators: View {
     @ObservedObject private var preferences = NotchTabPreferences.shared
     @ObservedObject private var coordinator = DynamicIslandViewCoordinator.shared
     @ObservedObject private var appearance = NotchAppearanceModel.shared
+    @ObservedObject private var copyActions = CopyActionManager.shared
     @Default(.notchActivityIndicators) private var enabled
     @Default(.notchIndicatorStyle) private var style
 

@@ -94,7 +94,7 @@ struct SmartToolsSettings: View {
             Defaults.Toggle(key: .enableCopyActions) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Copy-to-action")
-                    Text("Copy a tracking number, date, address, flight, e-mail, phone number or sum and the notch offers Track, Add to Calendar, Directions or the answer. Text marked secret by password managers is skipped.")
+                    Text("Copy a tracking number, date, address, flight, e-mail, phone number or sum: the closed notch previews it, and a temporary Copied tab (the one the notch opens on) has Track, Add to Calendar, Directions or the answer. The tab goes away after 30 seconds or once used. Text marked secret by password managers is skipped.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }

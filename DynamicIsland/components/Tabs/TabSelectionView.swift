@@ -46,6 +46,8 @@ struct TabModel: Identifiable {
 struct TabSelectionView: View {
     @ObservedObject private var preferences = NotchTabPreferences.shared
     @ObservedObject private var appearance = NotchAppearanceModel.shared
+    // The temporary Copied tab comes and goes with the clipboard.
+    @ObservedObject private var copyActions = CopyActionManager.shared
     @ObservedObject private var whatsApp = WhatsAppManager.shared
     @ObservedObject var coordinator = DynamicIslandViewCoordinator.shared
     @ObservedObject private var extensionNotchExperienceManager = ExtensionNotchExperienceManager.shared
@@ -140,7 +142,12 @@ struct TabSelectionView: View {
         let ids = NotchTabOrderPolicy.visibleIDs(order: Defaults[.notchTabOrder], hidden: Defaults[.notchHiddenTabs],
                                                available: candidates.map(\.id), fallback: NotchBuiltinTab.music.rawValue)
         let lookup = Dictionary(uniqueKeysWithValues: candidates.map { ($0.id, $0) })
-        return ids.compactMap { lookup[$0] }
+        let ordered = ids.compactMap { lookup[$0] }
+        // A temporary tab for something just copied comes first while it lasts.
+        if CopyActionManager.hasLiveSuggestion {
+            return [TabModel(label: "Copied", icon: "doc.on.clipboard.fill", view: .copyAction)] + ordered
+        }
+        return ordered
     }
 
     static func validateCurrentSelection() {

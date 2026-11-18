@@ -70,6 +70,9 @@ struct FocusGuardLiveActivity: View {
 
 // MARK: - Copy-to-action
 
+/// A preview under the closed notch for something just copied. It has no
+/// buttons: any click opens the notch, which lands on the Copied tab where
+/// the actions are.
 struct CopyActionLiveActivity: View {
     @ObservedObject private var manager = CopyActionManager.shared
     @ObservedObject private var appearance = NotchAppearanceModel.shared
@@ -87,35 +90,120 @@ struct CopyActionLiveActivity: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
             } trailing: {
-                ForEach(suggestion.actions.prefix(isHovering ? 2 : 1)) { action in
-                    Button { manager.perform(action) } label: {
-                        Text(shortTitle(action))
-                            .font(.system(size: 10, weight: .bold))
-                            .lineLimit(1)
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 3)
-                            .background(Capsule().fill(appearance.accentColor))
-                            .foregroundStyle(appearance.accentForegroundColor)
-                    }
-                    .buttonStyle(.plain)
-                    .help(action.title)
+                HStack(spacing: 3) {
+                    Text(CopyActionPresentation.shortTitle(suggestion.primary))
+                        .font(.system(size: 10, weight: .bold))
+                        .lineLimit(1)
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 8, weight: .bold))
                 }
+                .foregroundStyle(appearance.accentColor)
             }
             .onHover { manager.holdOpen($0) }
-            .accessibilityElement(children: .contain)
-            .accessibilityLabel("Copied \(suggestion.text)")
+            .help("Open the notch to \(suggestion.primary.title.lowercased())")
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Copied \(suggestion.text). Open the notch for \(suggestion.primary.title).")
+        }
+    }
+}
+
+enum CopyActionPresentation {
+    /// Wings are narrow: "Track UPS package" becomes "Track".
+    static func shortTitle(_ action: CopySuggestionAction) -> String {
+        switch action.kind {
+        case .copy: return action.title
+        case .addToCalendar: return "Add to Calendar"
+        case .open: return action.title.hasPrefix("Track") ? "Track" : action.title
         }
     }
 
-    /// Wings are narrow: "Track UPS package" becomes "Track".
-    private func shortTitle(_ action: CopySuggestionAction) -> String {
-        switch action.kind {
-        case .copy: return action.title
-        case .addToCalendar: return "Add"
+    static func kindLabel(_ suggestion: CopySuggestion) -> String {
+        switch suggestion.primary.kind {
+        case .addToCalendar: return "Date"
+        case .copy: return "Sum"
         case .open:
-            if action.title.hasPrefix("Track") { return "Track" }
-            return action.title
+            let title = suggestion.primary.title
+            if title.hasPrefix("Track flight") { return "Flight" }
+            if title.hasPrefix("Track") { return "Tracking number" }
+            if title == "Directions" { return "Address" }
+            if title == "Call" { return "Phone number" }
+            if title == "Email" { return "E-mail address" }
+            return "Copied"
         }
+    }
+}
+
+/// The temporary Copied tab: what was copied and what to do with it.
+struct NotchCopyActionView: View {
+    @ObservedObject private var manager = CopyActionManager.shared
+    @ObservedObject private var appearance = NotchAppearanceModel.shared
+
+    var body: some View {
+        Group {
+            if let suggestion = manager.suggestion {
+                VStack(alignment: .leading, spacing: NotchTokens.Spacing.m) {
+                    HStack(spacing: NotchTokens.Spacing.s) {
+                        Image(systemName: suggestion.primary.symbol)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(appearance.accentColor)
+                        Text(CopyActionPresentation.kindLabel(suggestion))
+                            .font(NotchTokens.Typography.title)
+                        Spacer(minLength: 0)
+                        NotchIconButton(symbol: "xmark", help: "Dismiss", action: manager.dismiss)
+                    }
+                    NotchCard {
+                        Text(suggestion.text)
+                            .font(.system(size: 15, weight: .medium))
+                            .lineLimit(3)
+                            .truncationMode(.middle)
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    HStack(spacing: NotchTokens.Spacing.m) {
+                        ForEach(Array(suggestion.actions.enumerated()), id: \.element.id) { index, action in
+                            CopyActionButton(action: action, prominent: index == 0) {
+                                manager.perform(action)
+                            }
+                        }
+                        Spacer(minLength: 0)
+                    }
+                    Text("Goes away on its own a few seconds after you leave this tab.")
+                        .font(NotchTokens.Typography.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .notchTabPadding()
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            } else {
+                NotchEmptyState(symbol: "doc.on.clipboard", title: "Nothing copied")
+            }
+        }
+        .onAppear { manager.copiedTabVisible(true) }
+        .onDisappear { manager.copiedTabVisible(false) }
+    }
+}
+
+private struct CopyActionButton: View {
+    let action: CopySuggestionAction
+    let prominent: Bool
+    let perform: () -> Void
+    @ObservedObject private var appearance = NotchAppearanceModel.shared
+    @State private var isHovering = false
+
+    var body: some View {
+        Button(action: perform) {
+            Label(action.title, systemImage: action.symbol)
+                .font(.system(size: 13, weight: .semibold))
+                .padding(.horizontal, 16)
+                .padding(.vertical, 9)
+                .background(
+                    Capsule().fill(prominent
+                        ? appearance.accentColor.opacity(isHovering ? 1 : 0.88)
+                        : Color.white.opacity(isHovering ? 0.16 : 0.1))
+                )
+                .foregroundStyle(prominent ? appearance.accentForegroundColor : Color.primary)
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovering = $0 }
     }
 }
 

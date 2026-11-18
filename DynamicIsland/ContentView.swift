@@ -356,7 +356,7 @@ struct ContentView: View {
     }
 
     private var isCopyActionVisible: Bool {
-        copyActions.suggestion != nil && canShowClosedActivity
+        copyActions.showsInClosedNotch && copyActions.suggestion != nil && canShowClosedActivity
     }
 
     private var isFocusGuardVisible: Bool {
@@ -1371,6 +1371,7 @@ struct ContentView: View {
         case .cuely: NotchCuelyView()
         case .terminal: NotchTerminalView()
         case .whatsapp: NotchWhatsAppView()
+        case .copyAction: NotchCopyActionView()
         case .extensionExperience:
             if let payload = currentExtensionTabPayload() {
                 NotchScrollableContent { ExtensionNotchExperienceTabView(payload: payload) }
@@ -2142,7 +2143,10 @@ struct ContentView: View {
         if visibleCommunicationCall != nil { showCallControls = true }
         let announced = visibleCommunicationCall == nil ? visibleCommunicationNotification : nil
         // Open on the tab that fits the moment, unless an alert decides it.
-        if announced == nil, visibleCommunicationCall == nil,
+        // Something just copied wins: its tab holds the one-tap actions.
+        if announced == nil, visibleCommunicationCall == nil, CopyActionManager.hasLiveSuggestion {
+            coordinator.currentView = .copyAction
+        } else if announced == nil, visibleCommunicationCall == nil,
            let contextView = NotchContextTabResolver.preferredView() {
             coordinator.currentView = contextView
         }
