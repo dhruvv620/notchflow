@@ -44,12 +44,32 @@ google-gemini/gemini-cli). Codex and Cursor follow their published hook formats 
 third-party guides; their official pages could not be checked when this was written, so both fail
 safe: an answer they don't understand leaves the agent's own prompt in place.
 
+## Conversations in the notch
+
+The AI Agents tab lists **Live** sessions (from the hooks) and **Recent** ones: Claude Code
+transcripts in `~/.claude/projects/<folder>/<session>.jsonl` and Codex rollouts in
+`~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl` from the last two weeks (only the start of each file
+is read for the list). Selecting one shows the conversation: your messages, the agent's replies,
+and its tool steps folded into one line per run ("6 steps · Ran npm test"). The file is re-read
+every second while the conversation is open, so a session running anywhere updates live.
+
+Typing in the conversation keeps it going:
+
+- a Claude Code session waiting in its terminal after a turn gets the message there (asyncRewake);
+- otherwise NotchFlow runs the agent in the background in the session's folder:
+  `claude -p --resume <id> --output-format stream-json --verbose '<message>'` or
+  `codex exec --json resume <id> '<message>'`, in a login shell so your PATH applies.
+  Its approvals arrive in the notch through the hooks, and the reply appears as the transcript grows.
+
+While a session is busy in its own terminal, the field waits for that turn to finish. Gemini CLI and
+Cursor sessions show their status but not their conversation (their session files are not read yet).
+
 ## New task
 
-**New task** in the AI Agents tab: pick the agent (Claude Code, Codex, Gemini CLI, Cursor Agent) and
-a project folder, type the task, and it opens in a new Terminal or iTerm window
-(`cd <folder> && claude '<task>'`). Its approvals and progress come back to the notch through the
-hooks above.
+**New** in the AI Agents tab: pick the agent and a project folder and type the task. Claude Code and
+Codex run right in the notch (`claude -p …` / `codex exec …`) and open as a conversation there;
+tick "Open in Terminal instead" (or pick Gemini CLI / Cursor Agent) to open a Terminal or iTerm
+window (`cd <folder> && claude '<task>'`). Either way approvals and progress come back to the notch.
 
 ## Scripts and any other tool
 

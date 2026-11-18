@@ -165,6 +165,13 @@ printf '\nChecking AI agent hooks (Claude Code events, approvals, settings.json 
     "$SOURCE_DIR/tests/AgentHookRegression.swift" -o "$BUILD_ROOT/AgentHookRegression"
 "$BUILD_ROOT/AgentHookRegression"
 
+printf '\nChecking agent conversations (Claude Code and Codex session files, resume commands)...\n'
+/usr/bin/xcrun swiftc -swift-version 5 -parse-as-library \
+    "$SOURCE_DIR/DynamicIsland/helpers/AgentHookPolicy.swift" \
+    "$SOURCE_DIR/DynamicIsland/helpers/AgentTranscriptPolicy.swift" \
+    "$SOURCE_DIR/tests/AgentTranscriptRegression.swift" -o "$BUILD_ROOT/AgentTranscriptRegression"
+"$BUILD_ROOT/AgentTranscriptRegression"
+
 printf '\nChecking smart tools (distraction meter, copy-to-action, replies, build watcher)...\n'
 /usr/bin/xcrun swiftc -swift-version 5 -parse-as-library \
     "$SOURCE_DIR/DynamicIsland/helpers/SmartToolsPolicy.swift" \

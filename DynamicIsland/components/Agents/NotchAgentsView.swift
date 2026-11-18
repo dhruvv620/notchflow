@@ -4,9 +4,11 @@ import AppKit
 import Defaults
 import SwiftUI
 
-/// The AI Agents tab: what an agent is waiting on you for, and every running session.
+/// The AI Agents tab: approvals first; otherwise your sessions on the left
+/// and the open conversation on the right, where you can keep it going.
 struct NotchAgentsView: View {
     @ObservedObject private var hub = AgentHub.shared
+    @ObservedObject private var conversations = AgentConversations.shared
     @EnvironmentObject private var vm: DynamicIslandViewModel
     @State private var interactionToken = UUID()
     @State private var composing = false
@@ -23,69 +25,45 @@ struct NotchAgentsView: View {
                     }
                 }
             } else {
-                VStack(alignment: .leading, spacing: NotchTokens.Spacing.s) {
-                    header
-                    if composing {
-                        AgentTaskComposer { composing = false }
+                HStack(alignment: .top, spacing: NotchTokens.Spacing.m) {
+                    AgentSessionList(composing: $composing)
+                        .frame(width: 210)
+                    Rectangle().fill(Color.white.opacity(0.08)).frame(width: 1)
+                    Group {
+                        if composing {
+                            AgentTaskComposer { withAnimation(NotchTokens.Motion.standard) { composing = false } }
+                        } else if let selected = conversations.selected {
+                            AgentChatView(summary: selected)
+                        } else {
+                            NotchEmptyState(symbol: "sparkles",
+                                            title: hub.sessions.isEmpty && conversations.recent.isEmpty ? "No sessions yet" : "Pick a session",
+                                            detail: AgentSetup.anyAgentConnected
+                                                ? "Pick one on the left to see its conversation and keep it going, or start a New task."
+                                                : "Connect Claude Code or Codex in Settings > AI Agents, then start a New task here.")
+                        }
                     }
-                    if hub.sessions.isEmpty {
-                        if !composing { emptyState }
-                    } else {
-                        sessionList
-                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 }
             }
         }
         .notchTabPadding()
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .onChange(of: hub.requests.isEmpty) { _, empty in
-            // Keep the notch open while you decide.
-            vm.setAutoCloseSuppression(!empty, token: interactionToken)
+        .onChange(of: hub.requests.isEmpty) { _, _ in updateSuppression() }
+        .onChange(of: composing) { _, _ in updateSuppression() }
+        .onAppear {
+            conversations.refreshList(force: true)
+            if let selected = conversations.selected { conversations.select(selected) }
+            updateSuppression()
         }
-        .onChange(of: composing) { _, open in
-            vm.setAutoCloseSuppression(open || !hub.requests.isEmpty, token: interactionToken)
-        }
-        .onAppear { vm.setAutoCloseSuppression(!hub.requests.isEmpty, token: interactionToken) }
-        .onDisappear { vm.setAutoCloseSuppression(false, token: interactionToken) }
-    }
-
-    private var header: some View {
-        HStack(spacing: NotchTokens.Spacing.s) {
-            Text("AI Agents").font(NotchTokens.Typography.title)
-            if !hub.sessions.isEmpty {
-                NotchBadge(text: "\(hub.sessions.count)")
-            }
-            Spacer(minLength: 0)
-            NotchPillButton(title: composing ? "Cancel" : "New task", symbol: composing ? "xmark" : "plus", prominent: !composing) {
-                withAnimation(NotchTokens.Motion.standard) { composing.toggle() }
-            }
+        .onDisappear {
+            conversations.stopFollowing()
+            vm.setAutoCloseSuppression(false, token: interactionToken)
         }
     }
 
-    private var emptyState: some View {
-        let connected = AgentSetup.anyAgentConnected
-        return NotchEmptyState(symbol: "sparkles", title: "No agents running",
-                               detail: connected
-                                   ? "Start one with New task, or in any terminal. Approvals, questions and progress show up here."
-                                   : "Connect Claude Code, Codex, Cursor or Gemini in Settings > AI Agents to work with them from the notch.") {
-            if !connected {
-                NotchPillButton(title: "Set up", symbol: "gearshape") {
-                    SettingsWindowController.shared.showWindow()
-                }
-            }
-        }
-    }
-
-    private var sessionList: some View {
-        VStack(alignment: .leading, spacing: NotchTokens.Spacing.s) {
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(spacing: NotchTokens.Spacing.xs) {
-                    ForEach(hub.sessions) { session in
-                        AgentSessionRow(session: session)
-                    }
-                }
-            }
-        }
+    /// Keep the notch open while you decide or type.
+    private func updateSuppression() {
+        vm.setAutoCloseSuppression(composing || !hub.requests.isEmpty, token: interactionToken)
     }
 }
 
@@ -299,101 +277,284 @@ private struct AgentButton: View {
     }
 }
 
-// MARK: - Sessions
+// MARK: - Session list
 
-private struct AgentSessionRow: View {
-    let session: AgentSession
+private struct AgentSessionList: View {
+    @Binding var composing: Bool
     @ObservedObject private var hub = AgentHub.shared
-    @State private var replying = false
-    @State private var reply = ""
-    @FocusState private var replyFocused: Bool
+    @ObservedObject private var conversations = AgentConversations.shared
+
+    private var recentOnly: [AgentSessionSummary] {
+        let live = Set(hub.sessions.map(\.id))
+        return conversations.recent.filter { !live.contains($0.id) }
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: NotchTokens.Spacing.xs) {
-            NotchRow(title: session.project, subtitle: subtitle, action: {
-                if hub.canReply(to: session) {
-                    withAnimation(NotchTokens.Motion.standard) { replying.toggle() }
-                } else {
-                    hub.openWindow(bundleID: session.appBundleID)
-                }
-            }) {
-                ZStack {
-                    Circle().fill(color.opacity(0.18)).frame(width: 24, height: 24)
-                    if session.isWorking {
-                        ProgressView().controlSize(.mini)
-                    } else {
-                        Image(systemName: symbol).font(.system(size: 10, weight: .bold)).foregroundStyle(color)
-                    }
-                }
-            } trailing: {
-                HStack(spacing: NotchTokens.Spacing.xs) {
-                    if let started = session.turnStartedAt, session.isWorking {
-                        TimelineView(.periodic(from: .now, by: 1)) { context in
-                            Text(elapsed(since: started, now: context.date))
-                                .font(NotchTokens.Typography.caption.monospacedDigit())
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    if hub.canReply(to: session) {
-                        NotchIconButton(symbol: "arrowshape.turn.up.left", help: "Reply from the notch", size: 18) {
-                            withAnimation(NotchTokens.Motion.standard) { replying.toggle() }
-                        }
-                    }
-                    if session.appBundleID != nil {
-                        NotchIconButton(symbol: "arrow.up.forward.app", help: "Show its window", size: 18) {
-                            hub.openWindow(bundleID: session.appBundleID)
-                        }
-                    }
-                    NotchIconButton(symbol: "xmark", help: "Remove from the list", size: 18) { hub.dismiss(session) }
+        VStack(alignment: .leading, spacing: NotchTokens.Spacing.s) {
+            HStack(spacing: NotchTokens.Spacing.s) {
+                Text("AI Agents").font(NotchTokens.Typography.title)
+                Spacer(minLength: 0)
+                NotchPillButton(title: "New", symbol: "plus", prominent: !composing) {
+                    withAnimation(NotchTokens.Motion.standard) { composing.toggle() }
                 }
             }
-            if replying && hub.canReply(to: session) {
-                NotchComposeField(placeholder: "Reply to \(session.agent.displayName) in \(session.project)", text: $reply,
-                                  onSend: send, onCancel: { replying = false }, isFocused: $replyFocused)
-                    .padding(.leading, 30)
-                    .onAppear { replyFocused = true }
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 3) {
+                    if conversations.startingNewSession {
+                        AgentListRow(symbol: "sparkle", title: "Starting…", subtitle: "New session", tint: .white,
+                                     busy: true, selected: false) {}
+                    }
+                    if !hub.sessions.isEmpty {
+                        NotchSectionHeader(title: "Live")
+                        ForEach(hub.sessions) { session in
+                            AgentListRow(symbol: session.agent.symbol, title: session.project, subtitle: liveSubtitle(session),
+                                         tint: tint(session.state), busy: session.isWorking || conversations.isRunning(session.id),
+                                         selected: conversations.selected?.id == session.id) {
+                                composing = false
+                                if session.agent == .claudeCode || session.agent == .codex {
+                                    conversations.select(sessionID: session.id)
+                                } else {
+                                    hub.openWindow(bundleID: session.appBundleID)
+                                }
+                            }
+                        }
+                    }
+                    if !recentOnly.isEmpty {
+                        NotchSectionHeader(title: "Recent")
+                        ForEach(recentOnly) { summary in
+                            AgentListRow(symbol: summary.agent == .claude ? AgentKind.claudeCode.symbol : AgentKind.codex.symbol,
+                                         title: summary.project, subtitle: summary.title, tint: .secondary,
+                                         busy: conversations.isRunning(summary.id),
+                                         selected: conversations.selected?.id == summary.id) {
+                                composing = false
+                                conversations.select(summary)
+                            }
+                        }
+                    }
+                    if hub.sessions.isEmpty && recentOnly.isEmpty && !conversations.startingNewSession {
+                        Text("Claude Code and Codex sessions from the last two weeks appear here.")
+                            .font(NotchTokens.Typography.caption)
+                            .foregroundStyle(.secondary)
+                            .padding(.top, NotchTokens.Spacing.s)
+                    }
+                }
             }
         }
-        .help(session.lastPrompt.map { "Asked: \($0)" } ?? session.cwd)
-        .onChange(of: hub.canReply(to: session)) { _, canReply in if !canReply { replying = false } }
     }
 
-    private func send() {
-        hub.reply(to: session, text: reply)
-        reply = ""
-        replying = false
-    }
-
-    private var subtitle: String {
+    private func liveSubtitle(_ session: AgentSession) -> String {
         switch session.state {
-        case .ready: return "\(session.agent.displayName) · Ready"
-        case .working(let activity): return "\(session.agent.displayName) · \(activity)"
+        case .ready: return "Ready"
+        case .working(let activity): return activity
         case .waiting(let reason): return "Needs you · \(reason)"
         case .done(let summary): return "Done · \(summary)"
         }
     }
 
-    private var symbol: String {
-        switch session.state {
-        case .ready: return "circle"
-        case .working: return "ellipsis"
-        case .waiting: return "exclamationmark"
-        case .done: return "checkmark"
-        }
-    }
-
-    private var color: Color {
-        switch session.state {
+    private func tint(_ state: AgentSession.State) -> Color {
+        switch state {
         case .ready: return .secondary
         case .working: return .white
         case .waiting: return .orange
         case .done: return .green
         }
     }
+}
 
-    private func elapsed(since start: Date, now: Date) -> String {
-        let seconds = max(0, Int(now.timeIntervalSince(start)))
-        return seconds < 60 ? "\(seconds)s" : "\(seconds / 60)m"
+private struct AgentListRow: View {
+    let symbol: String
+    let title: String
+    let subtitle: String
+    let tint: Color
+    let busy: Bool
+    let selected: Bool
+    let action: () -> Void
+    @ObservedObject private var appearance = NotchAppearanceModel.shared
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: NotchTokens.Spacing.s) {
+                ZStack {
+                    Circle().fill(tint.opacity(0.16)).frame(width: 22, height: 22)
+                    if busy {
+                        ProgressView().controlSize(.mini)
+                    } else {
+                        Image(systemName: symbol).font(.system(size: 9, weight: .bold)).foregroundStyle(tint)
+                    }
+                }
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(title).font(NotchTokens.Typography.bodyEmphasis).lineLimit(1)
+                    Text(subtitle).font(NotchTokens.Typography.caption).foregroundStyle(.secondary).lineLimit(1)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 6)
+            .padding(.vertical, 4)
+            .background(RoundedRectangle(cornerRadius: NotchTokens.Radius.row, style: .continuous)
+                .fill(selected ? appearance.accentColor.opacity(0.22) : Color.white.opacity(hovering ? 0.08 : 0.03)))
+            .contentShape(RoundedRectangle(cornerRadius: NotchTokens.Radius.row, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+    }
+}
+
+// MARK: - Conversation
+
+private struct AgentChatView: View {
+    let summary: AgentSessionSummary
+    @ObservedObject private var hub = AgentHub.shared
+    @ObservedObject private var conversations = AgentConversations.shared
+    @ObservedObject private var appearance = NotchAppearanceModel.shared
+    @State private var draft = ""
+    @State private var expandedGroups: Set<String> = []
+    @FocusState private var focused: Bool
+
+    private enum Row: Identifiable {
+        case message(AgentChatItem)
+        case tools([AgentChatItem])
+        var id: String {
+            switch self {
+            case .message(let item): return item.id
+            case .tools(let items): return "tools-" + (items.first?.id ?? "")
+            }
+        }
+    }
+
+    /// Consecutive tool steps fold into one line so the conversation stays readable.
+    private var rows: [Row] {
+        var rows: [Row] = []
+        var tools: [AgentChatItem] = []
+        for item in conversations.items {
+            if item.role == .tool {
+                tools.append(item)
+            } else {
+                if !tools.isEmpty { rows.append(.tools(tools)); tools = [] }
+                rows.append(.message(item))
+            }
+        }
+        if !tools.isEmpty { rows.append(.tools(tools)) }
+        return rows
+    }
+
+    private var live: AgentSession? { hub.sessions.first { $0.id == summary.id } }
+    private var isBusy: Bool { conversations.isRunning(summary.id) || live?.isWorking == true }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: NotchTokens.Spacing.s) {
+            header
+            ScrollViewReader { proxy in
+                ScrollView(.vertical, showsIndicators: false) {
+                    LazyVStack(alignment: .leading, spacing: NotchTokens.Spacing.s) {
+                        ForEach(rows) { row in
+                            switch row {
+                            case .message(let item): bubble(item.text, mine: item.role == .user)
+                            case .tools(let items): toolGroup(items)
+                            }
+                        }
+                        ForEach(Array(conversations.pendingMessages.enumerated()), id: \.offset) { _, text in
+                            bubble(text, mine: true).opacity(0.6)
+                        }
+                        if isBusy {
+                            HStack(spacing: 6) {
+                                ProgressView().controlSize(.mini)
+                                Text(workingText).font(NotchTokens.Typography.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                        Color.clear.frame(height: 1).id("bottom")
+                    }
+                }
+                .onAppear { proxy.scrollTo("bottom", anchor: .bottom) }
+                .onChange(of: conversations.items.count) { _, _ in
+                    withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo("bottom", anchor: .bottom) }
+                }
+                .onChange(of: conversations.pendingMessages.count) { _, _ in proxy.scrollTo("bottom", anchor: .bottom) }
+            }
+            if let error = conversations.lastError {
+                Text(error).font(NotchTokens.Typography.caption).foregroundStyle(.orange).lineLimit(2).textSelection(.enabled)
+            }
+            NotchComposeField(placeholder: placeholder, text: $draft, isSending: conversations.isRunning(summary.id),
+                              isEnabled: conversations.canSend, onSend: send, isFocused: $focused)
+        }
+    }
+
+    private var header: some View {
+        HStack(spacing: NotchTokens.Spacing.s) {
+            Image(systemName: summary.agent == .claude ? AgentKind.claudeCode.symbol : AgentKind.codex.symbol)
+                .foregroundStyle(Color.orange)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(summary.project).font(NotchTokens.Typography.headline).lineLimit(1)
+                Text(summary.title).font(NotchTokens.Typography.caption).foregroundStyle(.secondary).lineLimit(1)
+            }
+            Spacer(minLength: 0)
+            if conversations.isRunning(summary.id) {
+                NotchPillButton(title: "Stop", symbol: "stop.fill") { conversations.stop(summary.id) }
+            }
+            if let app = live?.appBundleID {
+                NotchIconButton(symbol: "arrow.up.forward.app", help: "Show its terminal") { hub.openWindow(bundleID: app) }
+            }
+        }
+    }
+
+    private var workingText: String {
+        if case .working(let activity) = live?.state { return activity }
+        return "Working…"
+    }
+
+    private var placeholder: String {
+        let name = summary.agent == .claude ? "Claude" : "Codex"
+        if conversations.isRunning(summary.id) { return "\(name) is working…" }
+        if let live, live.isWorking { return "\(name) is working in its terminal…" }
+        return "Message \(name) in \(summary.project)"
+    }
+
+    private func send() {
+        conversations.send(draft)
+        draft = ""
+    }
+
+    private func bubble(_ text: String, mine: Bool) -> some View {
+        HStack {
+            if mine { Spacer(minLength: 40) }
+            Text(LocalizedStringKey(text))
+                .font(.system(size: 12))
+                .textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .background(RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(mine ? appearance.accentColor.opacity(0.28) : Color.white.opacity(0.07)))
+            if !mine { Spacer(minLength: 40) }
+        }
+    }
+
+    private func toolGroup(_ items: [AgentChatItem]) -> some View {
+        let key = items.first?.id ?? ""
+        let expanded = expandedGroups.contains(key)
+        return VStack(alignment: .leading, spacing: 2) {
+            Button {
+                if expanded { expandedGroups.remove(key) } else { expandedGroups.insert(key) }
+            } label: {
+                HStack(spacing: 5) {
+                    Image(systemName: expanded ? "chevron.down" : "chevron.right").font(.system(size: 8, weight: .bold))
+                    Text(items.count == 1 ? items[0].text : "\(items.count) steps · \(items.last?.text ?? "")")
+                        .lineLimit(1)
+                }
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            if expanded && items.count > 1 {
+                ForEach(items) { item in
+                    Text(item.text)
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                        .padding(.leading, 13)
+                }
+            }
+        }
     }
 }
 
@@ -492,28 +653,33 @@ struct AgentLiveActivity: View {
 
 // MARK: - New task
 
-/// Starts an agent with a first prompt in a new Terminal or iTerm window.
+/// Starts an agent with a first prompt: here in the notch (Claude Code,
+/// Codex), or in a new Terminal or iTerm window.
 private struct AgentTaskComposer: View {
     let onStarted: () -> Void
     @ObservedObject private var hub = AgentHub.shared
+    @ObservedObject private var conversations = AgentConversations.shared
     @Default(.agentLaunchAgent) private var agentValue
     @Default(.agentRecentProjects) private var recentProjects
+    @Default(.agentRunInTerminal) private var runInTerminal
     @State private var directory = ""
     @State private var prompt = ""
     @FocusState private var promptFocused: Bool
 
     private var agent: AgentHookPolicy.LaunchAgent { AgentHookPolicy.LaunchAgent(rawValue: agentValue) ?? .claude }
+    /// Gemini CLI and Cursor Agent run in a terminal; their sessions aren't read here yet.
+    private var runsHere: Bool { !runInTerminal && (agent == .claude || agent == .codex) }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: NotchTokens.Spacing.s) {
+        VStack(alignment: .leading, spacing: NotchTokens.Spacing.m) {
+            Text("New task").font(NotchTokens.Typography.title)
             HStack(spacing: NotchTokens.Spacing.s) {
                 Menu {
                     ForEach(AgentHookPolicy.LaunchAgent.allCases, id: \.rawValue) { option in
                         Button(option.title) { agentValue = option.rawValue }
                     }
                 } label: {
-                    Label(agent.title, systemImage: "sparkles")
-                        .font(NotchTokens.Typography.captionEmphasis)
+                    Label(agent.title, systemImage: "sparkles").font(NotchTokens.Typography.captionEmphasis)
                 }
                 .menuStyle(.borderlessButton)
                 .fixedSize()
@@ -535,15 +701,21 @@ private struct AgentTaskComposer: View {
             }
             NotchComposeField(placeholder: "What should \(agent.title) do?", text: $prompt, onSend: start,
                               onCancel: onStarted, isFocused: $promptFocused)
+            Toggle(isOn: $runInTerminal) {
+                Text("Open in \(Defaults[.agentTerminalApp]) instead").font(NotchTokens.Typography.caption)
+            }
+            .toggleStyle(.checkbox)
+            .disabled(agent == .gemini || agent == .cursor)
+            Text(runsHere
+                 ? "Runs here in the notch: the conversation, its progress and its approvals stay in this tab."
+                 : "Opens in \(Defaults[.agentTerminalApp]); its progress and approvals still come back here.")
+                .font(NotchTokens.Typography.caption)
+                .foregroundStyle(.secondary)
             if let error = hub.launchError {
                 Text(error).font(NotchTokens.Typography.caption).foregroundStyle(.orange).lineLimit(2)
-            } else {
-                Text("Opens in \(Defaults[.agentTerminalApp]) so you can watch it; its approvals and progress come back here.")
-                    .font(NotchTokens.Typography.caption).foregroundStyle(.secondary)
             }
+            Spacer(minLength: 0)
         }
-        .padding(NotchTokens.Spacing.m)
-        .background { NotchElementSurface(cornerRadius: NotchTokens.Radius.card) }
         .onAppear {
             if directory.isEmpty { directory = recentProjects.first ?? "" }
             promptFocused = true
@@ -551,7 +723,11 @@ private struct AgentTaskComposer: View {
     }
 
     private func start() {
-        hub.startTask(agent: agent, prompt: prompt, directory: directory)
+        if runsHere {
+            conversations.start(agent: agent == .codex ? .codex : .claude, prompt: prompt, directory: directory)
+        } else {
+            hub.startTask(agent: agent, prompt: prompt, directory: directory)
+        }
         prompt = ""
         onStarted()
     }

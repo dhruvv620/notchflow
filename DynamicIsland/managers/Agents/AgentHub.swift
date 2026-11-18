@@ -11,7 +11,7 @@ extension Defaults.Keys {
     /// How long an approval waits in the notch before the agent asks in its own window.
     static let agentApprovalWaitSeconds = Key<Int>("agentApprovalWaitSeconds", default: 120)
     /// When the agent's own window is in front, let it ask there instead of the notch.
-    static let agentAskInWindowWhenInFront = Key<Bool>("agentAskInWindowWhenInFront", default: true)
+    static let agentAskInWindowWhenInFront = Key<Bool>("agentAskInWindowWhenInFront", default: false)
     /// Show "working" status under the closed notch (needs-you and done always show).
     static let agentShowWorkingInClosedNotch = Key<Bool>("agentShowWorkingInClosedNotch", default: true)
     /// Where "New task" opens agents: Terminal or iTerm.
