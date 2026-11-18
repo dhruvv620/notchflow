@@ -25,7 +25,7 @@ import SwiftUI
 import Defaults
 
 extension Color {
-    /// Returns the accent color configured in settings, falling back to the system accent color.
+    /// The accent chosen in Settings > Appearance (NotchAppearanceModel mirrors it into this key).
     static var effectiveAccent: Color {
         Defaults[.accentColor]
     }

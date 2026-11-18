@@ -245,6 +245,15 @@ struct NotchAppearanceSettingsSection: View {
             }
             .toggleStyle(.switch)
             .disabled(reduceMotion)
+            Defaults.Toggle(key: .useModernCloseAnimation) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Simpler close animation")
+                    Text("Closes with a plain spring instead of the blur and bounce.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            .toggleStyle(.switch)
+            .settingsHighlight(id: highlightID("Use simpler close animation"))
             if systemReduceMotion {
                 Text("Reduce Motion is also enabled in macOS Accessibility settings.")
                     .font(.caption).foregroundStyle(.secondary)

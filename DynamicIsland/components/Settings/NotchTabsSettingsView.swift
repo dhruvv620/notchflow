@@ -130,52 +130,57 @@ struct NotchTabsSettingsView: View {
                     featureToggle("Calendar", symbol: "calendar", key: .showCalendar, destination: "calendar")
                     }
                     Group {
-                    featureToggle("Communications", symbol: "bell.badge", key: .communicationsEnabled, destination: "communications")
+                    featureToggle("Notifications & Calls", symbol: "bell.badge", key: .communicationsEnabled, destination: "communications")
                     featureToggle("WhatsApp", symbol: "message.fill", key: .enableWhatsAppFeature, destination: "whatsapp")
                     }
                     featureToggle("Todos", symbol: "checklist", key: .enableRemindersFeature, destination: "calendar")
                     featureToggle("Clipboard", symbol: "doc.on.clipboard", key: .enableClipboardManager, destination: "clipboard")
-                    featureToggle("Cuely", symbol: "text.quote", key: .enableCuelyFeature, destination: "tabsAndFeatures")
+                    featureToggle("Cuely", symbol: "text.quote", key: .enableCuelyFeature, destination: nil)
                     featureToggle("Notes", symbol: "note.text", key: .enableNotes, destination: "notes")
                     featureToggle("Stats", symbol: "chart.xyaxis.line", key: .enableStatsFeature, destination: "stats")
                     featureToggle("AI Usage", symbol: "chart.bar.doc.horizontal", key: .enableLLMUsageFeature, destination: "stats")
                     featureToggle("Terminal", symbol: "apple.terminal", key: .enableTerminalFeature, destination: "terminal")
                 }.padding(6)
             }
-            GroupBox("Quick tools and activities") {
+            GroupBox("In the closed notch") {
                 VStack(spacing: 10) {
-                    featureToggle("Color picker", symbol: "eyedropper", key: .enableColorPickerFeature, destination: "colorPicker")
+                    featureToggle("Upcoming reminders", symbol: "calendar.badge.clock", key: .enableReminderLiveActivity, destination: "calendar")
+                    featureToggle("Meeting countdown", symbol: "video.fill", key: .enableMeetingCountdown, destination: "calendar")
                     featureToggle("Download alerts", symbol: "arrow.down.circle", key: .enableDownloadListener, destination: "downloads")
+                    featureToggle("Copy-to-action", symbol: "doc.on.clipboard.fill", key: .enableCopyActions, destination: "smartTools")
+                    featureToggle("Distraction meter", symbol: "eye.trianglebadge.exclamationmark", key: .enableFocusGuard, destination: "smartTools")
+                    featureToggle("Build watcher", symbol: "hammer", key: .enableBuildWatcher, destination: "smartTools")
                     featureToggle("System HUDs", symbol: "speaker.wave.2", key: .enableSystemHUD, destination: "hudAndOSD")
-                    featureToggle("Upcoming reminder activity", symbol: "calendar.badge.clock", key: .enableReminderLiveActivity, destination: "liveActivities")
-                    settingsLink("Appearance and size", symbol: "paintpalette", destination: "appearance")
-                    settingsLink("Live activities", symbol: "waveform.path.ecg", destination: "liveActivities")
-                    settingsLink("Calendar and Reminders access", symbol: "calendar", destination: "calendar")
-                    settingsLink("Device and audio controls", symbol: "headphones", destination: "devices")
-                    settingsLink("Battery", symbol: "battery.100", destination: "battery")
-                    settingsLink("Keyboard shortcuts", symbol: "keyboard", destination: "shortcuts")
                 }.padding(6)
             }
-            Text("Turning Clipboard off stops collecting new copies. Hiding a tab only removes its icon; reminder activity is controlled separately above.")
+            GroupBox("Tools") {
+                VStack(spacing: 10) {
+                    featureToggle("Color picker", symbol: "eyedropper", key: .enableColorPickerFeature, destination: "colorPicker")
+                    featureToggle("Smart replies", symbol: "sparkles", key: .enableSmartReplies, destination: "smartTools")
+                }.padding(6)
+            }
+            Text("Each switch here is the same setting as on that feature's own page. Turning Clipboard off stops collecting new copies; hiding a tab (in Tabs) only removes its icon.")
                 .font(.caption).foregroundStyle(.secondary)
         }
         .settingsHighlight(id: "tabsAndFeatures-Notch feature controls")
     }
 
-    private func featureToggle(_ title: String, symbol: String, key: Defaults.Key<Bool>, destination: String) -> some View {
+    private func featureToggle(_ title: String, symbol: String, key: Defaults.Key<Bool>, destination: String?) -> some View {
         featureRow(title, symbol: symbol, destination: destination) {
             Defaults.Toggle(key: key) { Text(title) }.labelsHidden().toggleStyle(.switch).controlSize(.small)
         }
     }
-    private func settingsLink(_ title: String, symbol: String, destination: String) -> some View {
-        featureRow(title, symbol: symbol, destination: destination) { EmptyView() }
-    }
-    private func featureRow<Control: View>(_ title: String, symbol: String, destination: String, @ViewBuilder control: () -> Control) -> some View {
+    private func featureRow<Control: View>(_ title: String, symbol: String, destination: String?, @ViewBuilder control: () -> Control) -> some View {
         HStack(spacing: 10) {
             Label(title, systemImage: symbol).font(.system(size: 13)).frame(maxWidth: .infinity, alignment: .leading)
             control()
-            Button { openSettings(destination) } label: { Image(systemName: "slider.horizontal.3") }
-                .buttonStyle(.borderless).help("Configure \(title)")
+            if let destination {
+                Button { openSettings(destination) } label: { Image(systemName: "slider.horizontal.3") }
+                    .buttonStyle(.borderless).help("Configure \(title)")
+            } else {
+                // Options for this feature live in its tab; keep the switches aligned.
+                Image(systemName: "slider.horizontal.3").hidden()
+            }
         }
     }
 }

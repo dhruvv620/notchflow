@@ -221,7 +221,6 @@ func applyProfileSettings(_ profiles: Set<String>) {
     if isDesigner {
         Defaults[.enableColorPickerFeature] = true
         Defaults[.showMirror] = true
-        Defaults[.lightingEffect] = true
         Defaults[.inlineHUD] = true
         Defaults[.enableStatsFeature] = false
         Defaults[.enableTimerFeature] = false

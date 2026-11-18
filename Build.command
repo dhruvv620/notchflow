@@ -31,6 +31,9 @@ DERIVED_DIR="$BUILD_ROOT/DerivedData"
 mkdir -p "$BUILD_ROOT"
 printf 'Building %s with cached dependencies in %s\n' "$CONFIGURATION" "$BUILD_ROOT"
 
+printf '\nChecking settings (no dead switches, every page reachable, search results land)...\n'
+(cd "$SOURCE_DIR" && /usr/bin/python3 -m unittest -q tests.test_settings_integrity)
+
 printf '\nChecking natural-language reminder dates...\n'
 /usr/bin/xcrun swiftc -swift-version 5 -parse-as-library \
     "$SOURCE_DIR/DynamicIsland/helpers/ReminderDateParser.swift" \

@@ -106,7 +106,7 @@ jobs:
           key: ${{ runner.os }}-notchflow-swiftpm-${{ steps.toolchain.outputs.cache-key }}-${{ hashFiles('DynamicIsland.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
 
       - name: Validate privacy configuration
-        run: python3 -m unittest tests.test_privacy_configuration
+        run: python3 -m unittest tests.test_privacy_configuration tests.test_settings_integrity
 
       - name: Check reminder date parsing
         shell: bash

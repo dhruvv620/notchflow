@@ -133,12 +133,6 @@ enum DownloadIndicatorStyle: String, Defaults.Serializable {
     }
 }
 
-enum DownloadIconStyle: String, Defaults.Serializable {
-    case onlyAppIcon = "Only app icon"
-    case onlyIcon = "Only download icon"
-    case iconAndAppIcon = "Icon and app icon"
-}
-
 enum MirrorShapeEnum: String, Defaults.Serializable {
     case rectangle = "Rectangular"
     case circle = "Circular"
@@ -344,16 +338,3 @@ enum LockScreenReminderChipStyle: String, CaseIterable, Defaults.Serializable, I
         }
 }
 
-enum TimerInputStyle: String, CaseIterable, Defaults.Serializable, Identifiable {
-    case ruler = "Ruler"
-    case manual = "Manual"
-    
-    var id: String { rawValue }
-    
-    var displayName: String {
-        switch self {
-        case .ruler: return String(localized: "Ruler")
-        case .manual: return String(localized: "Manual")
-        }
-    }
-}

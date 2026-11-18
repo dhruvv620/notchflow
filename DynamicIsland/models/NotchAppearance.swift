@@ -63,7 +63,11 @@ extension Defaults.Keys {
 @MainActor
 final class NotchAppearanceModel: ObservableObject {
     static let shared = NotchAppearanceModel()
-    @Published private(set) var accentColor: Color = .blue
+    @Published private(set) var accentColor: Color = .blue {
+        // Older parts (timer icons, system indicators, HUDs) read the legacy
+        // accent key; keep it equal to the accent chosen in Appearance.
+        didSet { Defaults[.accentColor] = accentColor }
+    }
     @Published private(set) var revision = 0
     /// A vibrant color picked from the desktop picture, when one can be read.
     @Published private(set) var wallpaperColor: NSColor?
