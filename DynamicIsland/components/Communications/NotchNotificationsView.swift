@@ -23,7 +23,7 @@ struct NotchNotificationsView: View {
         VStack(alignment: .leading, spacing: 6) {
             header
             if !enabled {
-                NotificationEmptyState(
+                NotchEmptyState(
                     symbol: "bell.slash",
                     title: "Notifications are off",
                     detail: "Collect notifications from your apps here, reply without switching apps, and clear them in one place."
@@ -40,9 +40,7 @@ struct NotchNotificationsView: View {
                 list
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.top, 2)
-        .padding(.bottom, 6)
+        .notchTabPadding()
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .overlay(alignment: .bottom) { undoToast }
         .environment(\.colorScheme, .dark)
@@ -67,23 +65,19 @@ struct NotchNotificationsView: View {
     private var header: some View {
         HStack(spacing: 6) {
             Text("Notifications")
-                .font(.system(size: 13, weight: .semibold))
+                .font(NotchTokens.Typography.title)
             if !hub.items.isEmpty {
-                Text("\(hub.items.count)")
-                    .font(.system(size: 10, weight: .semibold).monospacedDigit())
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 1)
-                    .background(Color.white.opacity(0.12), in: Capsule())
+                NotchBadge(text: "\(hub.items.count)")
             }
             if hub.allGroups.count > 1 {
                 filterChips
             } else {
                 Spacer(minLength: 0)
             }
-            HeaderIconButton(symbol: "arrow.clockwise", help: "Check for new notifications") {
+            NotchIconButton(symbol: "arrow.clockwise", help: "Check for new notifications") {
                 Task { await hub.refresh() }
             }
-            HeaderIconButton(symbol: "xmark.circle", help: hub.filter == nil ? "Clear all notifications" : "Clear this app's notifications") {
+            NotchIconButton(symbol: "xmark.circle", help: hub.filter == nil ? "Clear all notifications" : "Clear this app's notifications") {
                 withAnimation(.snappy) { hub.clearVisible() }
             }
             .disabled(hub.visibleItems.isEmpty)
@@ -93,11 +87,11 @@ struct NotchNotificationsView: View {
     private var filterChips: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 4) {
-                FilterChip(isSelected: hub.filter == nil, action: { withAnimation(.snappy) { hub.filter = nil } }) {
-                    Text("All").font(.system(size: 10, weight: .semibold))
+                NotchChip(isSelected: hub.filter == nil, action: { withAnimation(.snappy) { hub.filter = nil } }) {
+                    Text("All")
                 }
                 ForEach(hub.allGroups) { group in
-                    FilterChip(isSelected: hub.filter == group.id, action: {
+                    NotchChip(isSelected: hub.filter == group.id, action: {
                         withAnimation(.snappy) { hub.filter = hub.filter == group.id ? nil : group.id }
                     }) {
                         HStack(spacing: 3) {
@@ -210,7 +204,7 @@ struct NotchNotificationsView: View {
 
     private var emptyInbox: some View {
         VStack(spacing: 8) {
-            NotificationEmptyState(
+            NotchEmptyState(
                 symbol: "checkmark.circle",
                 title: "You're all caught up",
                 detail: sourceSummary
@@ -334,10 +328,10 @@ private struct NotificationCard: View {
                     .transition(.opacity)
             }
         }
-        .padding(8)
-        .background { NotchElementSurface(cornerRadius: 12) }
+        .padding(NotchTokens.Spacing.m)
+        .background { NotchElementSurface(cornerRadius: NotchTokens.Radius.card) }
         .overlay {
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: NotchTokens.Radius.card)
                 .strokeBorder(appearance.accentColor.opacity(isHighlighted ? 0.7 : 0), lineWidth: 1.5)
                 .allowsHitTesting(false)
         }
@@ -377,11 +371,11 @@ private struct NotificationCard: View {
     private var actions: some View {
         HStack(spacing: 6) {
             if hub.canReply(item) {
-                CardActionButton(title: "Reply", symbol: "arrowshape.turn.up.left", prominent: true) {
+                NotchPillButton(title: "Reply", symbol: "arrowshape.turn.up.left", prominent: true) {
                     withAnimation(.snappy) { hub.replyingID = item.id }
                 }
             }
-            CardActionButton(title: "Open", symbol: "arrow.up.right.square") {
+            NotchPillButton(title: "Open", symbol: "arrow.up.right.square") {
                 hub.open(item)
             }
             Spacer(minLength: 0)
@@ -402,46 +396,14 @@ private struct NotificationCard: View {
     }
 
     private var replyField: some View {
-        HStack(spacing: 6) {
-            TextField("Reply to \(item.headline)", text: $draft, axis: .vertical)
-                .textFieldStyle(.plain)
-                .font(.system(size: 12))
-                .lineLimit(1...4)
-                .focused($replyFocused)
-                .disabled(isSending)
-                .onSubmit(send)
-                .onExitCommand { withAnimation(.snappy) { hub.replyingID = nil } }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-            Button(action: send) {
-                ZStack {
-                    if isSending {
-                        ProgressView().controlSize(.mini)
-                    } else {
-                        Image(systemName: "arrow.up")
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(.black)
-                    }
-                }
-                .frame(width: 24, height: 24)
-                .background(Circle().fill(canSend ? appearance.accentColor : Color.white.opacity(0.18)))
-            }
-            .buttonStyle(.plain)
-            .disabled(!canSend)
-            .keyboardShortcut(.return, modifiers: .command)
-            .help("Send")
-            Button {
-                withAnimation(.snappy) { hub.replyingID = nil }
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 9, weight: .bold))
-                    .frame(width: 20, height: 20)
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(.secondary)
-            .help("Cancel")
-        }
+        NotchComposeField(
+            placeholder: "Reply to \(item.headline)",
+            text: $draft,
+            isSending: isSending,
+            onSend: send,
+            onCancel: { withAnimation(NotchTokens.Motion.standard) { hub.replyingID = nil } },
+            isFocused: $replyFocused
+        )
         .padding(.leading, 34)
     }
 
@@ -478,93 +440,6 @@ private struct NotificationCard: View {
 }
 
 // MARK: - Small parts
-
-private struct CardActionButton: View {
-    let title: String
-    let symbol: String
-    var prominent = false
-    let action: () -> Void
-    @ObservedObject private var appearance = NotchAppearanceModel.shared
-
-    var body: some View {
-        Button(action: action) {
-            Label(title, systemImage: symbol)
-                .font(.system(size: 10, weight: .semibold))
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(
-                    Capsule().fill(prominent ? appearance.accentColor.opacity(0.25) : Color.white.opacity(0.08))
-                )
-                .foregroundStyle(prominent ? appearance.accentColor : Color.primary)
-        }
-        .buttonStyle(.plain)
-    }
-}
-
-private struct HeaderIconButton: View {
-    let symbol: String
-    let help: String
-    let action: () -> Void
-    @State private var isHovering = false
-
-    var body: some View {
-        Button(action: action) {
-            Image(systemName: symbol)
-                .font(.system(size: 11, weight: .medium))
-                .frame(width: 22, height: 22)
-                .background(Circle().fill(Color.white.opacity(isHovering ? 0.12 : 0)))
-        }
-        .buttonStyle(.plain)
-        .foregroundStyle(.secondary)
-        .onHover { isHovering = $0 }
-        .help(help)
-    }
-}
-
-private struct FilterChip<ChipContent: View>: View {
-    let isSelected: Bool
-    let action: () -> Void
-    @ViewBuilder let label: () -> ChipContent
-    @ObservedObject private var appearance = NotchAppearanceModel.shared
-
-    var body: some View {
-        Button(action: action) {
-            label()
-                .padding(.horizontal, 7)
-                .frame(height: 20)
-                .background(
-                    Capsule().fill(isSelected ? appearance.accentColor.opacity(0.28) : Color.white.opacity(0.07))
-                )
-                .foregroundStyle(isSelected ? appearance.accentColor : Color.primary)
-        }
-        .buttonStyle(.plain)
-    }
-}
-
-private struct NotificationEmptyState<Actions: View>: View {
-    let symbol: String
-    let title: String
-    let detail: String
-    @ViewBuilder let actions: () -> Actions
-
-    var body: some View {
-        VStack(spacing: 6) {
-            Image(systemName: symbol)
-                .font(.system(size: 22, weight: .light))
-                .foregroundStyle(.secondary)
-            Text(title)
-                .font(.system(size: 13, weight: .semibold))
-            Text(detail)
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: 420)
-            HStack(spacing: 8, content: actions)
-                .controlSize(.small)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-}
 
 /// The posting app's icon, or a symbol when the app is not installed.
 struct NotificationAppIcon: View {

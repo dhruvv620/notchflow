@@ -356,32 +356,14 @@ private struct WhatsAppConversationColumn: View {
                     .foregroundStyle(.red)
                     .lineLimit(1)
             }
-            HStack(spacing: 6) {
-                TextField("Reply to \(chat.displayName)", text: $draft, axis: .vertical)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 12))
-                    .lineLimit(1...3)
-                    .focused($isReplyFocused)
-                    .onSubmit { send(to: chat.id) }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    .disabled(!manager.state.isConnected)
-
-                Button {
-                    send(to: chat.id)
-                } label: {
-                    Image(systemName: isSending ? "ellipsis" : "arrow.up")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(.black)
-                        .frame(width: 24, height: 24)
-                        .background(Circle().fill(canSend ? Color.whatsAppGreen : Color.white.opacity(0.2)))
-                }
-                .buttonStyle(.plain)
-                .disabled(!canSend)
-                .keyboardShortcut(.return, modifiers: .command)
-                .help("Send")
-            }
+            NotchComposeField(
+                placeholder: "Reply to \(chat.displayName)",
+                text: $draft,
+                isSending: isSending,
+                isEnabled: manager.state.isConnected,
+                onSend: { send(to: chat.id) },
+                isFocused: $isReplyFocused
+            )
         }
     }
 
@@ -457,35 +439,16 @@ private struct WhatsAppMessageBubble: View {
 
 private struct WhatsAppPlaceholder: View {
     let icon: String
-    let title: LocalizedStringKey
+    let title: String
     var subtitle: String? = nil
     var showsProgress = false
     var action: (() -> Void)? = nil
 
     var body: some View {
-        VStack(spacing: 8) {
-            if showsProgress {
-                ProgressView().controlSize(.small)
-            } else {
-                Image(systemName: icon)
-                    .font(.system(size: 24))
-                    .foregroundStyle(Color.whatsAppGreen)
-            }
-            Text(title)
-                .font(.system(size: 13, weight: .semibold))
-            if let subtitle {
-                Text(subtitle)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .lineLimit(3)
-                    .frame(maxWidth: 380)
-            }
+        NotchEmptyState(symbol: icon, title: title, detail: subtitle, showsProgress: showsProgress) {
             if let action {
-                Button("Open Settings", action: action)
-                    .controlSize(.small)
+                NotchPillButton(title: "Open Settings", symbol: "gear", prominent: true, action: action)
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
