@@ -1362,6 +1362,15 @@ struct GeneralSettings: View {
             }
             .settingsHighlight(id: highlightID("Peek before opening"))
             Toggle("Remember last tab", isOn: $coordinator.openLastTabByDefault)
+            Defaults.Toggle(key: .notchContextAwareTab) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Open on the tab that fits the moment")
+                    Text("Calendar five minutes before a meeting, Timers while one runs, WhatsApp or Notifications when something new arrived, Music while something plays.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .settingsHighlight(id: highlightID("Open on the tab that fits the moment"))
             if openNotchOnHover {
                 Slider(value: $minimumHoverDuration, in: 0...1, step: 0.1) {
                     HStack {

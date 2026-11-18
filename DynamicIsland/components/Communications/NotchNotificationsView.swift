@@ -48,12 +48,14 @@ struct NotchNotificationsView: View {
         .task { await hub.refresh() }
         .onAppear {
             hub.dismissAlert()
+            hub.markViewed()
             if !enabled { DynamicIslandViewCoordinator.shared.reportContentHeight(nil, for: .notifications) }
         }
         .onChange(of: hub.replyingID) { _, value in
             vm.setAutoCloseSuppression(value != nil, token: token)
         }
         .onDisappear {
+            hub.markViewed()
             hub.replyingID = nil
             vm.setAutoCloseSuppression(false, token: token)
             vm.setScrollGestureSuppression(false, token: token)

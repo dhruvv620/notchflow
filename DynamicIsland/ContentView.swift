@@ -2035,6 +2035,11 @@ struct ContentView: View {
         isPeeking = false
         if visibleCommunicationCall != nil { showCallControls = true }
         let announced = visibleCommunicationCall == nil ? visibleCommunicationNotification : nil
+        // Open on the tab that fits the moment, unless an alert decides it.
+        if announced == nil, visibleCommunicationCall == nil,
+           let contextView = NotchContextTabResolver.preferredView() {
+            coordinator.currentView = contextView
+        }
         withAnimation(.bouncy.speed(1.2)) {
             vm.open()
             if let announced {

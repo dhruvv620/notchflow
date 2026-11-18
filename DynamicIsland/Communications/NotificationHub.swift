@@ -13,6 +13,8 @@ extension Defaults.Keys {
     static let notificationMutedApps = Key<[String]>("notificationMutedApps", default: [])
     /// Highest Notification Center record already collected.
     static let notificationCenterLastRecordID = Key<Int>("notificationCenterLastRecordID", default: 0)
+    /// When the Notifications tab was last looked at (seconds since 1970).
+    static let notificationsLastViewedAt = Key<Double>("notificationsLastViewedAt", default: 0)
 }
 
 /// The notch's notification inbox.
@@ -72,6 +74,16 @@ final class NotificationHub: ObservableObject {
     }
     var groups: [NotchNotificationGroup] { NotchNotificationPolicy.grouped(visibleItems) }
     var allGroups: [NotchNotificationGroup] { NotchNotificationPolicy.grouped(items) }
+
+    /// Notifications that arrived since the tab was last on screen.
+    var unseenCount: Int {
+        let viewed = Defaults[.notificationsLastViewedAt]
+        return items.filter { $0.date.timeIntervalSince1970 > viewed }.count
+    }
+
+    func markViewed() {
+        Defaults[.notificationsLastViewedAt] = Date().timeIntervalSince1970
+    }
 
     private static let historyLimit = 200
     private let database = NotificationCenterDatabase()
