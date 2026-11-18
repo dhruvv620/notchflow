@@ -15,7 +15,8 @@ struct AgentsSettings: View {
     @State private var confirmConnect = false
     @State private var copiedPath = false
 
-    private func highlightID(_ title: String) -> String { SettingsTab.agents.highlightID(for: title) }
+    // SettingsTab is private to SettingsView.swift; ids follow its "<tab>-<title>" form.
+    private func highlightID(_ title: String) -> String { "agents-\(title)" }
 
     var body: some View {
         Form {

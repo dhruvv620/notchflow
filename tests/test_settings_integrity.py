@@ -60,6 +60,15 @@ class SettingsIntegrityTests(unittest.TestCase):
         self.assertEqual(sorted(cases), sorted(ordered), "Every SettingsTab case appears once in the sidebar order")
         self.assertEqual(len(ordered), len(set(ordered)))
 
+    def test_private_settings_types_stay_in_their_file(self):
+        """SettingsTab is private to SettingsView.swift; other pages build "<tab>-<title>" ids themselves."""
+        offenders = [
+            str(path.relative_to(ROOT))
+            for path, text in self.sources.items()
+            if path != SETTINGS_VIEW and re.search(r"\bSettingsTab(Group)?\.", text)
+        ]
+        self.assertEqual([], offenders, "SettingsTab is private to SettingsView.swift")
+
     def test_search_results_point_at_existing_controls(self):
         """Each search entry's highlight title must be attached to a control on some page."""
         entries = re.findall(r'SettingsSearchEntry\(tab: \.(\w+), title: "[^"]+".*?highlightID\(for: "([^"]+)"\)', self.settings_view)
