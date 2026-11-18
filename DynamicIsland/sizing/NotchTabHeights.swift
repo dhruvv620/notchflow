@@ -31,6 +31,9 @@ extension NotchViews {
         case .whatsapp:
             // A chat list beside a conversation and a reply field.
             return .taller(by: 60)
+        case .agents:
+            // An approval: header, command, buttons.
+            return .atLeast(236)
         case .notifications:
             // A short inbox gets a short panel; a long one grows a little.
             return .fitsContent(shrinkBy: 40, growBy: 60)

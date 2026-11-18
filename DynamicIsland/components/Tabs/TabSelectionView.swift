@@ -48,6 +48,7 @@ struct TabSelectionView: View {
     @ObservedObject private var appearance = NotchAppearanceModel.shared
     // The temporary Copied tab comes and goes with the clipboard.
     @ObservedObject private var copyActions = CopyActionManager.shared
+    @Default(.enableAgentsFeature) private var enableAgentsFeature
     @ObservedObject private var whatsApp = WhatsAppManager.shared
     @ObservedObject var coordinator = DynamicIslandViewCoordinator.shared
     @ObservedObject private var extensionNotchExperienceManager = ExtensionNotchExperienceManager.shared
@@ -117,6 +118,9 @@ struct TabSelectionView: View {
         }
         if Defaults[.showCalendar] {
             tabsArray.append(TabModel(label: "Calendar", icon: "calendar", view: .calendar))
+        }
+        if Defaults[.enableAgentsFeature] {
+            tabsArray.append(TabModel(label: "AI Agents", icon: "sparkles", view: .agents))
         }
         if Defaults[.enableThirdPartyExtensions] && Defaults[.enableExtensionNotchExperiences] && Defaults[.enableExtensionNotchTabs] {
             for payload in ExtensionNotchExperienceManager.shared.activeExperiences.filter({ $0.descriptor.tab != nil }) {

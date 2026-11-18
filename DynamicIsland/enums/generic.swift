@@ -85,6 +85,7 @@ public enum NotchViews {
     case notifications
     case calendar
     case whatsapp
+    case agents
     /// Temporary tab for something just copied (CopyActionManager); not reorderable.
     case copyAction
     case extensionExperience

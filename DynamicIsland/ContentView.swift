@@ -66,6 +66,8 @@ struct ContentView: View {
     @ObservedObject var focusGuard = FocusGuardManager.shared
     @ObservedObject var copyActions = CopyActionManager.shared
     @ObservedObject var buildWatcher = BuildWatchManager.shared
+    @ObservedObject var agentHub = AgentHub.shared
+    @Default(.agentShowWorkingInClosedNotch) var agentShowWorkingInClosedNotch
     @ObservedObject var remindersManager = RemindersManager.shared
     @Default(.showTodayProgressRing) var showTodayProgressRing
     @Default(.showLyricsUnderNotch) var showLyricsUnderNotch
@@ -355,6 +357,13 @@ struct ContentView: View {
             && !isCurrentScreenExpansionVisible
     }
 
+    /// An agent needs you, just finished, or (optionally) is working.
+    private var isAgentActivityVisible: Bool {
+        let hasSomething = !agentHub.requests.isEmpty || agentHub.announcement != nil
+            || (agentShowWorkingInClosedNotch && !agentHub.workingSessions.isEmpty)
+        return hasSomething && canShowClosedActivity
+    }
+
     private var isCopyActionVisible: Bool {
         copyActions.showsInClosedNotch && copyActions.suggestion != nil && canShowClosedActivity
     }
@@ -414,7 +423,7 @@ struct ContentView: View {
             width = max(width, vm.closedNotchSize.width + (MeetingLiveActivity.wingWidth + 6) * 2 + closedPadding)
         }
 
-        if isCopyActionVisible || isFocusGuardVisible || isBuildWatchVisible {
+        if isCopyActionVisible || isFocusGuardVisible || isBuildWatchVisible || isAgentActivityVisible {
             width = max(width, vm.closedNotchSize.width + 8 + ClosedNotchWingsMetrics.addedWidth + closedPadding)
         }
 
@@ -1134,6 +1143,9 @@ struct ContentView: View {
                           }
                           .id("whatsapp-\(banner.id)")
                           .transition(.opacity.animation(.smooth(duration: 0.25)))
+                      } else if isAgentActivityVisible {
+                          AgentLiveActivity(isHovering: isHovering)
+                              .transition(.opacity.animation(.smooth(duration: 0.25)))
                       } else if isCopyActionVisible {
                           CopyActionLiveActivity(isHovering: isHovering)
                               .id("copy-\(copyActions.suggestion?.id.uuidString ?? "")")
@@ -1372,6 +1384,7 @@ struct ContentView: View {
         case .terminal: NotchTerminalView()
         case .whatsapp: NotchWhatsAppView()
         case .copyAction: NotchCopyActionView()
+        case .agents: NotchAgentsView()
         case .extensionExperience:
             if let payload = currentExtensionTabPayload() {
                 NotchScrollableContent { ExtensionNotchExperienceTabView(payload: payload) }
@@ -2144,7 +2157,10 @@ struct ContentView: View {
         let announced = visibleCommunicationCall == nil ? visibleCommunicationNotification : nil
         // Open on the tab that fits the moment, unless an alert decides it.
         // Something just copied wins: its tab holds the one-tap actions.
-        if announced == nil, visibleCommunicationCall == nil, CopyActionManager.hasLiveSuggestion {
+        if announced == nil, visibleCommunicationCall == nil, AgentHub.hasPendingRequest, Defaults[.enableAgentsFeature] {
+            // An agent waiting on you comes first.
+            coordinator.currentView = .agents
+        } else if announced == nil, visibleCommunicationCall == nil, CopyActionManager.hasLiveSuggestion {
             coordinator.currentView = .copyAction
         } else if announced == nil, visibleCommunicationCall == nil,
            let contextView = NotchContextTabResolver.preferredView() {

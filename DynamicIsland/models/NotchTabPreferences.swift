@@ -15,7 +15,7 @@ extension Notification.Name {
 }
 
 enum NotchBuiltinTab: String, CaseIterable, Identifiable {
-    case music, shelf, timers, stats, usage, notes, clipboard, cuely, todos, notifications, whatsapp, calendar, terminal
+    case music, shelf, timers, stats, usage, notes, clipboard, cuely, todos, notifications, whatsapp, calendar, terminal, agents
     var id: String { rawValue }
     var title: String {
         switch self {
@@ -32,6 +32,7 @@ enum NotchBuiltinTab: String, CaseIterable, Identifiable {
         case .whatsapp: return "WhatsApp"
         case .calendar: return "Calendar"
         case .terminal: return "Terminal"
+        case .agents: return "AI Agents"
         }
     }
     var symbol: String {
@@ -49,6 +50,7 @@ enum NotchBuiltinTab: String, CaseIterable, Identifiable {
         case .whatsapp: return "message.fill"
         case .calendar: return "calendar"
         case .terminal: return "apple.terminal"
+        case .agents: return "sparkles"
         }
     }
     var view: NotchViews {
@@ -66,6 +68,7 @@ enum NotchBuiltinTab: String, CaseIterable, Identifiable {
         case .whatsapp: return .whatsapp
         case .calendar: return .calendar
         case .terminal: return .terminal
+        case .agents: return .agents
         }
     }
     static func identifier(for view: NotchViews) -> String {
@@ -86,6 +89,7 @@ enum NotchBuiltinTab: String, CaseIterable, Identifiable {
         case .whatsapp: return Defaults[.enableWhatsAppFeature]
         case .calendar: return Defaults[.showCalendar]
         case .terminal: return Defaults[.enableTerminalFeature]
+        case .agents: return Defaults[.enableAgentsFeature]
         }
     }
     var settingsDestination: String {
@@ -103,6 +107,7 @@ enum NotchBuiltinTab: String, CaseIterable, Identifiable {
         case .whatsapp: return "whatsapp"
         case .calendar: return "calendar"
         case .terminal: return "terminal"
+        case .agents: return "agents"
         }
     }
 }

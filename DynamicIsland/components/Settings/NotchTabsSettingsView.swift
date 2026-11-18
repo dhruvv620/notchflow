@@ -132,6 +132,7 @@ struct NotchTabsSettingsView: View {
                     Group {
                     featureToggle("Notifications & Calls", symbol: "bell.badge", key: .communicationsEnabled, destination: "communications")
                     featureToggle("WhatsApp", symbol: "message.fill", key: .enableWhatsAppFeature, destination: "whatsapp")
+                    featureToggle("AI Agents", symbol: "sparkles", key: .enableAgentsFeature, destination: "agents")
                     }
                     featureToggle("Todos", symbol: "checklist", key: .enableRemindersFeature, destination: "calendar")
                     featureToggle("Clipboard", symbol: "doc.on.clipboard", key: .enableClipboardManager, destination: "clipboard")

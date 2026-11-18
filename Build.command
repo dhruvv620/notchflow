@@ -159,6 +159,12 @@ printf '\nChecking the notification inbox...\n'
     "$SOURCE_DIR/tests/NotificationHubRegression.swift" -o "$BUILD_ROOT/NotificationHubRegression"
 "$BUILD_ROOT/NotificationHubRegression"
 
+printf '\nChecking AI agent hooks (Claude Code events, approvals, settings.json install)...\n'
+/usr/bin/xcrun swiftc -swift-version 5 -parse-as-library \
+    "$SOURCE_DIR/DynamicIsland/helpers/AgentHookPolicy.swift" \
+    "$SOURCE_DIR/tests/AgentHookRegression.swift" -o "$BUILD_ROOT/AgentHookRegression"
+"$BUILD_ROOT/AgentHookRegression"
+
 printf '\nChecking smart tools (distraction meter, copy-to-action, replies, build watcher)...\n'
 /usr/bin/xcrun swiftc -swift-version 5 -parse-as-library \
     "$SOURCE_DIR/DynamicIsland/helpers/SmartToolsPolicy.swift" \

@@ -71,6 +71,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
     case smartTools
     case terminal
     case whatsapp
+    case agents
     case about
 
     var id: String { rawValue }
@@ -79,7 +80,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
     var group: SettingsTabGroup {
         switch self {
         case .general, .appearance, .tabsAndFeatures, .shortcuts:                return .core
-        case .media, .liveActivities, .communications, .whatsapp,
+        case .media, .liveActivities, .communications, .whatsapp, .agents,
              .calendar, .timer, .shelf:                                          return .notch
         case .smartTools, .notes, .clipboard, .screenAssistant,
              .colorPicker, .terminal, .stats:                                    return .tools
@@ -115,6 +116,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .smartTools: return String(localized: "Smart Tools")
         case .terminal: return String(localized: "Terminal")
         case .whatsapp: return String(localized: "WhatsApp")
+        case .agents: return String(localized: "AI Agents")
         case .about: return String(localized: "About")
         }
     }
@@ -145,6 +147,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .smartTools: return "wand.and.stars"
         case .terminal: return "apple.terminal"
         case .whatsapp: return "message.fill"
+        case .agents: return "sparkles"
         case .about: return "info.circle"
         }
     }
@@ -175,6 +178,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .smartTools: return .orange
         case .terminal: return Color(red: 0.2, green: 0.8, blue: 0.4)
         case .whatsapp: return .whatsAppGreen
+        case .agents: return .orange
         case .about: return .secondary
         }
     }
@@ -507,6 +511,7 @@ struct SettingsView: View {
             .liveActivities,
             .communications,
             .whatsapp,
+            .agents,
             .calendar,
             .timer,
             .shelf,
@@ -940,6 +945,12 @@ struct SettingsView: View {
 
             // Terminal
             SettingsSearchEntry(tab: .terminal, title: "Enable terminal", keywords: ["terminal", "guake", "shell"], highlightID: SettingsTab.terminal.highlightID(for: "Enable terminal")),
+            SettingsSearchEntry(tab: .agents, title: "AI Agents", keywords: ["agents","ai","claude","approve","permission"], highlightID: SettingsTab.agents.highlightID(for: "AI Agents")),
+            SettingsSearchEntry(tab: .agents, title: "Claude Code", keywords: ["claude code","hooks","connect","approve","terminal"], highlightID: SettingsTab.agents.highlightID(for: "Claude Code")),
+            SettingsSearchEntry(tab: .agents, title: "Wait for an answer in the notch", keywords: ["approval","timeout","wait"], highlightID: SettingsTab.agents.highlightID(for: "Wait for an answer in the notch")),
+            SettingsSearchEntry(tab: .agents, title: "Ask in the agent's window when it is in front", keywords: ["terminal","front","approval"], highlightID: SettingsTab.agents.highlightID(for: "Ask in the agent's window when it is in front")),
+            SettingsSearchEntry(tab: .agents, title: "Show working agents under the closed notch", keywords: ["status","working","closed notch"], highlightID: SettingsTab.agents.highlightID(for: "Show working agents under the closed notch")),
+            SettingsSearchEntry(tab: .agents, title: "notchflow command", keywords: ["cli","command line","notchflow ask","notify","script"], highlightID: SettingsTab.agents.highlightID(for: "notchflow command")),
             SettingsSearchEntry(tab: .smartTools, title: "Distraction meter", keywords: ["pomodoro", "focus", "youtube", "distraction", "off track"], highlightID: SettingsTab.smartTools.highlightID(for: "Distraction meter")),
             SettingsSearchEntry(tab: .smartTools, title: "Copy-to-action", keywords: ["clipboard", "copy", "tracking", "calendar", "directions"], highlightID: SettingsTab.smartTools.highlightID(for: "Copy-to-action")),
             SettingsSearchEntry(tab: .smartTools, title: "Smart replies", keywords: ["minimax", "ai", "reply", "suggestions", "api key"], highlightID: SettingsTab.smartTools.highlightID(for: "Smart replies")),
@@ -1074,6 +1085,10 @@ struct SettingsView: View {
         case .smartTools:
             SettingsForm(tab: .smartTools) {
                 SmartToolsSettings()
+            }
+        case .agents:
+            SettingsForm(tab: .agents) {
+                AgentsSettings()
             }
         case .about:
             if let controller = updaterController {

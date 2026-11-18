@@ -870,6 +870,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         FocusGuardManager.shared.start()
         CopyActionManager.shared.start()
         BuildWatchManager.shared.start()
+        AgentHub.shared.start()
         _ = UpNextManager.shared
 
         ReminderLiveActivityManager.shared.$activeWindowReminders
