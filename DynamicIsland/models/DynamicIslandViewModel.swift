@@ -75,6 +75,23 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
     private func resetScrollGestureSuppression() {
         scrollGestureSuppressionTokens.removeAll()
         isScrollGestureActive = false
+        horizontalSwipeClaimTokens.removeAll()
+        isHorizontalSwipeClaimed = false
+    }
+
+    /// Content that pages with horizontal swipes (the clipboard) claims them
+    /// while the pointer is over it, so the same swipe does not also switch tabs.
+    @Published private(set) var isHorizontalSwipeClaimed = false
+    private var horizontalSwipeClaimTokens: Set<UUID> = []
+
+    func setHorizontalSwipeClaim(_ active: Bool, token: UUID) {
+        if active {
+            horizontalSwipeClaimTokens.insert(token)
+        } else {
+            horizontalSwipeClaimTokens.remove(token)
+        }
+        let claimed = !horizontalSwipeClaimTokens.isEmpty
+        if claimed != isHorizontalSwipeClaimed { isHorizontalSwipeClaimed = claimed }
     }
 
     func setAutoCloseSuppression(_ active: Bool, token: UUID) {
