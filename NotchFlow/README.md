@@ -172,3 +172,15 @@ Turn on **WhatsApp** in **Settings > Tabs & Features**, then open **Settings > W
 The WhatsApp tab then shows your recent chats with unread counts; click one to read it and reply. New messages are announced under the closed notch; click the announcement or open the notch to jump to that chat. Right-click a chat to mark it read or ignore it.
 
 GOWA runs as a child process of NotchFlow, listens on 127.0.0.1 only, uses a password generated at each launch, and stops when NotchFlow quits. Its session, database and log live in `~/Library/Application Support/NotchFlow/WhatsAppGateway`. Unread counts are NotchFlow's own: messages from before you linked never count, and a chat clears when you read it in NotchFlow, read it on your phone, or reply. Text replies only for now; photos, voice notes and documents show as labels. This is an unofficial integration; use it with your own account.
+
+## Notifications
+
+Turn on **Communications** in **Settings > Tabs & Features** to get the Notifications tab, then check **Settings > Communications > Where notifications come from**:
+
+- **Notification Center history** collects every app's notifications, including ones whose banner you missed. It needs Full Disk Access: click **Allow Full Disk Access**, add NotchFlow in System Settings, and the inbox fills within a few seconds. NotchFlow copies Notification Center's store to a private temporary folder and reads the copy; it never changes Notification Center.
+- **Live banners** (Accessibility) add the banner's own Reply, Open and Close while it is on screen.
+- **WhatsApp** messages from the linked account join the inbox and can always be answered.
+
+In the tab, notifications are grouped by app; use the chips at the top to show one app. Hover a notification for **Reply** and **Open**, click its text to read all of it, or use the × to dismiss it. The × in the header clears everything shown, with **Undo** for a few seconds. Right-click to copy the text or mute the app. Replies go through WhatsApp, through Messages (macOS asks once to let NotchFlow control Messages), or through the banner while it is still on screen; other apps offer Open instead.
+
+New notifications are announced in the closed notch. Hover or click to open the tab on that notification. Focus is respected when **Respect Focus** is on.

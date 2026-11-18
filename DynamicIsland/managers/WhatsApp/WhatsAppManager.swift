@@ -776,6 +776,13 @@ final class WhatsAppManager: ObservableObject {
         }
 
         guard !message.isFromMe else { return }
+        if !isIgnored(chatID), Date().timeIntervalSince(message.timestamp) < 600 {
+            NotificationHub.shared.ingestWhatsApp(
+                message,
+                chatName: chat(id: chatID)?.displayName ?? message.senderName,
+                isGroup: WhatsAppJID.isGroup(chatID)
+            )
+        }
         if isTabVisible && selectedChatID == chatID && Defaults[.whatsAppMarkReadOnOpen] {
             Task { await markChatRead(chatID) }
             return

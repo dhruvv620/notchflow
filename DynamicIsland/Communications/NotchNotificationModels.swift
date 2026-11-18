@@ -1,0 +1,219 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+import Foundation
+
+/// One notification in the notch inbox, whatever it came from.
+///
+/// Pure value types and policy only (Foundation, no UI or system access), so
+/// Build.command can check them with `swiftc` on its own.
+struct NotchNotification: Identifiable, Equatable, Codable, Sendable {
+    enum Source: String, Codable, Sendable {
+        /// macOS Notification Center's own store (needs Full Disk Access).
+        case notificationCenter
+        /// A banner read from the screen through Accessibility.
+        case banner
+        /// A message from the linked WhatsApp gateway.
+        case whatsapp
+    }
+
+    /// How a reply typed in the notch reaches the conversation.
+    enum ReplyRoute: Equatable, Codable, Sendable {
+        case none
+        case whatsapp(chatJID: String)
+        case messages(chatID: String)
+        /// The live banner's own reply field. Only works while it is on screen.
+        case banner(id: String)
+
+        var isAvailable: Bool { self != .none }
+    }
+
+    let id: String
+    let source: Source
+    /// Bundle identifier of the app that posted it, when known.
+    var bundleIdentifier: String?
+    var appName: String
+    var title: String
+    var subtitle: String
+    var body: String
+    var date: Date
+    var threadID: String?
+    var reply: ReplyRoute
+    /// The matching on-screen banner, which can still be opened or dismissed.
+    var liveBannerID: String?
+
+    /// Groups notifications from the same app together.
+    var groupKey: String { bundleIdentifier ?? "name:" + appName.lowercased() }
+
+    /// The headline: the sender or title, falling back to the app.
+    var headline: String {
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? appName : trimmed
+    }
+}
+
+struct NotchNotificationGroup: Identifiable, Equatable, Sendable {
+    let id: String
+    let appName: String
+    let bundleIdentifier: String?
+    var items: [NotchNotification]
+
+    var latest: Date { items.first?.date ?? .distantPast }
+}
+
+enum NotchNotificationPolicy {
+    /// Most recent first, at most `limit`, no duplicate ids.
+    static func normalized(_ items: [NotchNotification], limit: Int) -> [NotchNotification] {
+        var seen = Set<String>()
+        return Array(items
+            .sorted { $0.date > $1.date }
+            .filter { seen.insert($0.id).inserted }
+            .prefix(max(0, limit)))
+    }
+
+    /// Groups by app, newest group first, items newest first inside each group.
+    static func grouped(_ items: [NotchNotification]) -> [NotchNotificationGroup] {
+        var order: [String] = []
+        var groups: [String: NotchNotificationGroup] = [:]
+        for item in items.sorted(by: { $0.date > $1.date }) {
+            let key = item.groupKey
+            if groups[key] == nil {
+                order.append(key)
+                groups[key] = NotchNotificationGroup(id: key, appName: item.appName, bundleIdentifier: item.bundleIdentifier, items: [])
+            }
+            groups[key]?.items.append(item)
+        }
+        return order.compactMap { groups[$0] }
+    }
+
+    /// Whether a banner read from the screen is the same notification as one
+    /// already in the inbox (the Notification Center store sees it too).
+    static func isSameNotification(_ banner: NotchNotification, as existing: NotchNotification) -> Bool {
+        guard existing.id != banner.id, existing.source != .banner else { return false }
+        let sameApp: Bool
+        if let lhs = banner.bundleIdentifier, let rhs = existing.bundleIdentifier {
+            sameApp = lhs == rhs
+        } else {
+            sameApp = banner.appName.caseInsensitiveCompare(existing.appName) == .orderedSame
+        }
+        guard sameApp, abs(banner.date.timeIntervalSince(existing.date)) < 90 else { return false }
+        func clean(_ value: String) -> String {
+            value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        }
+        let body = clean(banner.body)
+        guard !body.isEmpty else { return false }
+        let existingBody = clean(existing.body)
+        let bodyMatches = existingBody == body || existingBody.hasPrefix(body) || body.hasPrefix(existingBody)
+        let title = clean(banner.title)
+        let titleMatches = title.isEmpty || clean(existing.title) == title || clean(existing.subtitle) == title
+        return bodyMatches && titleMatches
+    }
+
+    /// Messages posts its notifications with the conversation's identifier as
+    /// the thread, e.g. `iMessage;-;+15551234567` or `SMS;+;chat1234`. That is
+    /// the `id` AppleScript accepts for `chat id "…"`.
+    static func messagesChatID(fromThread thread: String?) -> String? {
+        guard let thread = thread?.trimmingCharacters(in: .whitespacesAndNewlines), !thread.isEmpty else { return nil }
+        let parts = thread.split(separator: ";", maxSplits: 2, omittingEmptySubsequences: false)
+        guard parts.count == 3,
+              ["imessage", "sms", "rcs", "any"].contains(parts[0].lowercased()),
+              parts[1] == "-" || parts[1] == "+",
+              !parts[2].isEmpty else { return nil }
+        return thread
+    }
+
+    static let messagesBundleIdentifier = "com.apple.MobileSMS"
+    static let whatsAppBundleIdentifiers: Set<String> = ["net.whatsapp.WhatsApp", "desktop.WhatsApp"]
+
+    /// Escapes text for a double-quoted AppleScript string literal.
+    static func appleScriptString(_ value: String) -> String {
+        var result = "\""
+        for character in value {
+            switch character {
+            case "\\": result += "\\\\"
+            case "\"": result += "\\\""
+            default: result.append(character)
+            }
+        }
+        return result + "\""
+    }
+
+    static func messagesReplyScript(text: String, chatID: String) -> String {
+        """
+        tell application "Messages"
+            send \(appleScriptString(text)) to chat id \(appleScriptString(chatID))
+        end tell
+        """
+    }
+}
+
+/// One row of Notification Center's store, decoded from its binary plist.
+///
+/// macOS keeps delivered notifications in an SQLite database whose `record`
+/// table holds each notification as a property list: the posting app under
+/// `app`, the delivery time under `date` (seconds since 2001), and the request
+/// under `req` with `titl`, `subt`, `body` and the thread under `thre`.
+struct NotificationCenterRecord: Equatable, Sendable {
+    let recordID: Int64
+    let bundleIdentifier: String
+    let title: String
+    let subtitle: String
+    let body: String
+    let threadID: String?
+    let date: Date
+
+    static func parse(recordID: Int64, appIdentifier: String?, data: Data, fallbackDate: Date?) -> NotificationCenterRecord? {
+        guard let plist = try? PropertyListSerialization.propertyList(from: data, options: [], format: nil),
+              let root = plist as? [String: Any] else { return nil }
+        let request = root["req"] as? [String: Any] ?? [:]
+
+        func string(_ dictionary: [String: Any], _ key: String) -> String {
+            (dictionary[key] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        }
+        func date(_ value: Any?) -> Date? {
+            if let date = value as? Date { return date }
+            if let seconds = value as? Double { return Date(timeIntervalSinceReferenceDate: seconds) }
+            if let number = value as? NSNumber { return Date(timeIntervalSinceReferenceDate: number.doubleValue) }
+            return nil
+        }
+
+        let bundle = (root["app"] as? String) ?? appIdentifier ?? ""
+        let title = string(request, "titl")
+        let subtitle = string(request, "subt")
+        let body = string(request, "body")
+        guard !bundle.isEmpty, !(title.isEmpty && subtitle.isEmpty && body.isEmpty) else { return nil }
+        let thread = string(request, "thre")
+        return NotificationCenterRecord(
+            recordID: recordID,
+            bundleIdentifier: bundle,
+            title: title,
+            subtitle: subtitle,
+            body: body,
+            threadID: thread.isEmpty ? nil : thread,
+            date: date(root["date"]) ?? date(request["date"]) ?? fallbackDate ?? Date()
+        )
+    }
+
+    func notification(appName: String) -> NotchNotification {
+        let reply: NotchNotification.ReplyRoute
+        if bundleIdentifier == NotchNotificationPolicy.messagesBundleIdentifier,
+           let chatID = NotchNotificationPolicy.messagesChatID(fromThread: threadID) {
+            reply = .messages(chatID: chatID)
+        } else {
+            reply = .none
+        }
+        return NotchNotification(
+            // Notification Center reuses record ids after its newest rows are
+            // deleted, so the delivery time keeps ids unique across reuse.
+            id: "nc-\(recordID)-\(Int(date.timeIntervalSinceReferenceDate))",
+            source: .notificationCenter,
+            bundleIdentifier: bundleIdentifier,
+            appName: appName,
+            title: title,
+            subtitle: subtitle,
+            body: body,
+            date: date,
+            threadID: threadID,
+            reply: reply,
+            liveBannerID: nil
+        )
+    }
+}

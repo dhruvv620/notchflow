@@ -805,6 +805,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         MemoryUsageMonitor.shared.startMonitoring()
 
         WhatsAppManager.shared.start()
+        NotificationHub.shared.start()
 
         ReminderLiveActivityManager.shared.$activeWindowReminders
             .receive(on: RunLoop.main)

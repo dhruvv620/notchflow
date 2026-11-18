@@ -44,6 +44,7 @@ struct ContentView: View {
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @ObservedObject var coordinator = DynamicIslandViewCoordinator.shared
     @ObservedObject private var communications = CommunicationsManager.shared
+    @ObservedObject private var notificationHub = NotificationHub.shared
     @State private var showCallControls = false
     @ObservedObject var musicManager = MusicManager.shared
     @ObservedObject var timerManager = TimerManager.shared
@@ -969,8 +970,9 @@ struct ContentView: View {
                       CommunicationCompactActivity(call: call, notification: nil, cameraWidth: vm.closedNotchSize.width,
                                                    height: vm.effectiveClosedNotchHeight)
                   } else if vm.notchState == .closed, let notification = visibleCommunicationNotification {
-                      CommunicationCompactActivity(call: nil, notification: notification, cameraWidth: vm.closedNotchSize.width,
-                                                   height: vm.effectiveClosedNotchHeight)
+                      NotchNotificationCompactActivity(notification: notification, cameraWidth: vm.closedNotchSize.width,
+                                                       height: vm.effectiveClosedNotchHeight)
+                          .id(notification.id)
                   } else if coordinator.firstLaunch {
                       Spacer()
                       HelloAnimation().frame(width: 200, height: 80).onAppear(perform: {
@@ -1225,10 +1227,12 @@ struct ContentView: View {
         if Defaults[.communicationRespectFocus] && doNotDisturbManager.isDoNotDisturbActive && communications.priorityCall?.phase == .incoming { return nil }
         return communications.priorityCall
     }
-    private var visibleCommunicationNotification: CommunicationNotification? {
-        guard communications.enabled, communications.accessGranted, interactionsEnabled else { return nil }
+    private var visibleCommunicationNotification: NotchNotification? {
+        // Notifications no longer depend on Accessibility: Notification Center
+        // history and WhatsApp feed the inbox without it.
+        guard communications.enabled, interactionsEnabled, !lockScreenManager.isLocked else { return nil }
         if Defaults[.communicationRespectFocus] && doNotDisturbManager.isDoNotDisturbActive { return nil }
-        return communications.latestNotification
+        return notificationHub.alert
     }
     private var visibleCallOverlay: CommunicationCall? {
         guard let call = visibleCommunicationCall, call.phase == .incoming || showCallControls else { return nil }
@@ -1245,7 +1249,7 @@ struct ContentView: View {
         case .shelf: NotchShelfView()
         case .timer: NotchTimerView()
         case .reminders: NotchRemindersView()
-        case .notifications: CommunicationsInboxView()
+        case .notifications: NotchNotificationsView()
         case .calendar:
             NotchScrollableContent { StandaloneCalendarView().padding(.horizontal, 12) }
         case .stats: NotchScrollableContent { NotchStatsView() }
@@ -2024,10 +2028,16 @@ struct ContentView: View {
     // MARK: - Private Methods
     private func openNotch() {
         if visibleCommunicationCall != nil { showCallControls = true }
-        let opensNotification = visibleCommunicationCall == nil && visibleCommunicationNotification != nil
+        let announced = visibleCommunicationCall == nil ? visibleCommunicationNotification : nil
         withAnimation(.bouncy.speed(1.2)) {
             vm.open()
-            if opensNotification { coordinator.currentView = .notifications }
+            if let announced {
+                coordinator.currentView = .notifications
+                notificationHub.filter = nil
+                // Land on the announced notification with its actions showing.
+                notificationHub.highlight(announced.id)
+                notificationHub.dismissAlert()
+            }
         }
     }
 
