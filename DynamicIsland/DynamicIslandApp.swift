@@ -1769,6 +1769,7 @@ final class MediaControlsStateCoordinator {
 extension NSScreen {
     /// The CoreGraphics display ID: stable for a physical display while it is
     /// connected, unlike the NSScreen object or its (possibly shared) name.
+    @MainActor
     var notchDisplayID: CGDirectDisplayID? {
         (deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value
     }

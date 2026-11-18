@@ -30,6 +30,7 @@ struct NotchMorphEffect: ViewModifier, Animatable {
 
 extension AnyTransition {
     /// Unfolds from the notch on insertion, folds back on removal.
+    @MainActor
     static var notchMorph: AnyTransition {
         // Reduce Motion (NotchFlow's or the system's) gets a plain cross-fade.
         if Defaults[.notchReduceMotion] || NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
