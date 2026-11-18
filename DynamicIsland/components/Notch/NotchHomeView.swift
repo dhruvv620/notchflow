@@ -285,6 +285,11 @@ struct MusicControlsView: View {
                     .animation(.easeInOut(duration: 0.32), value: line)
                 }
             }
+            // With room to spare and no lyric line showing, say what plays next.
+            if showsLyrics && !(enableLyrics && !musicManager.currentLyrics.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) {
+                UpNextRow()
+                    .frame(maxWidth: width, alignment: .leading)
+            }
         }
     }
 

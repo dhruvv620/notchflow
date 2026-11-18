@@ -847,6 +847,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         WhatsAppManager.shared.start()
         NotificationHub.shared.start()
         MeetingManager.shared.start()
+        _ = UpNextManager.shared
 
         ReminderLiveActivityManager.shared.$activeWindowReminders
             .receive(on: RunLoop.main)
