@@ -40,6 +40,14 @@ struct WhatsAppRegression {
         try require(stored.chatJID == "628123@s.whatsapp.net" && stored.senderName == "Selene", "Message fields misread")
         try require(stored.previewText == WhatsAppMessage.label(forMediaType: "image", filename: nil), "Photo without caption has no label")
 
+        // GOWA omits `results` when a list is empty
+        let noDevices = try JSONDecoder().decode(GOWAResponse<[GOWADevice]>.self, from: Data(#"{"status":200,"code":"SUCCESS","message":"List devices"}"#.utf8))
+        try require(noDevices.results == nil, "Missing results field not accepted")
+        let devices = try JSONDecoder().decode(GOWAResponse<[GOWADevice]>.self, from: Data(#"""
+        {"status":200,"code":"SUCCESS","results":[{"id":"notchflow","state":"disconnected","created_at":"2026-11-18T10:00:00.123456Z"}]}
+        """#.utf8))
+        try require(devices.results?.first?.id == "notchflow", "Device list not decoded")
+
         // Webhook deliveries
         let mention = WhatsAppWebhookEvent(data: Data(#"""
         {"event":"message","payload":{"id":"3EB0","chat_id":"120363@g.us","from":"628123@s.whatsapp.net","sender_display_name":"Saved Contact","from_name":"John","timestamp":"2023-10-15T10:36:00Z","is_from_me":false,"body":"@628987 can you check this?","mentions":["628987@s.whatsapp.net"]}}

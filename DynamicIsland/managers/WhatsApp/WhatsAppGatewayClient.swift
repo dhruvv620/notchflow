@@ -22,6 +22,8 @@ enum WhatsAppGatewayError: LocalizedError {
     case notRunning
     case http(status: Int, code: String?, message: String?)
     case invalidResponse
+    /// The gateway answered, but not in the shape NotchFlow expects.
+    case unreadable(path: String, detail: String)
 
     var errorDescription: String? {
         switch self {
@@ -33,6 +35,8 @@ enum WhatsAppGatewayError: LocalizedError {
             return String(localized: "The gateway answered with HTTP \(status).")
         case .invalidResponse:
             return String(localized: "The gateway sent a response NotchFlow could not read.")
+        case let .unreadable(path, detail):
+            return String(localized: "The gateway's answer to \(path) could not be read (\(detail)).")
         }
     }
 
@@ -113,13 +117,21 @@ struct WhatsAppGatewayClient {
         do {
             return try JSONDecoder().decode(T.self, from: data)
         } catch {
-            throw WhatsAppGatewayError.invalidResponse
+            throw WhatsAppGatewayError.unreadable(path: request.url?.path ?? "?", detail: Self.describe(error))
         }
     }
 
-    private func get<T: Decodable>(_ path: String, query: [URLQueryItem] = [], scoped: Bool = true) async throws -> T {
+    /// GOWA omits `results` entirely when it is empty (`omitempty`), so an
+    /// empty list arrives as no field at all rather than as `[]`.
+    private func getOptional<T: Decodable>(_ path: String, query: [URLQueryItem] = [], scoped: Bool = true) async throws -> T? {
         let response: GOWAResponse<T> = try await send(makeRequest(path, query: query, scoped: scoped), as: GOWAResponse<T>.self)
-        guard let results = response.results else { throw WhatsAppGatewayError.invalidResponse }
+        return response.results
+    }
+
+    private func get<T: Decodable>(_ path: String, query: [URLQueryItem] = [], scoped: Bool = true) async throws -> T {
+        guard let results: T = try await getOptional(path, query: query, scoped: scoped) else {
+            throw WhatsAppGatewayError.invalidResponse
+        }
         return results
     }
 
@@ -137,6 +149,20 @@ struct WhatsAppGatewayClient {
         return response.results
     }
 
+    private static func describe(_ error: Error) -> String {
+        guard let decoding = error as? DecodingError else { return error.localizedDescription }
+        func path(_ context: DecodingError.Context) -> String {
+            context.codingPath.map { $0.intValue.map(String.init) ?? $0.stringValue }.joined(separator: ".")
+        }
+        switch decoding {
+        case let .keyNotFound(key, context): return "missing \(path(context)).\(key.stringValue)"
+        case let .typeMismatch(_, context): return "unexpected type at \(path(context))"
+        case let .valueNotFound(_, context): return "null at \(path(context))"
+        case let .dataCorrupted(context): return "malformed data at \(path(context))"
+        @unknown default: return "unknown decoding error"
+        }
+    }
+
     private static func pathComponent(_ value: String) -> String {
         var allowed = CharacterSet.urlPathAllowed
         allowed.remove(charactersIn: "/")
@@ -150,7 +176,8 @@ struct WhatsAppGatewayClient {
     }
 
     func devices() async throws -> [GOWADevice] {
-        try await get("/devices", scoped: false)
+        let devices: [GOWADevice]? = try await getOptional("/devices", scoped: false)
+        return devices ?? []
     }
 
     func createDevice() async throws {
@@ -205,20 +232,20 @@ struct WhatsAppGatewayClient {
     // MARK: Chats and messages
 
     func chats(limit: Int = 40) async throws -> [GOWAChat] {
-        let list: GOWAChatList = try await get(
+        let list: GOWAChatList? = try await getOptional(
             "/chats",
             query: [URLQueryItem(name: "limit", value: String(limit)), URLQueryItem(name: "offset", value: "0")]
         )
-        return list.data ?? []
+        return list?.data ?? []
     }
 
     /// Messages of one chat, newest first, as the gateway returns them.
     func messages(chatJID: String, limit: Int = 50) async throws -> [GOWAMessage] {
-        let list: GOWAMessageList = try await get(
+        let list: GOWAMessageList? = try await getOptional(
             "/chat/\(Self.pathComponent(chatJID))/messages",
             query: [URLQueryItem(name: "limit", value: String(limit)), URLQueryItem(name: "offset", value: "0")]
         )
-        return list.data ?? []
+        return list?.data ?? []
     }
 
     func sendText(to chatJID: String, text: String, replyTo messageID: String? = nil) async throws -> String? {
