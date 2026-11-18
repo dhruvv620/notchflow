@@ -3014,7 +3014,7 @@ struct Media: View {
                 Defaults.Toggle(key: .showLyricsUnderNotch) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Sing along under the closed notch")
-                        Text("Shows the line being sung, with a highlight that sweeps across it in time with the music.")
+                        Text("While the lyrics button in the Music tab is on, the line being sung also shows under the closed notch, with a highlight that sweeps across it in time with the music.")
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 }

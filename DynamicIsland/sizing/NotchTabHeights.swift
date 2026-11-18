@@ -3,6 +3,11 @@
 import Defaults
 import SwiftUI
 
+extension Defaults.Keys {
+    /// How big the Cuely panel is (CuelyPanelSize raw value).
+    static let cuelyPanelSize = Key<Int>("cuelyPanelSize", default: CuelyPanelSize.regular.rawValue)
+}
+
 extension NotchViews {
     /// How tall this tab wants the open notch. One table for the window, the
     /// visible panel and the view model, so the three can no longer disagree.
@@ -54,5 +59,10 @@ func tabOpenNotchSize(for view: NotchViews, preset: CGSize, screen: String?, clo
         reported = nil
     }
     let height = NotchTabHeightPolicy.height(preset: preset.height, rule: view.heightRule, reportedPanelHeight: reported)
+    if view == .cuely, !Defaults[.enableMinimalisticUI] {
+        // Cuely can be made bigger from its own size button.
+        let size = CuelyPanelSize(rawValue: Defaults[.cuelyPanelSize]) ?? .regular
+        return CGSize(width: max(preset.width, CGFloat(size.minimumWidth)), height: height + CGFloat(size.extraHeight))
+    }
     return CGSize(width: preset.width, height: height)
 }

@@ -75,7 +75,9 @@ class DynamicIslandWindow: NSPanel {
 
     /// True while AppKit lays this window out (its display-cycle layout pass).
     private var isInLayoutPass = false
-    private var deferredFrame: (rect: NSRect, display: Bool)?
+    /// True while AppDelegate applies the frame it computed for this window.
+    private var isApplyingOwnedFrame = false
+    private var deferredFrame: NSRect?
     private var deferredFrameScheduled = false
 
     override func layoutIfNeeded() {
@@ -84,15 +86,26 @@ class DynamicIslandWindow: NSPanel {
         super.layoutIfNeeded()
     }
 
+    /// The only way the app sizes the notch window. AppDelegate owns the
+    /// frame; SwiftUI lays out inside it.
+    func setOwnedFrame(_ frameRect: NSRect) {
+        isApplyingOwnedFrame = true
+        defer { isApplyingOwnedFrame = false }
+        setFrame(frameRect, display: false)
+    }
+
     override func setFrame(_ frameRect: NSRect, display flag: Bool) {
-        // SwiftUI's hosting view can resize the window from inside the
-        // window's own layout pass (windowDidLayout -> updateAnimatedWindowSize).
-        // Resizing there invalidates the layout of views being laid out, and
-        // AppKit throws ("needs another layout pass") and aborts. Keep the
-        // newest requested frame and apply it right after the pass instead.
         if isInLayoutPass {
-            guard frameRect != frame else { return }
-            deferredFrame = (frameRect, flag)
+            // SwiftUI's hosting view tries to animate the window size from
+            // inside the window's own layout pass (windowDidLayout ->
+            // updateAnimatedWindowSize). Resizing there makes AppKit throw
+            // ("needs another layout pass") and abort, and the window size is
+            // AppDelegate's anyway, so those requests are ignored. Delaying
+            // them instead made them arrive late and fight the app's own
+            // frame, which shook the notch on every tab switch.
+            guard isApplyingOwnedFrame, frameRect != frame else { return }
+            // The app's own frame, requested mid-layout: apply it right after.
+            deferredFrame = frameRect
             guard !deferredFrameScheduled else { return }
             deferredFrameScheduled = true
             DispatchQueue.main.async { [weak self] in
@@ -100,12 +113,12 @@ class DynamicIslandWindow: NSPanel {
                 self.deferredFrameScheduled = false
                 guard let pending = self.deferredFrame else { return }
                 self.deferredFrame = nil
-                self.setFrame(pending.rect, display: pending.display)
+                self.setOwnedFrame(pending)
             }
             return
         }
-        // A frame applied outside layout supersedes one held from inside it.
-        deferredFrame = nil
+        // A newer frame of the app's own supersedes one held from mid-layout.
+        if isApplyingOwnedFrame { deferredFrame = nil }
         super.setFrame(frameRect, display: flag)
         // AppKit may call this while laying out its hosting view. Keep native
         // event-property writes out of that window display/constraint cycle.

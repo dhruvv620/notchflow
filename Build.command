@@ -58,6 +58,12 @@ printf '\nChecking Cuely script validation and persistence...\n'
     "$SOURCE_DIR/tests/CuelyScriptStoreRegression.swift" -o "$BUILD_ROOT/CuelyScriptStoreRegression"
 "$BUILD_ROOT/CuelyScriptStoreRegression"
 
+printf '\nChecking Cuely voice following...\n'
+/usr/bin/xcrun swiftc -swift-version 5 -parse-as-library \
+    "$SOURCE_DIR/DynamicIsland/helpers/CuelyVoiceFollowPolicy.swift" \
+    "$SOURCE_DIR/tests/CuelyVoiceFollowRegression.swift" -o "$BUILD_ROOT/CuelyVoiceFollowRegression"
+"$BUILD_ROOT/CuelyVoiceFollowRegression"
+
 printf '\nChecking timer modes, tab ordering and visible input regions...\n'
 /usr/bin/xcrun swiftc -swift-version 5 -parse-as-library \
     "$SOURCE_DIR/DynamicIsland/helpers/TimerModeLifecycle.swift" \

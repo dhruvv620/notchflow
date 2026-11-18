@@ -42,6 +42,8 @@ final class CuelyTranscriptionManager: ObservableObject {
     private var pendingStartID: UUID?
     private var userRequestedRunning = false
     private var lifecycleObservers = Set<AnyCancellable>()
+    /// Words from the script being read, so the recognizer favours them.
+    private var contextualHints: [String] = []
 
     init(locale: Locale = .current) {
         recognizer = SFSpeechRecognizer(locale: locale)
@@ -205,6 +207,7 @@ final class CuelyTranscriptionManager: ObservableObject {
         request.shouldReportPartialResults = true
         request.addsPunctuation = true
         request.taskHint = .dictation
+        request.contextualStrings = contextualHints
         // Prefer a local recognizer whenever this locale has one. When it does
         // not, the OS-granted Speech Recognition service is the fallback; the
         // status copy above makes that distinction visible while recording.
@@ -273,6 +276,18 @@ final class CuelyTranscriptionManager: ObservableObject {
 
     func requestAndStart(append: Bool = false) async {
         await start(append: append)
+    }
+
+    /// Listens while the user reads a script; the script's words are given
+    /// to the recognizer as hints.
+    func startFollowing(scriptText: String) async {
+        var seen = Set<String>()
+        contextualHints = CuelyVoiceFollowPolicy.words(in: scriptText)
+            .map { (scriptText as NSString).substring(with: $0.range) }
+            .filter { $0.count >= 4 && seen.insert($0.lowercased()).inserted }
+            .prefix(100)
+            .map { $0 }
+        await start(append: false)
     }
 
     func clear() {
@@ -363,7 +378,8 @@ final class CuelyTranscriptionManager: ObservableObject {
         let segment = segment.trimmingCharacters(in: .whitespacesAndNewlines)
         if prefix.isEmpty { return segment }
         if segment.isEmpty { return prefix }
-        return prefix + "\n" + segment
+        // Only the end is ever used; a long reading must not grow without bound.
+        return String((prefix + "\n" + segment).suffix(4_000))
     }
 
     private static func mapSpeechAccess(_ status: SFSpeechRecognizerAuthorizationStatus) -> AccessState {

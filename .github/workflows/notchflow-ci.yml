@@ -34,6 +34,10 @@ jobs:
         run: |
           swiftc -swift-version 5 -parse-as-library DynamicIsland/models/CuelyScript.swift DynamicIsland/managers/CuelyScriptPersistence.swift tests/CuelyScriptStoreRegression.swift -o /tmp/cuely-script-tests
           /tmp/cuely-script-tests
+      - name: Check Cuely voice following
+        run: |
+          swiftc -swift-version 5 -parse-as-library DynamicIsland/helpers/CuelyVoiceFollowPolicy.swift tests/CuelyVoiceFollowRegression.swift -o /tmp/cuely-follow-tests
+          /tmp/cuely-follow-tests
       - name: Check timer lifecycle and tab order
         run: |
           swiftc -swift-version 5 -parse-as-library DynamicIsland/helpers/TimerModeLifecycle.swift tests/TimerModeRegression.swift -o /tmp/timer-mode-tests

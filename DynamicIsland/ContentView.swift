@@ -71,6 +71,8 @@ struct ContentView: View {
     @Default(.showLyricsUnderNotch) var showLyricsUnderNotch
     // Re-render the panel size when the Music tab's lyrics panel opens or closes.
     @Default(.musicLyricsExpanded) var musicLyricsExpanded
+    // Re-render the panel size when Cuely is made bigger or smaller.
+    @Default(.cuelyPanelSize) var cuelyPanelSize
     
     @Default(.enableStatsFeature) var enableStatsFeature
     @Default(.showCpuGraph) var showCpuGraph
@@ -174,7 +176,8 @@ struct ContentView: View {
         }
         
         // Minimalistic Home keeps its own extension-driven height below.
-        if coordinator.currentView.heightRule != .preset && !(enableMinimalisticUI && coordinator.currentView == .home) {
+        if (coordinator.currentView.heightRule != .preset || coordinator.currentView == .cuely)
+            && !(enableMinimalisticUI && coordinator.currentView == .home) {
             return tabOpenNotchSize(for: coordinator.currentView, preset: baseSize,
                                     screen: vm.screen, closedHeight: vm.effectiveClosedNotchHeight)
         }
@@ -375,6 +378,9 @@ struct ContentView: View {
     /// The sung line under the closed notch, while synced lyrics play.
     private var isClosedLyricsVisible: Bool {
         Defaults[.enableLyrics]
+            // Follows the lyrics button in the Music tab: lyrics off there
+            // means no lyrics under the closed notch either.
+            && musicLyricsExpanded
             && showLyricsUnderNotch
             && vm.notchState == .closed
             && musicManager.isPlaying

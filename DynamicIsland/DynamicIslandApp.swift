@@ -480,7 +480,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // A non-finite or empty frame raises an AppKit exception (a crash).
         guard targetFrame.isUsableWindowFrame else { return }
         if window.frame != targetFrame {
-            window.setFrame(targetFrame, display: false)
+            if let notchWindow = window as? DynamicIslandWindow {
+                notchWindow.setOwnedFrame(targetFrame)
+            } else {
+                window.setFrame(targetFrame, display: false)
+            }
         }
         
         if changeAlpha {
@@ -653,7 +657,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Opening resizes from inside a SwiftUI update; forcing a synchronous
         // redraw there re-enters the hosting view's layout. Let AppKit draw on
         // its next display pass instead.
-        window.setFrame(targetFrame, display: false)
+        if let notchWindow = window as? DynamicIslandWindow {
+            notchWindow.setOwnedFrame(targetFrame)
+        } else {
+            window.setFrame(targetFrame, display: false)
+        }
     }
 
     /// The notch window that hosts a given view model, on any display.
@@ -778,6 +786,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Opening or closing the Music tab's lyrics panel changes its height.
         Defaults.publisher(.musicLyricsExpanded, options: []).map { _ in true }
             .merge(with: Defaults.publisher(.enableLyrics, options: []).map { _ in true })
+            .merge(with: Defaults.publisher(.cuelyPanelSize, options: []).map { _ in true })
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.updateWindowSizeForTabSwitch() }
             .store(in: &cancellables)

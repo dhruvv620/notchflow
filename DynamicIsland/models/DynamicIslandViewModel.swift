@@ -372,7 +372,7 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
         let baseSize = Defaults[.enableMinimalisticUI] ? minimalisticOpenNotchSize(isDynamicIslandMode: shouldUseDynamicIslandMode(for: screen)) : openNotchSize
         let adjustedSize = baseSize
 
-        if coordinator.currentView.heightRule != .preset {
+        if coordinator.currentView.heightRule != .preset || coordinator.currentView == .cuely {
             return tabOpenNotchSize(for: coordinator.currentView, preset: baseSize,
                                     screen: screen, closedHeight: effectiveClosedNotchHeight)
         }
