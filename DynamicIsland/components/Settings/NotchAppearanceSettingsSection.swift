@@ -236,6 +236,15 @@ struct NotchAppearanceSettingsSection: View {
         Section {
             Toggle("Reduce motion", isOn: $reduceMotion).toggleStyle(.switch)
                 .settingsHighlight(id: highlightID("Reduce notch motion"))
+            Defaults.Toggle(key: .enableNotchMorph) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Unfold content out of the notch")
+                    Text("Content grows out of the notch as it opens. Off uses a quicker fade.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            .toggleStyle(.switch)
+            .disabled(reduceMotion)
             if systemReduceMotion {
                 Text("Reduce Motion is also enabled in macOS Accessibility settings.")
                     .font(.caption).foregroundStyle(.secondary)

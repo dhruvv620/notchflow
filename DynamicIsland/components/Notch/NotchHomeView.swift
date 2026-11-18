@@ -207,6 +207,7 @@ struct MusicControlsView: View {
     @Default(.showMediaOutputControl) private var showMediaOutputControl
     @Default(.musicSkipBehavior) private var musicSkipBehavior
     @Default(.enableLyrics) private var enableLyrics
+    @Default(.musicLyricsExpanded) private var musicLyricsExpanded
     private let seekInterval: TimeInterval = 10
     private let skipMagnitude: CGFloat = 6
 
@@ -256,37 +257,9 @@ struct MusicControlsView: View {
                 frameWidth: width
             )
             .fontWeight(.medium)
-            // Lyrics shown under the author name (same font size as author) when enabled in settings
-            if enableLyrics && showsLyrics {
-                let transition = AnyTransition.asymmetric(
-                    insertion: .move(edge: .bottom).combined(with: .opacity),
-                    removal: .move(edge: .top).combined(with: .opacity)
-                )
-
-                let line = musicManager.currentLyrics.trimmingCharacters(in: .whitespacesAndNewlines)
-
-                if !line.isEmpty {
-                    let lyricsBinding = Binding<String>(
-                        get: { musicManager.currentLyrics },
-                        set: { _ in }
-                    )
-
-                    MarqueeText(
-                        lyricsBinding,
-                        font: .system(size: 12, weight: .regular),
-                        nsFont: .headline,
-                        textColor: .white.opacity(0.7),
-                        minDuration: 0.35,
-                        frameWidth: width
-                    )
-                    .padding(.top, 2)
-                    .id(line)
-                    .transition(transition)
-                    .animation(.easeInOut(duration: 0.32), value: line)
-                }
-            }
-            // With room to spare and no lyric line showing, say what plays next.
-            if showsLyrics && !(enableLyrics && !musicManager.currentLyrics.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) {
+            // With room to spare, say what plays next. Lyrics live behind the
+            // lyrics button in the tab header.
+            if showsLyrics {
                 UpNextRow()
                     .frame(maxWidth: width, alignment: .leading)
             }
@@ -557,12 +530,22 @@ struct MusicControlsView: View {
         case .airPlay:
             AirPlayPickerButton()
         case .lyrics:
+            // Same as the header's lyrics button: shows or hides the lyrics
+            // panel under the player, turning lyrics on if they were off.
+            let showing = enableLyrics && Defaults[.musicLyricsExpanded]
             HoverButton(
-                icon: enableLyrics ? "quote.bubble.fill" : "quote.bubble",
-                iconColor: enableLyrics ? brandAccentColor : appearance.accentColor.opacity(0.65),
+                icon: showing ? "quote.bubble.fill" : "quote.bubble",
+                iconColor: showing ? brandAccentColor : appearance.accentColor.opacity(0.65),
                 scale: .medium
             ) {
-                enableLyrics.toggle()
+                withAnimation(.smooth(duration: NotchTabHeightPolicy.animationDuration)) {
+                    if !enableLyrics {
+                        enableLyrics = true
+                        Defaults[.musicLyricsExpanded] = true
+                    } else {
+                        Defaults[.musicLyricsExpanded].toggle()
+                    }
+                }
             }
         }
     }
@@ -617,6 +600,8 @@ struct NotchHomeView: View {
     @ObservedObject private var musicManager = MusicManager.shared
     @Default(.showStandardMediaControls) private var showStandardMediaControls
     @Default(.autoHideInactiveNotchMediaPlayer) private var autoHideInactiveNotchMediaPlayer
+    @Default(.musicLyricsExpanded) private var lyricsExpanded
+    @Default(.enableLyrics) private var lyricsEnabled
     let albumArtNamespace: Namespace.ID
 
     /// Whether the music player should actively display (enabled AND has real content).
@@ -650,6 +635,10 @@ struct NotchHomeView: View {
                     if shouldShowMusicPlayer {
                         MusicPlayerView(albumArtNamespace: albumArtNamespace)
                             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                        if lyricsExpanded && lyricsEnabled {
+                            MusicLyricsPanel()
+                                .transition(.move(edge: .bottom).combined(with: .opacity))
+                        }
                     } else {
                         VStack(spacing: 5) {
                             Image(systemName: "music.note")
@@ -677,6 +666,9 @@ struct NotchHomeView: View {
                     .accessibilityLabel(musicManager.isPlaying ? "Playing" : "Paused")
             }
             Spacer(minLength: 8)
+            if shouldShowMusicPlayer {
+                MusicLyricsToggle()
+            }
             MediaSourcePicker()
         }
         .frame(height: 14)

@@ -8,7 +8,10 @@ extension NotchViews {
     /// visible panel and the view model, so the three can no longer disagree.
     var heightRule: NotchTabHeightRule {
         switch self {
-        case .home, .shelf, .llmUsage, .colorPicker, .clipboard, .cuely, .reminders, .calendar:
+        case .home:
+            // Taller while the lyrics panel is open under the player.
+            return .fitsContent(shrinkBy: 0, growBy: MusicLyricsPanel.height + 6)
+        case .shelf, .llmUsage, .colorPicker, .clipboard, .cuely, .reminders, .calendar:
             return .preset
         // Stats and extension tabs keep their own row/preferred-height logic.
         case .stats, .extensionExperience:
@@ -39,6 +42,9 @@ func tabOpenNotchSize(for view: NotchViews, preset: CGSize, screen: String?, clo
     let reported: CGFloat?
     if view == .notes {
         reported = coordinator.notesLayoutState.preferredHeight
+    } else if view == .home {
+        let lyricsOpen = Defaults[.musicLyricsExpanded] && Defaults[.enableLyrics] && !Defaults[.enableMinimalisticUI]
+        reported = lyricsOpen ? preset.height + MusicLyricsPanel.height + 6 : nil
     } else if let content = coordinator.reportedContentHeights[view] {
         // Tabs report their content; the panel adds the notch header above it.
         let chrome = notchExpandedHeaderHeight(for: screen, closedHeight: closedHeight,

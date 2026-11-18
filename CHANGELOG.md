@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Lyrics button in the Music tab**: a lyrics button in the Now Playing header (and the Lyrics control slot) shows or hides a lyrics panel under the player, with the previous, current and next lines and a highlight sweeping across the sung line. The notch grows to fit it and shrinks back when it is hidden. Lyrics no longer appear under the artist name on their own.
+
+### Changed
+- **Unfolding animation is now optional and off by default**: Settings > Appearance > Unfold content out of the notch. Without it the notch opens with the quicker fade.
 - **Up next**: the Music tab shows what plays next under the artist when there is room (Spotify's queue through the signed-in web session, or the following tracks of the playing Apple Music playlist when not shuffled). Click it for the next five and pick one to skip ahead to it.
 - **Sing along under the closed notch** (Settings > Media, with lyrics on): while a song with synced lyrics plays, the line being sung shows under the closed notch, tinted with the album color, and a highlight sweeps across it in time with the music (30 fps). Instrumental stretches show a pulsing note; Peek takes the line's place while you hover.
 - **Pomodoro history and Focus**: completed focus sessions are recorded (90 days kept, sessions finished during sleep counted too), and the Pomodoro section shows the last seven days as bars with today's minutes, the week's total and your streak. Optionally, Pomodoro runs a Shortcut when focus starts and another on breaks or when stopped, so a Focus can turn on and off with it (make two shortcuts with Set Focus and name them in the Pomodoro settings).

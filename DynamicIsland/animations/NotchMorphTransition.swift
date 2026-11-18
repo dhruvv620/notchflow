@@ -4,6 +4,11 @@ import AppKit
 import Defaults
 import SwiftUI
 
+extension Defaults.Keys {
+    /// Content unfolds out of the notch when it opens. Off: a plain fade.
+    static let enableNotchMorph = Key<Bool>("enableNotchMorph", default: false)
+}
+
 /// Content that grows out of the notch instead of fading in after it.
 ///
 /// The panel's shape already animates its size and corner radii; this makes
@@ -32,8 +37,9 @@ extension AnyTransition {
     /// Unfolds from the notch on insertion, folds back on removal.
     @MainActor
     static var notchMorph: AnyTransition {
-        // Reduce Motion (NotchFlow's or the system's) gets a plain cross-fade.
-        if Defaults[.notchReduceMotion] || NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+        // Off by choice, or Reduce Motion (NotchFlow's or the system's): a plain cross-fade.
+        if !Defaults[.enableNotchMorph] || Defaults[.notchReduceMotion]
+            || NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
             return .opacity
         }
         return .asymmetric(

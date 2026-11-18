@@ -775,6 +775,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }.store(in: &cancellables)
 
+        // Opening or closing the Music tab's lyrics panel changes its height.
+        Defaults.publisher(.musicLyricsExpanded, options: []).map { _ in true }
+            .merge(with: Defaults.publisher(.enableLyrics, options: []).map { _ in true })
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.updateWindowSizeForTabSwitch() }
+            .store(in: &cancellables)
+
         // A tab whose content grew or shrank changes the notch height too.
         coordinator.$reportedContentHeights
             .removeDuplicates()

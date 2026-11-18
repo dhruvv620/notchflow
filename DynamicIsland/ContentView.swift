@@ -66,6 +66,8 @@ struct ContentView: View {
     @ObservedObject var remindersManager = RemindersManager.shared
     @Default(.showTodayProgressRing) var showTodayProgressRing
     @Default(.showLyricsUnderNotch) var showLyricsUnderNotch
+    // Re-render the panel size when the Music tab's lyrics panel opens or closes.
+    @Default(.musicLyricsExpanded) var musicLyricsExpanded
     
     @Default(.enableStatsFeature) var enableStatsFeature
     @Default(.showCpuGraph) var showCpuGraph
@@ -168,7 +170,8 @@ struct ContentView: View {
             }
         }
         
-        if coordinator.currentView.heightRule != .preset {
+        // Minimalistic Home keeps its own extension-driven height below.
+        if coordinator.currentView.heightRule != .preset && !(enableMinimalisticUI && coordinator.currentView == .home) {
             return tabOpenNotchSize(for: coordinator.currentView, preset: baseSize,
                                     screen: vm.screen, closedHeight: vm.effectiveClosedNotchHeight)
         }
