@@ -19,6 +19,10 @@ struct NotchTimerView: View {
     @Default(.timerPresets) private var presets
     @AppStorage("notchflowTimerSection") private var storedSection = TimerSection.timer.rawValue
     @AppStorage("customTimerDuration") private var timerDuration: Double = 600
+    @ObservedObject private var focusHistory = FocusHistory.shared
+    @Default(.pomodoroControlsFocus) private var pomodoroControlsFocus
+    @Default(.pomodoroFocusOnShortcut) private var focusOnShortcut
+    @Default(.pomodoroFocusOffShortcut) private var focusOffShortcut
     @AppStorage("notchflowPomodoroFocusMinutes") private var focusMinutes: Double = 25
     @AppStorage("notchflowPomodoroShortBreakMinutes") private var shortBreakMinutes: Double = 5
     @AppStorage("notchflowPomodoroLongBreakMinutes") private var longBreakMinutes: Double = 15
@@ -205,11 +209,16 @@ struct NotchTimerView: View {
                 Text(modes.pomodoro.isPaused ? "Paused" : "Next session starts automatically")
                     .font(.caption2).foregroundStyle(.secondary)
                 Spacer(minLength: 0)
+                FocusWeekStrip()
             } else {
                 CompactDurationRuler(minutes: $focusMinutes, accent: appearance.accentColor)
             }
-            Text("\(Int(shortBreakMinutes))m break · \(Int(longBreakMinutes))m long break after every \(sessionsBeforeLongBreak) sessions · no session limit")
-                .font(.system(size: 10)).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.85)
+            if !modes.pomodoro.isActive && focusHistory.weekMinutes > 0 {
+                FocusWeekStrip()
+            } else {
+                Text("\(Int(shortBreakMinutes))m break · \(Int(longBreakMinutes))m long break after every \(sessionsBeforeLongBreak) sessions · no session limit")
+                    .font(.system(size: 10)).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.85)
+            }
         }
     }
 
@@ -238,6 +247,14 @@ struct NotchTimerView: View {
                 Stepper("Short break: \(Int(shortBreakMinutes)) min", value: $shortBreakMinutes, in: 1...60)
                 Stepper("Long break: \(Int(longBreakMinutes)) min", value: $longBreakMinutes, in: 1...120)
                 Stepper("Long break every \(sessionsBeforeLongBreak) sessions", value: $sessionsBeforeLongBreak, in: 1...12)
+                Divider()
+                Defaults.Toggle(key: .pomodoroControlsFocus) { Text("Turn on a Focus during focus sessions") }
+                if pomodoroControlsFocus {
+                    TextField("Shortcut for focus", text: $focusOnShortcut)
+                    TextField("Shortcut for breaks", text: $focusOffShortcut)
+                    Text("In the Shortcuts app, make two shortcuts with Set Focus (on, and off) and enter their names here.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
                 if modes.pomodoro.isActive { Text("End the current Pomodoro to change its durations.").font(.caption).foregroundStyle(.secondary) }
             } else {
                 HStack {

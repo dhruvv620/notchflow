@@ -40,6 +40,7 @@ final class TimerModesManager: ObservableObject {
         pomodoro = next
         mirrorNewPhase(at: Date())
         startTicker()
+        FocusHistory.shared.pomodoroEntered(pomodoro.phase)
     }
 
     func pausePomodoro() {
@@ -70,6 +71,7 @@ final class TimerModesManager: ObservableObject {
         next.reset()
         pomodoro = next
         if shouldStopTimer { timer.forceStopTimer() }
+        FocusHistory.shared.pomodoroEntered(nil)
     }
 
     func startNormalTimer(duration: TimeInterval) {
@@ -121,8 +123,15 @@ final class TimerModesManager: ObservableObject {
         }
         guard !pomodoro.isPaused else { return }
         var next = pomodoro
+        let completedBefore = next.completedFocusSessions
         let changed = next.update(at: now)
         pomodoro = next
+        // Count focus sessions that finished, even several after a long sleep.
+        let finished = min(8, max(0, next.completedFocusSessions - completedBefore))
+        if finished > 0 {
+            FocusHistory.shared.recordFocus(minutes: Double(finished) * next.configuration.focusDuration / 60, at: now)
+        }
+        if changed { FocusHistory.shared.pomodoroEntered(next.phase) }
         if changed {
             mirrorNewPhase(at: now)
             timer.playManagedPhaseSound()

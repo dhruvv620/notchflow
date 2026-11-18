@@ -95,6 +95,12 @@ printf '\nChecking native hosting and communications...\n'
 /usr/bin/xcrun swiftc -swift-version 5 -parse-as-library "$SOURCE_DIR/DynamicIsland/Communications/CommunicationModels.swift" "$SOURCE_DIR/DynamicIsland/Communications/NotificationCardPolicy.swift" "$SOURCE_DIR/tests/NotificationCardRegression.swift" -o "$BUILD_ROOT/NotificationCardRegression"
 "$BUILD_ROOT/NotificationCardRegression"
 
+printf '\nChecking focus history...\n'
+/usr/bin/xcrun swiftc -swift-version 5 -parse-as-library \
+    "$SOURCE_DIR/DynamicIsland/helpers/FocusHistoryPolicy.swift" \
+    "$SOURCE_DIR/tests/FocusHistoryRegression.swift" -o "$BUILD_ROOT/FocusHistoryRegression"
+"$BUILD_ROOT/FocusHistoryRegression"
+
 printf '\nChecking todo capture and today progress...\n'
 /usr/bin/xcrun swiftc -swift-version 5 -parse-as-library \
     "$SOURCE_DIR/DynamicIsland/helpers/TodoCapturePolicy.swift" \
