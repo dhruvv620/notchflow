@@ -199,6 +199,8 @@ struct ContentView: View {
 
     @State private var hoverTask: Task<Void, Never>?
     @State private var isHovering: Bool = false
+    /// The one-line preview shown while hovering the closed notch (Peek mode).
+    @State private var isPeeking: Bool = false
     @State private var lastHapticTime: Date = Date()
     @State private var hoverClickMonitor: Any?
     @State private var hoverClickLocalMonitor: Any?
@@ -319,6 +321,10 @@ struct ContentView: View {
     /// measured closed bounds. Include hover growth and the temporary battery
     /// HUD's real dimensions rather than treating every closed surface as the
     /// physical camera cutout.
+    private var peekLineWidth: CGFloat {
+        max(vm.closedNotchSize.width + 140, 280)
+    }
+
     private var isWhatsAppBannerVisible: Bool {
         whatsAppManager.banner != nil
             && vm.notchState == .closed
@@ -333,6 +339,11 @@ struct ContentView: View {
         let closedPadding = activeCornerRadiusInsets.closed.bottom * 2
         var width = vm.closedNotchSize.width + baseHeight * 2 + closedPadding
         var height = baseHeight + hoverGrowth
+
+        if isPeeking && vm.notchState == .closed {
+            width = max(width, peekLineWidth + closedPadding)
+            height += NotchPeekLine.height
+        }
 
         if isWhatsAppBannerVisible {
             // The announcement adds a line of text under the notch; keep it clickable.
@@ -1088,6 +1099,11 @@ struct ContentView: View {
                            Rectangle().fill(.clear).frame(width: vm.closedNotchSize.width - 20, height: vm.effectiveClosedNotchHeight)
                        }
                       
+                      if isPeeking && vm.notchState == .closed && !isSneakPeekVisibleOnCurrentScreen {
+                          NotchPeekLine(width: peekLineWidth)
+                              .transition(.notchMorph)
+                      }
+
                       if isSneakPeekVisibleOnCurrentScreen {
                           if (coordinator.sneakPeek.type != .music) && (coordinator.sneakPeek.type != .battery) && (coordinator.sneakPeek.type != .timer) && (coordinator.sneakPeek.type != .reminder) && (coordinator.sneakPeek.type != .capsLock) && !coordinator.sneakPeek.type.isExtensionPayload && !Defaults[.inlineHUD] && !isAirPodsListeningModeSneak && ((coordinator.sneakPeek.type != .volume && coordinator.sneakPeek.type != .brightness && coordinator.sneakPeek.type != .backlight) || vm.notchState == .closed) {
                               SystemEventIndicatorModifier(eventType: $coordinator.sneakPeek.type, value: $coordinator.sneakPeek.value, icon: $coordinator.sneakPeek.icon, sendEventBack: { _ in
@@ -2016,6 +2032,7 @@ struct ContentView: View {
 
     // MARK: - Private Methods
     private func openNotch() {
+        isPeeking = false
         if visibleCommunicationCall != nil { showCallControls = true }
         let announced = visibleCommunicationCall == nil ? visibleCommunicationNotification : nil
         withAnimation(.bouncy.speed(1.2)) {
@@ -2237,6 +2254,33 @@ struct ContentView: View {
 
             let shouldFocusTimerTab = enableTimerFeature && timerDisplayMode == .tab && timerManager.isTimerActive && !enableMinimalisticUI
 
+            // Peek mode: preview first, open only on a click or a longer hover.
+            if Defaults[.enableNotchPeek] && !enableMinimalisticUI,
+               vm.notchState == .closed, !isSneakPeekVisibleOnCurrentScreen {
+                let opensOnHover = Defaults[.openNotchOnHover] || shouldFocusTimerTab
+                hoverTask = Task {
+                    try? await Task.sleep(for: .seconds(Defaults[.minimumHoverDuration]))
+                    guard !Task.isCancelled else { return }
+                    await MainActor.run {
+                        guard self.vm.notchState == .closed, self.isHovering else { return }
+                        withAnimation(.snappy(duration: 0.25)) { self.isPeeking = true }
+                    }
+                    guard opensOnHover else { return }
+                    try? await Task.sleep(for: .seconds(0.9))
+                    guard !Task.isCancelled else { return }
+                    await MainActor.run {
+                        guard self.vm.notchState == .closed,
+                              self.isHovering,
+                              !self.coordinator.isHoverOpenSuppressed else { return }
+                        if shouldFocusTimerTab {
+                            withAnimation(.smooth) { self.coordinator.currentView = .timer }
+                        }
+                        self.openNotch()
+                    }
+                }
+                return
+            }
+
             guard vm.notchState == .closed,
                 !isSneakPeekVisibleOnCurrentScreen,
                 (Defaults[.openNotchOnHover] || shouldFocusTimerTab) else { return }
@@ -2260,6 +2304,9 @@ struct ContentView: View {
                 }
             }
         } else {
+            if isPeeking {
+                withAnimation(.snappy(duration: 0.2)) { isPeeking = false }
+            }
             hoverTask = Task {
                 try? await Task.sleep(for: .milliseconds(100))
                 guard !Task.isCancelled else { return }

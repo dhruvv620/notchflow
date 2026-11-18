@@ -731,6 +731,7 @@ struct SettingsView: View {
             SettingsSearchEntry(tab: .general, title: "Extend hover area", keywords: ["hover", "cursor"], highlightID: SettingsTab.general.highlightID(for: "Extend hover area")),
             SettingsSearchEntry(tab: .general, title: "Enable haptics", keywords: ["haptic", "feedback"], highlightID: SettingsTab.general.highlightID(for: "Enable haptics")),
             SettingsSearchEntry(tab: .general, title: "Open notch on hover", keywords: ["hover to open", "auto open"], highlightID: SettingsTab.general.highlightID(for: "Open notch on hover")),
+            SettingsSearchEntry(tab: .general, title: "Peek before opening", keywords: ["peek", "preview", "hover", "accidental"], highlightID: SettingsTab.general.highlightID(for: "Peek before opening")),
             SettingsSearchEntry(tab: .general, title: "External display style", keywords: ["dynamic island", "pill", "external display", "non-notch", "floating", "capsule"], highlightID: SettingsTab.general.highlightID(for: "External display style")),
             SettingsSearchEntry(tab: .general, title: "Hide until hovered", keywords: ["hide", "hover", "external", "non-notch", "auto hide", "slide"], highlightID: SettingsTab.general.highlightID(for: "Hide until hovered")),
             SettingsSearchEntry(tab: .general, title: "Notch display height", keywords: ["display height", "menu bar size"], highlightID: SettingsTab.general.highlightID(for: "Notch display height")),
@@ -1351,6 +1352,15 @@ struct GeneralSettings: View {
                 Text("Open notch on hover")
             }
             .settingsHighlight(id: highlightID("Open notch on hover"))
+            Defaults.Toggle(key: .enableNotchPeek) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Peek before opening")
+                    Text("Hovering shows a one-line preview (timer, music, next meeting, unread messages). Click to open, or keep hovering when Open notch on hover is on.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .settingsHighlight(id: highlightID("Peek before opening"))
             Toggle("Remember last tab", isOn: $coordinator.openLastTabByDefault)
             if openNotchOnHover {
                 Slider(value: $minimumHoverDuration, in: 0...1, step: 0.1) {
