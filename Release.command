@@ -131,6 +131,12 @@ BUILT_NUMBER="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP/Conten
 [ "$BUILT_VERSION" = "$VERSION" ] && [ "$BUILT_NUMBER" = "$BUILD_NUMBER" ] \
     || fail "The app says $BUILT_VERSION ($BUILT_NUMBER), expected $VERSION ($BUILD_NUMBER)."
 MIN_SYSTEM="$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$APP/Contents/Info.plist" 2>/dev/null || echo 14.0)"
+# Sparkle refuses to start ("Unable to Check For Updates") when the app's
+# public key is missing or does not decode to 32 bytes; never ship that.
+BUILT_KEY="$(/usr/libexec/PlistBuddy -c 'Print :SUPublicEDKey' "$APP/Contents/Info.plist" 2>/dev/null || true)"
+[ "$BUILT_KEY" = "$PUBLIC_KEY" ] || fail "The built app's update key ($BUILT_KEY) is not this Mac's key ($PUBLIC_KEY)."
+KEY_BYTES="$(printf '%s' "$BUILT_KEY" | /usr/bin/base64 -D 2>/dev/null | /usr/bin/wc -c | /usr/bin/tr -d ' ')"
+[ "$KEY_BYTES" = 32 ] || fail "The update key in the built app does not decode to 32 bytes (got $KEY_BYTES); Sparkle would not start."
 if [ "$IDENTITY" = "-" ]; then
     printf '\nWarning: this build is ad-hoc signed. Friends will have to grant permissions\n'
     printf 'again after every update. Add a certificate in Xcode > Settings > Accounts >\n'
