@@ -1,6 +1,7 @@
 /*
  * NotchFlow
- * Copyright (C) 2024-2026 Atoll Contributors
+ * Copyright (C) 2026 dhruvv620
+ * Portions Copyright (C) 2024-2026 Atoll Contributors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by

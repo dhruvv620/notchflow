@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 dhruvv620
 import Foundation
 
 /// One notification in the notch inbox, whatever it came from.

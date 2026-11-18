@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 dhruvv620
+// Portions Copyright (C) 2024-2026 Atoll Contributors
 
 import AppKit
 import Defaults

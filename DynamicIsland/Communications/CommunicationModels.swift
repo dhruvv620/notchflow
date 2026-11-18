@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 dhruvv620
 import Foundation
 
 enum CommunicationApp: String, CaseIterable, Codable, Identifiable, Hashable, Sendable {

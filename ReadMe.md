@@ -93,7 +93,7 @@ It builds and signs NotchFlow, makes `NotchFlow.dmg` and `NotchFlow.zip`, signs 
 
 ## License
 
-NotchFlow is free software under the [GNU General Public License v3](LICENSE). [NOTICE](NOTICE) lists the projects it is based on and their copyrights.
+Copyright (C) 2026 [dhruvv620](https://github.com/dhruvv620). NotchFlow is free software under the [GNU General Public License v3](LICENSE); [NOTICE](NOTICE) lists the open-source projects parts of it come from.
 
 ## Acknowledgments
 

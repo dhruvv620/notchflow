@@ -1,7 +1,8 @@
 /*
  * NotchFlow
  * Original work Copyright (C) 2026 ZephyrCodesStuff (https://github.com/ZephyrCodesStuff/rtaudio)
- * Modified work Copyright (C) 2026 Atoll Contributors
+ * Modified work Copyright (C) 2026 dhruvv620
+ * Portions Copyright (C) 2026 Atoll Contributors
  *
  * CoreAudio tap for capturing real-time audio from music applications.
  * Uses macOS 14.2+ Process Tap API for efficient audio capture.

@@ -3520,7 +3520,7 @@ struct About: View {
                 VStack(spacing: 0) {
                     Divider()
                         .padding(.bottom, 5)
-                    Text("NotchFlow is free software under the GPL v3.")
+                    Text("NotchFlow by dhruvv620 · Free software under the GPL v3")
                         .foregroundStyle(.secondary)
                         .padding(.bottom, 7)
                         .multilineTextAlignment(.center)

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 dhruvv620
 import Foundation
 
 /// Preserves settings from the earlier Debug-only bundle identifier when local

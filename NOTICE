@@ -1,13 +1,14 @@
-NotchFlow - NOTICE
+NotchFlow
+Copyright (C) 2026 dhruvv620
 
 NotchFlow is free software: you can redistribute it and/or modify it under
 the terms of the GNU General Public License version 3 or later. See LICENSE
 for the full text.
 
-NotchFlow is a modified version of Atoll (DynamicIsland),
-Copyright (C) 2024-2026 Atoll Contributors, which is itself derived from the
-boring.notch project. Both are licensed under the GNU General Public License
-v3.0. Their copyright notices are kept in the source files they apply to,
+Portions of NotchFlow come from earlier open-source projects and keep their
+copyright: Atoll (DynamicIsland), Copyright (C) 2024-2026 Atoll Contributors,
+which is itself derived from boring.notch, both under the GNU General Public
+License v3.0. Source files containing their code say so in their headers,
 and media inherited from them (sounds, animations and artwork other than the
 NotchFlow icon) remains the copyright of its authors.
 
