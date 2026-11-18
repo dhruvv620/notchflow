@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 ### Fixed
+- **Notch closing or crashing on external displays and when reopened quickly**: windows were tracked by `NSScreen` object, which AppKit replaces on every display change (attaching, waking or rearranging a monitor), so every notch window was torn down and rebuilt, sometimes during its own layout pass. Windows now follow their display by display ID, and windows of displays that are really gone are disposed on the next run-loop turn. Opening no longer forces a synchronous redraw from inside the SwiftUI update, invalid frames are refused instead of raising, and closing on hover exit now waits for the opening to settle and checks that the pointer really left the panel.
 - Fixed an issue where `BluetoothHUDAnimations` (.mov files) were missing in release builds.
 - Improved the GitHub Actions release workflow to use a monotonic build number allocator and automated patch versioning for stable releases.
 

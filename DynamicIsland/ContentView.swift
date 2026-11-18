@@ -2275,6 +2275,18 @@ struct ContentView: View {
                 try? await Task.sleep(for: .milliseconds(100))
                 guard !Task.isCancelled else { return }
 
+                // A hover exit is only a hint. While the panel grows or shrinks,
+                // its hover region briefly has the wrong size, and reopening
+                // quickly used to close the notch under the pointer. Close only
+                // once the opening has settled and the pointer is really
+                // outside the open panel.
+                while !Task.isCancelled {
+                    let keepOpen = await MainActor.run { self.isPointerOverOpenPanel() || self.isOpeningSettling() }
+                    if !keepOpen { break }
+                    try? await Task.sleep(for: .milliseconds(80))
+                }
+                guard !Task.isCancelled else { return }
+
                 await MainActor.run {
                     withAnimation(.bouncy.speed(1.2)) {
                         self.isHovering = false
@@ -2292,6 +2304,25 @@ struct ContentView: View {
                 }
             }
         }
+    }
+
+    private func isOpeningSettling() -> Bool {
+        vm.notchState == .open && Date().timeIntervalSince(vm.lastOpenedAt) < 0.45
+    }
+
+    /// Whether the pointer is over the open panel, judged from the panel's
+    /// target size and its window rather than the hover region, which lags
+    /// behind while the panel animates.
+    private func isPointerOverOpenPanel() -> Bool {
+        guard vm.notchState == .open,
+              let window = AppDelegate.shared?.notchWindow(for: vm),
+              window.isVisible else { return false }
+        let frame = window.frame
+        let margin: CGFloat = 8
+        let width = min(frame.width, vm.notchSize.width + margin * 2)
+        let height = min(frame.height, vm.notchSize.height + margin)
+        let panel = CGRect(x: frame.midX - width / 2, y: frame.maxY - height, width: width, height: height)
+        return panel.contains(NSEvent.mouseLocation)
     }
 
     private func isPointInsideNotchWindow(_ point: CGPoint) -> Bool {

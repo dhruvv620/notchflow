@@ -332,6 +332,10 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
         return false
     }
 
+    /// When the notch last opened. Hover can report "left" while the panel is
+    /// still growing, so closing waits until the opening has settled.
+    private(set) var lastOpenedAt: Date = .distantPast
+
     func open() {
         let targetSize = calculateDynamicNotchSize()
 
@@ -351,6 +355,7 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
         }
 
         notchSize = targetSize
+        lastOpenedAt = Date()
         notchState = .open
 
         // Force music information update when notch is opened

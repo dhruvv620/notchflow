@@ -476,6 +476,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             width: roundedWidth,
             height: roundedHeight
         )
+        // A non-finite or empty frame raises an AppKit exception (a crash).
+        guard targetFrame.isUsableWindowFrame else { return }
         if window.frame != targetFrame {
             window.setFrame(targetFrame, display: false)
         }
@@ -631,8 +633,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let newY = (screenFrame.origin.y + screenFrame.height - clampedHeight).rounded()
         let targetFrame = NSRect(x: newX, y: newY, width: clampedWidth, height: clampedHeight)
 
-        guard window.frame != targetFrame else { return }
-        window.setFrame(targetFrame, display: true)
+        // A non-finite or empty frame raises an AppKit exception (a crash).
+        guard targetFrame.isUsableWindowFrame, window.frame != targetFrame else { return }
+        // Opening resizes from inside a SwiftUI update; forcing a synchronous
+        // redraw there re-enters the hosting view's layout. Let AppKit draw on
+        // its next display pass instead.
+        window.setFrame(targetFrame, display: false)
+    }
+
+    /// The notch window that hosts a given view model, on any display.
+    func notchWindow(for viewModel: DynamicIslandViewModel) -> NSWindow? {
+        if Defaults[.showOnAllDisplays] {
+            guard let screen = viewModels.first(where: { $0.value === viewModel })?.key else { return nil }
+            return windows[screen]
+        }
+        return viewModel === vm ? window : nil
     }
 
     private func shouldAnimateResize(for newSize: CGSize) -> Bool {
@@ -1460,17 +1475,46 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     @objc func adjustWindowPosition(changeAlpha: Bool = false) {
         if Defaults[.showOnAllDisplays] {
-            let currentScreens = Set(NSScreen.screens)
+            let currentScreens = NSScreen.screens
 
-            // Snapshot keys before mutation. Mutating Dictionary.Keys while
-            // enumerating it can trap during display removal.
-            let removedScreens = windows.keys.filter { !currentScreens.contains($0) }
-            for screen in removedScreens {
-                guard let removedWindow = windows.removeValue(forKey: screen) else { continue }
-                let removedViewModel = viewModels.removeValue(forKey: screen)
-                disposeWindow(removedWindow, viewModel: removedViewModel)
+            // AppKit replaces its NSScreen objects whenever the display
+            // configuration changes (a monitor is attached, wakes, or is
+            // rearranged), so the dictionary keys go stale even for displays
+            // that are still there. Carry each window over to its display's
+            // new NSScreen, matched by display ID, instead of treating every
+            // display as removed and rebuilding every notch mid-interaction.
+            var staleWindows = windows
+            var staleViewModels = viewModels
+            var nextWindows: [NSScreen: NSWindow] = [:]
+            var nextViewModels: [NSScreen: DynamicIslandViewModel] = [:]
+            for screen in currentScreens {
+                let match = staleWindows.keys.first { $0 === screen }
+                    ?? staleWindows.keys.first { old in
+                        guard let id = screen.notchDisplayID else { return false }
+                        return old.notchDisplayID == id
+                    }
+                if let match, let window = staleWindows.removeValue(forKey: match) {
+                    nextWindows[screen] = window
+                    if let viewModel = staleViewModels.removeValue(forKey: match) {
+                        viewModel.screen = screen.localizedName
+                        nextViewModels[screen] = viewModel
+                    }
+                }
             }
-            
+            windows = nextWindows
+            viewModels = nextViewModels
+
+            // Only displays that are really gone lose their window. Hide it
+            // now, but tear its view tree down on the next run-loop turn: this
+            // can run inside a layout or event pass of that very window.
+            for (screen, removedWindow) in staleWindows {
+                let removedViewModel = staleViewModels[screen]
+                removedWindow.orderOut(nil)
+                DispatchQueue.main.async { [weak self] in
+                    self?.disposeWindow(removedWindow, viewModel: removedViewModel)
+                }
+            }
+
             for screen in currentScreens {
                 if windows[screen] == nil {
                     let viewModel = DynamicIslandViewModel(screen: screen.localizedName)
@@ -1692,5 +1736,21 @@ final class MediaControlsStateCoordinator {
         guard let cached = Defaults[.cachedMusicControlWindowPreference] else { return }
         Defaults[.musicControlWindowEnabled] = cached
         Defaults[.cachedMusicControlWindowPreference] = nil
+    }
+}
+
+extension NSScreen {
+    /// The CoreGraphics display ID: stable for a physical display while it is
+    /// connected, unlike the NSScreen object or its (possibly shared) name.
+    var notchDisplayID: CGDirectDisplayID? {
+        (deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value
+    }
+}
+
+extension NSRect {
+    /// Whether AppKit can accept this as a window frame.
+    var isUsableWindowFrame: Bool {
+        origin.x.isFinite && origin.y.isFinite && size.width.isFinite && size.height.isFinite
+            && size.width >= 1 && size.height >= 1
     }
 }
