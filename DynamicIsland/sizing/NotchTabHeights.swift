@@ -31,7 +31,9 @@ extension NotchViews {
 }
 
 /// The open notch size for a tab, from the user's panel size and what the tab
-/// reported about its content.
+/// reported about its content. Main-actor isolated like the coordinator it reads;
+/// every caller (the panel, the view model, the window sizing) runs there.
+@MainActor
 func tabOpenNotchSize(for view: NotchViews, preset: CGSize, screen: String?, closedHeight: CGFloat) -> CGSize {
     let coordinator = DynamicIslandViewCoordinator.shared
     let reported: CGFloat?

@@ -137,7 +137,10 @@ struct NotchNotificationsView: View {
             // The panel follows the list: a couple of notifications make a
             // short notch, a long inbox a taller one, within the tab's limits.
             .onPreferenceChange(NotificationListHeightKey.self) { height in
-                DynamicIslandViewCoordinator.shared.reportContentHeight(height + Self.chromeHeight, for: .notifications)
+                // The preference callback is not main-actor isolated on newer SDKs.
+                Task { @MainActor in
+                    DynamicIslandViewCoordinator.shared.reportContentHeight(height + Self.chromeHeight, for: .notifications)
+                }
             }
             .onHover { vm.setScrollGestureSuppression($0, token: token) }
             .onChange(of: hub.replyingID) { _, id in
