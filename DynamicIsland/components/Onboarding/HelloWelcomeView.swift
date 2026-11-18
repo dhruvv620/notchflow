@@ -6,7 +6,7 @@ import SwiftUI
 
 /// "hello" in one continuous cursive stroke, drawn in a 640 x 320 design
 /// space and scaled to fit. Trim it to write it out.
-struct HelloLettering: Shape {
+struct CursiveHelloLettering: Shape {
     /// The part of the design space the letters use, with room for the pen.
     private static let bounds = CGRect(x: 18, y: 28, width: 520, height: 206)
 
@@ -65,7 +65,7 @@ enum WelcomeChime {
 
 /// The animated "hello": the word writes itself with a chime, then fills in
 /// with a soft glow. Click it to write it again.
-struct HelloAnimation: View {
+struct CursiveHelloView: View {
     var lineWidth: CGFloat = 9
     var playsSound = true
     var onWritten: (() -> Void)? = nil
@@ -87,12 +87,12 @@ struct HelloAnimation: View {
     var body: some View {
         let gradient = LinearGradient(colors: Self.colors, startPoint: .leading, endPoint: .trailing)
         ZStack {
-            HelloLettering()
+            CursiveHelloLettering()
                 .trim(from: 0, to: progress)
                 .stroke(gradient, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round))
                 .blur(radius: 14)
                 .opacity(glow ? 0.55 : 0)
-            HelloLettering()
+            CursiveHelloLettering()
                 .trim(from: 0, to: progress)
                 .stroke(gradient, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round))
         }
@@ -135,7 +135,7 @@ struct HelloWelcomeView: View {
     var body: some View {
         VStack(spacing: 0) {
             Spacer(minLength: 40)
-            HelloAnimation {
+            CursiveHelloView {
                 withAnimation(.easeOut(duration: 0.7)) { showDetails = true }
             }
             .frame(height: 170)
@@ -198,7 +198,7 @@ final class HelloWindowController {
         }
         // A fresh view each time so the writing starts over.
         window?.contentView = NSHostingView(rootView:
-            HelloAnimation()
+            CursiveHelloView()
                 .padding(36)
                 .frame(width: 420, height: 300)
                 .background(VisualEffectView(material: .hudWindow, blendingMode: .behindWindow).ignoresSafeArea())
