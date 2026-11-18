@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Smart Tools** (new Settings > Smart Tools page):
+  - **Distraction meter**: during a Pomodoro focus block, when YouTube, X or another listed site is the front browser tab (Safari, Chrome, Arc, Brave, Edge), or a listed app is in front, the notch glows amber and shows the site and "3 min off track" for the block so far. Off by default.
+  - **Copy-to-action**: copy a tracking number (UPS, FedEx, USPS, Amazon, postal), a date, an address, a flight number, an e-mail, a phone number or a sum, and the closed notch offers Track, Add to Calendar (opens Calendar with the event filled in), Directions (Apple Maps), Call, Email or the answer, for nine seconds. Text marked secret by password managers is skipped.
+  - **Smart replies with your MiniMax key**: a sparkles button above WhatsApp and notification replies asks MiniMax for three short replies; tap one to put it in the field. The key is kept in the Keychain; the API address and model can be changed, and a Test button checks them. Nothing is sent until you tap.
+  - **People pins**: pin up to five WhatsApp chats (right-click a chat in the WhatsApp tab); they sit as faces in the Shelf corner, and dropping files on a face sends them on WhatsApp.
+  - **Build watcher**: with a GitHub token (kept in the Keychain) and a list of repositories, running GitHub Actions show a spinner in the closed notch, then Passed in green or Failed in red; click to open the run. Terminal commands started with the `nf` shell function (copy it from Settings) are watched the same way.
 - **Lyrics button in the Music tab**: a lyrics button in the Now Playing header (and the Lyrics control slot) shows or hides a lyrics panel under the player, with the previous, current and next lines and a highlight sweeping across the sung line. The notch grows to fit it and shrinks back when it is hidden. Lyrics no longer appear under the artist name on their own.
 
 ### Changed

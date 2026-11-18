@@ -63,6 +63,9 @@ struct ContentView: View {
     @ObservedObject var shelfState = ShelfStateViewModel.shared
     @ObservedObject var whatsAppManager = WhatsAppManager.shared
     @ObservedObject var meetingManager = MeetingManager.shared
+    @ObservedObject var focusGuard = FocusGuardManager.shared
+    @ObservedObject var copyActions = CopyActionManager.shared
+    @ObservedObject var buildWatcher = BuildWatchManager.shared
     @ObservedObject var remindersManager = RemindersManager.shared
     @Default(.showTodayProgressRing) var showTodayProgressRing
     @Default(.showLyricsUnderNotch) var showLyricsUnderNotch
@@ -341,6 +344,26 @@ struct ContentView: View {
             && !musicManager.isPlaying
     }
 
+    /// Shared conditions for a closed-notch activity to show on this screen.
+    private var canShowClosedActivity: Bool {
+        vm.notchState == .closed
+            && !vm.hideOnClosed
+            && !lockScreenManager.isLocked
+            && !isCurrentScreenExpansionVisible
+    }
+
+    private var isCopyActionVisible: Bool {
+        copyActions.suggestion != nil && canShowClosedActivity
+    }
+
+    private var isFocusGuardVisible: Bool {
+        focusGuard.isOffTrack && canShowClosedActivity
+    }
+
+    private var isBuildWatchVisible: Bool {
+        (buildWatcher.announcement != nil || !buildWatcher.running.isEmpty) && canShowClosedActivity
+    }
+
     private var isMeetingActivityVisible: Bool {
         meetingManager.showsCountdown
             && vm.notchState == .closed
@@ -383,6 +406,10 @@ struct ContentView: View {
 
         if isMeetingActivityVisible {
             width = max(width, vm.closedNotchSize.width + (MeetingLiveActivity.wingWidth + 6) * 2 + closedPadding)
+        }
+
+        if isCopyActionVisible || isFocusGuardVisible || isBuildWatchVisible {
+            width = max(width, vm.closedNotchSize.width + 8 + ClosedNotchWingsMetrics.addedWidth + closedPadding)
         }
 
         if isPeeking && vm.notchState == .closed {
@@ -653,6 +680,9 @@ struct ContentView: View {
                     : .clear,
                 radius: Defaults[.cornerRadiusScaling] ? 10 : 5
             )
+            // The distraction meter: an amber glow while off track.
+            .shadow(color: isFocusGuardVisible ? FocusGuardLiveActivity.amber.opacity(0.9) : .clear, radius: 9)
+            .animation(.smooth(duration: 0.4), value: isFocusGuardVisible)
             // Extra horizontal inset for Dynamic Island mode so the shadow
             // is not clipped by the outer frame constraint
             .padding(.horizontal, isIslandMode ? dynamicIslandShadowInset : 0)
@@ -1098,8 +1128,21 @@ struct ContentView: View {
                           }
                           .id("whatsapp-\(banner.id)")
                           .transition(.opacity.animation(.smooth(duration: 0.25)))
+                      } else if isCopyActionVisible {
+                          CopyActionLiveActivity(isHovering: isHovering)
+                              .id("copy-\(copyActions.suggestion?.id.uuidString ?? "")")
+                              .transition(.opacity.animation(.smooth(duration: 0.25)))
                       } else if isMeetingActivityVisible {
                           MeetingLiveActivity(isHovering: isHovering)
+                              .transition(.opacity.animation(.smooth(duration: 0.25)))
+                      } else if isBuildWatchVisible && buildWatcher.announcement != nil {
+                          BuildWatchLiveActivity(isHovering: isHovering)
+                              .transition(.opacity.animation(.smooth(duration: 0.25)))
+                      } else if isFocusGuardVisible {
+                          FocusGuardLiveActivity(isHovering: isHovering)
+                              .transition(.opacity.animation(.smooth(duration: 0.25)))
+                      } else if isBuildWatchVisible {
+                          BuildWatchLiveActivity(isHovering: isHovering)
                               .transition(.opacity.animation(.smooth(duration: 0.25)))
                       } else if canShowMusicDuringExpansion && musicPairingEligible {
                           MusicLiveActivity(secondary: musicSecondary)

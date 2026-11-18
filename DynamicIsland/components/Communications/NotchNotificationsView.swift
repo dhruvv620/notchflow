@@ -401,14 +401,17 @@ private struct NotificationCard: View {
     }
 
     private var replyField: some View {
-        NotchComposeField(
-            placeholder: "Reply to \(item.headline)",
-            text: $draft,
-            isSending: isSending,
-            onSend: send,
-            onCancel: { withAnimation(NotchTokens.Motion.standard) { hub.replyingID = nil } },
-            isFocused: $replyFocused
-        )
+        VStack(alignment: .leading, spacing: 3) {
+            SmartReplyBar(id: "nc-\(item.id)", sender: item.headline, message: item.body, text: $draft)
+            NotchComposeField(
+                placeholder: "Reply to \(item.headline)",
+                text: $draft,
+                isSending: isSending,
+                onSend: send,
+                onCancel: { withAnimation(NotchTokens.Motion.standard) { hub.replyingID = nil } },
+                isFocused: $replyFocused
+            )
+        }
         .padding(.leading, 34)
     }
 

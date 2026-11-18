@@ -56,7 +56,7 @@ class PrivacyConfigurationTests(unittest.TestCase):
         self.assertEqual(
             2,
             project.count(
-                'INFOPLIST_KEY_NSAppleEventsUsageDescription = "NotchFlow uses AppleScript to control Spotify, Apple Music and Notes, and to send the replies you type in the notch through Messages.";'
+                'INFOPLIST_KEY_NSAppleEventsUsageDescription = "NotchFlow uses AppleScript to control Spotify, Apple Music and Notes, to send the replies you type in the notch through Messages, and, when the distraction meter is on, to read the address of your browser tab during a Pomodoro.";'
             ),
         )
 

@@ -122,6 +122,10 @@ struct ShelfView: View {
                         .padding()
                 }
             }
+            .overlay(alignment: .topTrailing) {
+                ShelfPeoplePins()
+                    .padding(6)
+            }
             .overlay(alignment: .bottom) {
                 ShelfQuickActionBar()
                     .padding(.bottom, 6)

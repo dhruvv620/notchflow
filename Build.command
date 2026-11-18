@@ -150,6 +150,12 @@ printf '\nChecking the notification inbox...\n'
     "$SOURCE_DIR/tests/NotificationHubRegression.swift" -o "$BUILD_ROOT/NotificationHubRegression"
 "$BUILD_ROOT/NotificationHubRegression"
 
+printf '\nChecking smart tools (distraction meter, copy-to-action, replies, build watcher)...\n'
+/usr/bin/xcrun swiftc -swift-version 5 -parse-as-library \
+    "$SOURCE_DIR/DynamicIsland/helpers/SmartToolsPolicy.swift" \
+    "$SOURCE_DIR/tests/SmartToolsRegression.swift" -o "$BUILD_ROOT/SmartToolsRegression"
+"$BUILD_ROOT/SmartToolsRegression"
+
 printf '\nChecking WhatsApp message parsing...\n'
 /usr/bin/xcrun swiftc -swift-version 5 -parse-as-library \
     "$SOURCE_DIR/DynamicIsland/managers/WhatsApp/WhatsAppModels.swift" \

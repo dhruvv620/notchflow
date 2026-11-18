@@ -67,6 +67,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
     case shelf
     case shortcuts
     case notes
+    case smartTools
     case terminal
     case whatsapp
     case about
@@ -79,7 +80,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .general, .appearance, .tabsAndFeatures, .communications:                                          return .core
         case .media, .liveActivities, .lockScreen, .devices:                 return .mediaAndDisplay
         case .hudAndOSD, .battery:                                           return .system
-        case .timer, .calendar, .notes:                                      return .productivity
+        case .timer, .calendar, .notes, .smartTools:                         return .productivity
         case .clipboard, .screenAssistant, .colorPicker, .shelf,
              .downloads, .shortcuts:                                         return .utilities
         case .stats, .terminal:                                              return .developer
@@ -111,6 +112,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .shelf: return String(localized: "Shelf")
         case .shortcuts: return String(localized: "Shortcuts")
         case .notes: return String(localized: "Notes")
+        case .smartTools: return String(localized: "Smart Tools")
         case .terminal: return String(localized: "Terminal")
         case .whatsapp: return String(localized: "WhatsApp")
         case .about: return String(localized: "About")
@@ -140,6 +142,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .shelf: return "books.vertical"
         case .shortcuts: return "keyboard"
         case .notes: return "note.text"
+        case .smartTools: return "wand.and.stars"
         case .terminal: return "apple.terminal"
         case .whatsapp: return "message.fill"
         case .about: return "info.circle"
@@ -169,6 +172,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .shelf: return .brown
         case .shortcuts: return .orange
         case .notes: return Color(red: 0.979, green: 0.716, blue: 0.153, opacity: 1.000)
+        case .smartTools: return .orange
         case .terminal: return Color(red: 0.2, green: 0.8, blue: 0.4)
         case .whatsapp: return .whatsAppGreen
         case .about: return .secondary
@@ -511,6 +515,7 @@ struct SettingsView: View {
             .timer,
             .calendar,
             .notes,
+            .smartTools,
             // Utilities
             .clipboard,
             .screenAssistant,
@@ -949,6 +954,11 @@ struct SettingsView: View {
 
             // Terminal
             SettingsSearchEntry(tab: .terminal, title: "Enable terminal", keywords: ["terminal", "guake", "shell"], highlightID: SettingsTab.terminal.highlightID(for: "Enable terminal")),
+            SettingsSearchEntry(tab: .smartTools, title: "Distraction meter", keywords: ["pomodoro", "focus", "youtube", "distraction", "off track"], highlightID: SettingsTab.smartTools.highlightID(for: "Distraction meter")),
+            SettingsSearchEntry(tab: .smartTools, title: "Copy-to-action", keywords: ["clipboard", "copy", "tracking", "calendar", "directions"], highlightID: SettingsTab.smartTools.highlightID(for: "Copy-to-action")),
+            SettingsSearchEntry(tab: .smartTools, title: "Smart replies", keywords: ["minimax", "ai", "reply", "suggestions", "api key"], highlightID: SettingsTab.smartTools.highlightID(for: "Smart replies")),
+            SettingsSearchEntry(tab: .smartTools, title: "People pins", keywords: ["shelf", "whatsapp", "favourites", "send file"], highlightID: SettingsTab.smartTools.highlightID(for: "People pins")),
+            SettingsSearchEntry(tab: .smartTools, title: "Build watcher", keywords: ["github", "actions", "ci", "deploy", "terminal", "build"], highlightID: SettingsTab.smartTools.highlightID(for: "Build watcher")),
             SettingsSearchEntry(tab: .whatsapp, title: "Show my WhatsApp messages", keywords: ["whatsapp", "messages", "chat", "reply", "qr", "link"], highlightID: SettingsTab.whatsapp.highlightID(for: "Show my WhatsApp messages")),
             SettingsSearchEntry(tab: .whatsapp, title: "Mute groups", keywords: ["whatsapp", "groups", "mute", "mention"], highlightID: SettingsTab.whatsapp.highlightID(for: "Mute groups")),
             SettingsSearchEntry(tab: .whatsapp, title: "Mark as read when I open a conversation", keywords: ["whatsapp", "read receipts", "blue ticks"], highlightID: SettingsTab.whatsapp.highlightID(for: "Mark as read when I open a conversation")),
@@ -1074,6 +1084,10 @@ struct SettingsView: View {
         case .whatsapp:
             SettingsForm(tab: .whatsapp) {
                 WhatsAppSettings()
+            }
+        case .smartTools:
+            SettingsForm(tab: .smartTools) {
+                SmartToolsSettings()
             }
         case .about:
             if let controller = updaterController {

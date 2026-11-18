@@ -149,6 +149,10 @@ private struct WhatsAppChatListColumn: View {
                                 Button("Add to Todos") {
                                     Task { await RemindersManager.shared.capture(TodoCapturePolicy.followUpTitle(sender: chat.displayName, body: chat.preview ?? "")) }
                                 }
+                                Button(PeoplePins.isPinned(chat.id) ? "Unpin from Shelf" : "Pin to Shelf") {
+                                    PeoplePins.toggle(chat.id)
+                                }
+                                .disabled(!PeoplePins.isPinned(chat.id) && Defaults[.peoplePins].count >= PeoplePins.limit)
                                 Button("Ignore This Chat") {
                                     manager.setIgnored(true, chatID: chat.id)
                                 }
@@ -359,6 +363,15 @@ private struct WhatsAppConversationColumn: View {
                     .foregroundStyle(.red)
                     .lineLimit(1)
             }
+            if let last = lastIncoming(in: chat) {
+                SmartReplyBar(
+                    id: "wa-\(last.id)",
+                    sender: chat.isGroup ? last.senderName : chat.displayName,
+                    message: last.text,
+                    context: recentContext(in: chat),
+                    text: $draft
+                )
+            }
             NotchComposeField(
                 placeholder: "Reply to \(chat.displayName)",
                 text: $draft,
@@ -367,6 +380,20 @@ private struct WhatsAppConversationColumn: View {
                 onSend: { send(to: chat.id) },
                 isFocused: $isReplyFocused
             )
+        }
+    }
+
+    private func lastIncoming(in chat: WhatsAppChat) -> WhatsAppMessage? {
+        guard let last = manager.messages[chat.id]?.last, !last.isFromMe, !last.isRevoked,
+              !last.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        return last
+    }
+
+    private func recentContext(in chat: WhatsAppChat) -> [String] {
+        (manager.messages[chat.id] ?? []).suffix(7).dropLast().compactMap { message in
+            let text = message.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !text.isEmpty else { return nil }
+            return "\(message.isFromMe ? "Me" : (message.senderName.isEmpty ? chat.displayName : message.senderName)): \(text)"
         }
     }
 
