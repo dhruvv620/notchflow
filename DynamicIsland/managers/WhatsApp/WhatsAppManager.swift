@@ -657,6 +657,27 @@ final class WhatsAppManager: ObservableObject {
         }
     }
 
+    /// Sends files from the Shelf (or anywhere) to a chat.
+    @discardableResult
+    func sendFiles(_ urls: [URL], to chatID: String) async -> Bool {
+        guard let client, state.isConnected else {
+            lastSendError = String(localized: "WhatsApp is not connected right now.")
+            return false
+        }
+        lastSendError = nil
+        for url in urls {
+            do {
+                _ = try await client.sendFile(to: chatID, fileURL: url)
+            } catch {
+                lastSendError = error.localizedDescription
+                return false
+            }
+        }
+        markReadLocally(chatID, at: Date())
+        Task { await loadMessages(chatID) }
+        return true
+    }
+
     // MARK: Banner
 
     func dismissBanner() {

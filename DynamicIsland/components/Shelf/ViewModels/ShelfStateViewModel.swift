@@ -170,6 +170,8 @@ final class ShelfStateViewModel: ObservableObject {
             NSLog("Bookmark for \(item) stale; refreshing")
             await MainActor.run { scheduleDeferredBookmarkUpdate(for: item, bookmark: refreshed) }
         }
+        let itemID = item.id
+        await MainActor.run { ShelfResolvedURLCache.shared.store(result.url, for: itemID) }
         return result.url
     }
 

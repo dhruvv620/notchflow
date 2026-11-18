@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Shelf quick actions**: selecting files on the Shelf shows an action bar: Resize (half size, fit 2048 px or 1080 px), PDF, Cut Out (remove background), Zip, AirDrop, and WhatsApp, which sends the files to one of your recent chats through the linked account (images as photos, other files as documents). Results land back on the Shelf.
+
+### Fixed
+- **Shelf right-click actions were missing for files**: Open, Open With, Image Actions and Compress depended on a file location that was never filled in after bookmark resolution was made asynchronous, so they never appeared and their handlers did nothing. Resolved locations are now cached as items load.
 - **Better incoming calls**: the call card shows the caller's photo from Contacts (or colored initials) with a pulse while it rings, their latest message from the last 15 minutes as the likely reason for the call, and a Message menu next to Decline with quick replies or a custom message. Declining with a message sends it through the linked WhatsApp account for WhatsApp calls, or through Messages to the caller's number from the call or Contacts. Contacts access is requested the first time a call needs it.
 
 ### Fixed

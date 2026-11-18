@@ -122,6 +122,11 @@ struct ShelfView: View {
                         .padding()
                 }
             }
+            .overlay(alignment: .bottom) {
+                ShelfQuickActionBar()
+                    .padding(.bottom, 6)
+                    .animation(NotchTokens.Motion.standard, value: selection.selectedIDs)
+            }
             .transaction { transaction in
                 transaction.animation = vm.animation
             }

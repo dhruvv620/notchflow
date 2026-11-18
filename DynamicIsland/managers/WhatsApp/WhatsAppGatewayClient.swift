@@ -255,6 +255,33 @@ struct WhatsAppGatewayClient {
         return result?.messageID
     }
 
+    /// Sends a file: images as photos, anything else as a document.
+    func sendFile(to chatJID: String, fileURL: URL, caption: String? = nil) async throws -> String? {
+        let isImage = ["jpg", "jpeg", "png", "heic", "gif", "webp"].contains(fileURL.pathExtension.lowercased())
+        let path = isImage ? "/send/image" : "/send/file"
+        let fieldName = isImage ? "image" : "file"
+        let data = try Data(contentsOf: fileURL)
+        let boundary = "NotchFlow-\(UUID().uuidString)"
+        var body = Data()
+        func field(_ name: String, _ value: String) {
+            body.append(Data("--\(boundary)\r\nContent-Disposition: form-data; name=\"\(name)\"\r\n\r\n\(value)\r\n".utf8))
+        }
+        field("phone", chatJID)
+        if let caption, !caption.isEmpty { field("caption", caption) }
+        if isImage { field("compress", "false") }
+        let filename = fileURL.lastPathComponent.replacingOccurrences(of: "\"", with: "")
+        body.append(Data("--\(boundary)\r\nContent-Disposition: form-data; name=\"\(fieldName)\"; filename=\"\(filename)\"\r\nContent-Type: application/octet-stream\r\n\r\n".utf8))
+        body.append(data)
+        body.append(Data("\r\n--\(boundary)--\r\n".utf8))
+
+        var request = try makeRequest(path, method: "POST")
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        request.httpBody = body
+        request.timeoutInterval = 120
+        let response: GOWAResponse<GOWASendResults> = try await send(request, as: GOWAResponse<GOWASendResults>.self)
+        return response.results?.messageID
+    }
+
     func markRead(messageID: String, chatJID: String) async throws {
         try await call("/message/\(Self.pathComponent(messageID))/read", method: "POST", body: ["phone": chatJID])
     }

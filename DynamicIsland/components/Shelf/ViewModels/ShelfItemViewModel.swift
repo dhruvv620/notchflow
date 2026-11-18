@@ -58,6 +58,8 @@ final class ShelfItemViewModel: ObservableObject {
         let bookmark = Bookmark(data: bookmarkData)
         let (url, _) = await bookmark.resolveAsync()
         guard let resolvedURL = url else { return }
+        let itemID = item.id
+        await MainActor.run { ShelfResolvedURLCache.shared.store(resolvedURL, for: itemID) }
         
         // Load display name
         let name = await loadDisplayNameFromURL(resolvedURL)
@@ -133,6 +135,8 @@ final class ShelfItemViewModel: ObservableObject {
         guard case .file(let bookmarkData) = item.kind else { return nil }
         let bookmark = Bookmark(data: bookmarkData)
         let (url, _) = await bookmark.resolveAsync()
+        let itemID = item.id
+        await MainActor.run { ShelfResolvedURLCache.shared.store(url, for: itemID) }
         return url
     }
 

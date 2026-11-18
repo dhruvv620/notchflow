@@ -102,10 +102,12 @@ struct ShelfItem: Identifiable, Codable, Equatable, Sendable {
         }
     }
     
+    /// The file's location once it has been resolved in the background.
+    /// Never resolves a bookmark synchronously; items whose bookmark has not
+    /// been resolved yet return nil until their metadata loads.
     var fileURL: URL? {
         guard case .file = kind else { return nil }
-        // Don't resolve synchronously - use async method from ShelfStateViewModel
-        return nil
+        return ShelfResolvedURLCache.shared.url(for: id)
     }
     
     var URL: URL? {
@@ -301,3 +303,21 @@ private extension ShelfItem {
         return result
     }
 }
+
+/// Resolved file locations of shelf items, filled whenever a bookmark is
+/// resolved in the background, so synchronous code (context menus, the quick
+/// action bar) can use them without blocking on bookmark resolution.
+@MainActor
+final class ShelfResolvedURLCache {
+    static let shared = ShelfResolvedURLCache()
+    private var urls: [UUID: URL] = [:]
+
+    func url(for id: UUID) -> URL? { urls[id] }
+
+    func store(_ url: URL?, for id: UUID) {
+        if let url { urls[id] = url } else { urls.removeValue(forKey: id) }
+    }
+
+    func forget(_ id: UUID) { urls.removeValue(forKey: id) }
+}
+
