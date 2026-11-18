@@ -1,1 +1,244 @@
-LyoKICogQXRvbGwgKER5bmFtaWNJc2xhbmQpCiAqIENvcHlyaWdodCAoQykgMjAyNC0yMDI2IEF0b2xsIENvbnRyaWJ1dG9ycwogKgogKiBUaGlzIHByb2dyYW0gaXMgZnJlZSBzb2Z0d2FyZTogeW91IGNhbiByZWRpc3RyaWJ1dGUgaXQgYW5kL29yIG1vZGlmeQogKiBpdCB1bmRlciB0aGUgdGVybXMgb2YgdGhlIEdOVSBHZW5lcmFsIFB1YmxpYyBMaWNlbnNlIGFzIHB1Ymxpc2hlZCBieQogKiB0aGUgRnJlZSBTb2Z0d2FyZSBGb3VuZGF0aW9uLCBlaXRoZXIgdmVyc2lvbiAzIG9mIHRoZSBMaWNlbnNlLCBvcgogKiAoYXQgeW91ciBvcHRpb24pIGFueSBsYXRlciB2ZXJzaW9uLgogKgogKiBUaGlzIHByb2dyYW0gaXMgZGlzdHJpYnV0ZWQgaW4gdGhlIGhvcGUgdGhhdCBpdCB3aWxsIGJlIHVzZWZ1bCwKICogYnV0IFdJVEhPVVQgQU5ZIFdBUlJBTlRZOyB3aXRob3V0IGV2ZW4gdGhlIGltcGxpZWQgd2FycmFudHkgb2YKICogTUVSQ0hBTlRBQklMSVRZIG9yIEZJVE5FU1MgRk9SIEEgUEFSVElDVUxBUiBQVVJQT1NFLiBTZWUgdGhlCiAqIEdOVSBHZW5lcmFsIFB1YmxpYyBMaWNlbnNlIGZvciBtb3JlIGRldGFpbHMuCiAqCiAqIFlvdSBzaG91bGQgaGF2ZSByZWNlaXZlZCBhIGNvcHkgb2YgdGhlIEdOVSBHZW5lcmFsIFB1YmxpYyBMaWNlbnNlCiAqIGFsb25nIHdpdGggdGhpcyBwcm9ncmFtLiBJZiBub3QsIHNlZSA8aHR0cHM6Ly93d3cuZ251Lm9yZy9saWNlbnNlcy8+LgogKi8KCmltcG9ydCBBcHBLaXQKaW1wb3J0IEZvdW5kYXRpb24KaW1wb3J0IERlZmF1bHRzCmltcG9ydCBBdG9sbEV4dGVuc2lvbktpdAppbXBvcnQgU3dpZnRVSQoKQE1haW5BY3RvcgpmaW5hbCBjbGFzcyBFeHRlbnNpb25MaXZlQWN0aXZpdHlNYW5hZ2VyOiBPYnNlcnZhYmxlT2JqZWN0IHsKICAgIHN0YXRpYyBsZXQgc2hhcmVkID0gRXh0ZW5zaW9uTGl2ZUFjdGl2aXR5TWFuYWdlcigpCgogICAgQFB1Ymxpc2hlZCBwcml2YXRlKHNldCkgdmFyIGFjdGl2ZUFjdGl2aXRpZXM6IFtFeHRlbnNpb25MaXZlQWN0aXZpdHlQYXlsb2FkXSA9IFtdCgogICAgcHJpdmF0ZSBsZXQgYXV0aG9yaXphdGlvbk1hbmFnZXIgPSBFeHRlbnNpb25BdXRob3JpemF0aW9uTWFuYWdlci5zaGFyZWQKICAgIHByaXZhdGUgbGV0IG1heENhcGFjaXR5S2V5ID0gRGVmYXVsdHMuS2V5cy5leHRlbnNpb25MaXZlQWN0aXZpdHlDYXBhY2l0eQogICAgcHJpdmF0ZSBsZXQgZXZlbnRCcmlkZ2UgPSBFeHRlbnNpb25FdmVudEJyaWRnZS5zaGFyZWQKICAgIHByaXZhdGUgdmFyIGxpdmVBY3Rpdml0eU9ic2VydmVyOiBOU09iamVjdFByb3RvY29sPwogICAgcHJpdmF0ZSB2YXIgc3VwcHJlc3NCcm9hZGNhc3QgPSBmYWxzZQogICAgcHJpdmF0ZSBsZXQgY3VycmVudFByb2Nlc3NJRCA9IFByb2Nlc3NJbmZvLnByb2Nlc3NJbmZvLnByb2Nlc3NJZGVudGlmaWVyCgogICAgcHJpdmF0ZSBpbml0KCkgewogICAgICAgIC8vIFBlcnNpc3RlZCBzbmFwc2hvdHMgb3V0bGl2ZSB0aGUgYXBwcyB0aGF0IHByZXNlbnRlZCB0aGVtOiB0aGUKICAgICAgICAvLyBzbmFwc2hvdCBmaWxlIGlzIG9ubHkgcmV3cml0dGVuIHdoZW4gdGhlIGFjdGl2aXR5IHNldCBjaGFuZ2VzLCBhbmQKICAgICAgICAvLyBub3RoaW5nIGRpc21pc3NlcyBhbiBhY3Rpdml0eSB3aG9zZSBwcmVzZW50ZXIgaXMgZ29uZS4gUmVzdG9yaW5nCiAgICAgICAgLy8gb25lIGJsaW5kbHkgcGlucyBpdCBpbiB0aGUgbm90Y2ggZm9yZXZlciAoYSBvbmUtb2ZmIHRlc3QgYWN0aXZpdHkKICAgICAgICAvLyBmcm9tIGEgaGVscGVyIGFwcCBzdGF5ZWQgb24gc2NyZWVuIGZvciBkYXlzIHRoaXMgd2F5KS4gT24gbGF1bmNoLAogICAgICAgIC8vIGtlZXAgb25seSBhY3Rpdml0aWVzIHdob3NlIHNvdXJjZSBhcHAgaXMgc3RpbGwgaW5zdGFsbGVkIGFuZCB0aGF0CiAgICAgICAgLy8gYXJyaXZlZCB3aXRoaW4gdGhlIGxhc3QgMjQgaG91cnMsIGFuZCBwZXJzaXN0IHRoZSBjbGVhbmVkIHNuYXBzaG90CiAgICAgICAgLy8gc28gc3RhbGUgZW50cmllcyBkbyBub3QgY29tZSBiYWNrLgogICAgICAgIGxldCByZXN0b3JlZCA9IGV2ZW50QnJpZGdlLmxvYWRQZXJzaXN0ZWRMaXZlQWN0aXZpdGllcygpCiAgICAgICAgbGV0IGN1dG9mZiA9IERhdGUubm93LmFkZGluZ1RpbWVJbnRlcnZhbCgtMjQgKiA2MCAqIDYwKQogICAgICAgIGFjdGl2ZUFjdGl2aXRpZXMgPSByZXN0b3JlZC5maWx0ZXIgeyBwYXlsb2FkIGluCiAgICAgICAgICAgIHBheWxvYWQucmVjZWl2ZWRBdCA+PSBjdXRvZmYgJiYKICAgICAgICAgICAgICAgIE5TV29ya3NwYWNlLnNoYXJlZC51cmxGb3JBcHBsaWNhdGlvbih3aXRoQnVuZGxlSWRlbnRpZmllcjogcGF5bG9hZC5idW5kbGVJZGVudGlmaWVyKSAhPSBuaWwKICAgICAgICB9CiAgICAgICAgaWYgYWN0aXZlQWN0aXZpdGllcy5jb3VudCAhPSByZXN0b3JlZC5jb3VudCB7CiAgICAgICAgICAgIGV2ZW50QnJpZGdlLmJyb2FkY2FzdExpdmVBY3Rpdml0eVNuYXBzaG90KGFjdGl2ZUFjdGl2aXRpZXMpCiAgICAgICAgfQogICAgICAgIHNvcnRBY3Rpdml0aWVzKCkKICAgICAgICBsaXZlQWN0aXZpdHlPYnNlcnZlciA9IGV2ZW50QnJpZGdlLm9ic2VydmVMaXZlQWN0aXZpdHlTbmFwc2hvdHMgeyBbd2VhayBzZWxmXSBwYXlsb2Fkcywgc291cmNlUElEIGluCiAgICAgICAgICAgIHNlbGY/LmFwcGx5U25hcHNob3QocGF5bG9hZHMsIHNvdXJjZVBJRDogc291cmNlUElEKQogICAgICAgIH0KICAgIH0KCiAgICBkZWluaXQgewogICAgICAgIGlmIGxldCB0b2tlbiA9IGxpdmVBY3Rpdml0eU9ic2VydmVyIHsKICAgICAgICAgICAgZXZlbnRCcmlkZ2UucmVtb3ZlT2JzZXJ2ZXIodG9rZW4pCiAgICAgICAgfQogICAgfQoKICAgIGZ1bmMgcHJlc2VudChkZXNjcmlwdG9yOiBBdG9sbExpdmVBY3Rpdml0eURlc2NyaXB0b3IsIGJ1bmRsZUlkZW50aWZpZXI6IFN0cmluZykgdGhyb3dzIHsKICAgICAgICBndWFyZCBhdXRob3JpemF0aW9uTWFuYWdlci5jYW5Qcm9jZXNzTGl2ZUFjdGl2aXR5UmVxdWVzdChmcm9tOiBidW5kbGVJZGVudGlmaWVyKSBlbHNlIHsKICAgICAgICAgICAgbG9nRGlhZ25vc3RpY3MoIlJlamVjdGVkIGxpdmUgYWN0aXZpdHkgXChkZXNjcmlwdG9yLmlkKSBmcm9tIFwoYnVuZGxlSWRlbnRpZmllcik6IHNjb3BlIGRpc2FibGVkIG9yIGJ1bmRsZSB1bmF1dGhvcml6ZWQiKQogICAgICAgICAgICB0aHJvdyBFeHRlbnNpb25WYWxpZGF0aW9uRXJyb3IudW5hdXRob3JpemVkCiAgICAgICAgfQogICAgICAgIGd1YXJkIGRlc2NyaXB0b3IuaXNWYWxpZCBlbHNlIHsKICAgICAgICAgICAgbG9nRGlhZ25vc3RpY3MoIlJlamVjdGVkIGxpdmUgYWN0aXZpdHkgXChkZXNjcmlwdG9yLmlkKSBmcm9tIFwoYnVuZGxlSWRlbnRpZmllcik6IGRlc2NyaXB0b3IgdmFsaWRhdGlvbiBmYWlsZWQiKQogICAgICAgICAgICB0aHJvdyBFeHRlbnNpb25WYWxpZGF0aW9uRXJyb3IuaW52YWxpZERlc2NyaXB0b3IoIlN0cnVjdHVyZSB2YWxpZGF0aW9uIGZhaWxlZCIpCiAgICAgICAgfQoKICAgICAgICBsZXQgaXNVcGRhdGU6IEJvb2wKICAgICAgICBpZiBsZXQgaW5kZXggPSBhY3RpdmVBY3Rpdml0aWVzLmZpcnN0SW5kZXgod2hlcmU6IHsgJDAuZGVzY3JpcHRvci5pZCA9PSBkZXNjcmlwdG9yLmlkICYmICQwLmJ1bmRsZUlkZW50aWZpZXIgPT0gYnVuZGxlSWRlbnRpZmllciB9KSB7CiAgICAgICAgICAgIGxldCBwYXlsb2FkID0gRXh0ZW5zaW9uTGl2ZUFjdGl2aXR5UGF5bG9hZCgKICAgICAgICAgICAgICAgIGJ1bmRsZUlkZW50aWZpZXI6IGJ1bmRsZUlkZW50aWZpZXIsCiAgICAgICAgICAgICAgICBkZXNjcmlwdG9yOiBkZXNjcmlwdG9yLAogICAgICAgICAgICAgICAgcmVjZWl2ZWRBdDogYWN0aXZlQWN0aXZpdGllc1tpbmRleF0ucmVjZWl2ZWRBdAogICAgICAgICAgICApCiAgICAgICAgICAgIGFjdGl2ZUFjdGl2aXRpZXNbaW5kZXhdID0gcGF5bG9hZAogICAgICAgICAgICBzb3J0QWN0aXZpdGllcygpCiAgICAgICAgICAgIGF1dGhvcml6YXRpb25NYW5hZ2VyLnJlY29yZEFjdGl2aXR5KGZvcjogYnVuZGxlSWRlbnRpZmllciwgc2NvcGU6IC5saXZlQWN0aXZpdGllcykKICAgICAgICAgICAgTG9nZ2VyLmxvZygiUmVwbGFjZWQgZXh0ZW5zaW9uIGxpdmUgYWN0aXZpdHkgXChkZXNjcmlwdG9yLmlkKSBmb3IgXChidW5kbGVJZGVudGlmaWVyKSIsIGNhdGVnb3J5OiAuZXh0ZW5zaW9ucykKICAgICAgICAgICAgaXNVcGRhdGUgPSB0cnVlCiAgICAgICAgfSBlbHNlIHsKICAgICAgICAgICAgZ3VhcmQgYWN0aXZlQWN0aXZpdGllcy5jb3VudCA8IERlZmF1bHRzW21heENhcGFjaXR5S2V5XSBlbHNlIHsKICAgICAgICAgICAgICAgIGxvZ0RpYWdub3N0aWNzKCJSZWplY3RlZCBsaXZlIGFjdGl2aXR5IFwoZGVzY3JpcHRvci5pZCkgZnJvbSBcKGJ1bmRsZUlkZW50aWZpZXIpOiBjYXBhY2l0eSBsaW1pdCBcKERlZmF1bHRzW21heENhcGFjaXR5S2V5XSkgcmVhY2hlZCIpCiAgICAgICAgICAgICAgICB0aHJvdyBFeHRlbnNpb25WYWxpZGF0aW9uRXJyb3IuZXhjZWVkc0NhcGFjaXR5CiAgICAgICAgICAgIH0KCiAgICAgICAgICAgIGxldCBwYXlsb2FkID0gRXh0ZW5zaW9uTGl2ZUFjdGl2aXR5UGF5bG9hZCgKICAgICAgICAgICAgICAgIGJ1bmRsZUlkZW50aWZpZXI6IGJ1bmRsZUlkZW50aWZpZXIsCiAgICAgICAgICAgICAgICBkZXNjcmlwdG9yOiBkZXNjcmlwdG9yLAogICAgICAgICAgICAgICAgcmVjZWl2ZWRBdDogLm5vdwogICAgICAgICAgICApCiAgICAgICAgICAgIGFjdGl2ZUFjdGl2aXRpZXMuYXBwZW5kKHBheWxvYWQpCiAgICAgICAgICAgIHNvcnRBY3Rpdml0aWVzKCkKICAgICAgICAgICAgYXV0aG9yaXphdGlvbk1hbmFnZXIucmVjb3JkQWN0aXZpdHkoZm9yOiBidW5kbGVJZGVudGlmaWVyLCBzY29wZTogLmxpdmVBY3Rpdml0aWVzKQogICAgICAgICAgICBsb2dEaWFnbm9zdGljcygiUXVldWVkIGxpdmUgYWN0aXZpdHkgXChkZXNjcmlwdG9yLmlkKSBmb3IgXChidW5kbGVJZGVudGlmaWVyKTsgdG90YWwgYWN0aXZpdGllczogXChhY3RpdmVBY3Rpdml0aWVzLmNvdW50KSIpCiAgICAgICAgICAgIGlzVXBkYXRlID0gZmFsc2UKICAgICAgICB9CiAgICAgICAgCiAgICAgICAgYnJvYWRjYXN0U25hcHNob3QoKQogICAgICAgIAogICAgICAgIC8vIFRyaWdnZXIgc25lYWsgcGVlayAoZGVmYXVsdGluZyB0byBlbmFibGVkIGZvciBsZWdhY3kgZGVzY3JpcHRvcnMpCiAgICAgICAgbGV0IHJlc29sdmVkQ29uZmlnID0gZGVzY3JpcHRvci5zbmVha1BlZWtDb25maWcgPz8gLmRlZmF1bHQKICAgICAgICBpZiByZXNvbHZlZENvbmZpZy5lbmFibGVkIHsKICAgICAgICAgICAgbGV0IHNob3VsZFNob3cgPSAhaXNVcGRhdGUgfHwgcmVzb2x2ZWRDb25maWcuc2hvd09uVXBkYXRlCiAgICAgICAgICAgIGlmIHNob3VsZFNob3cgewogICAgICAgICAgICAgICAgdHJpZ2dlclNuZWFrUGVlayhmb3I6IGRlc2NyaXB0b3IsIGJ1bmRsZUlkZW50aWZpZXI6IGJ1bmRsZUlkZW50aWZpZXIsIGNvbmZpZzogcmVzb2x2ZWRDb25maWcpCiAgICAgICAgICAgIH0KICAgICAgICB9CiAgICB9CgogICAgZnVuYyB1cGRhdGUoZGVzY3JpcHRvcjogQXRvbGxMaXZlQWN0aXZpdHlEZXNjcmlwdG9yLCBidW5kbGVJZGVudGlmaWVyOiBTdHJpbmcpIHRocm93cyB7CiAgICAgICAgZ3VhcmQgZGVzY3JpcHRvci5pc1ZhbGlkIGVsc2UgewogICAgICAgICAgICBsb2dEaWFnbm9zdGljcygiUmVqZWN0ZWQgbGl2ZSBhY3Rpdml0eSB1cGRhdGUgXChkZXNjcmlwdG9yLmlkKSBmcm9tIFwoYnVuZGxlSWRlbnRpZmllcik6IGRlc2NyaXB0b3IgdmFsaWRhdGlvbiBmYWlsZWQiKQogICAgICAgICAgICB0aHJvdyBFeHRlbnNpb25WYWxpZGF0aW9uRXJyb3IuaW52YWxpZERlc2NyaXB0b3IoIlN0cnVjdHVyZSB2YWxpZGF0aW9uIGZhaWxlZCIpCiAgICAgICAgfQogICAgICAgIGd1YXJkIGxldCBpbmRleCA9IGFjdGl2ZUFjdGl2aXRpZXMuZmlyc3RJbmRleCh3aGVyZTogeyAkMC5kZXNjcmlwdG9yLmlkID09IGRlc2NyaXB0b3IuaWQgJiYgJDAuYnVuZGxlSWRlbnRpZmllciA9PSBidW5kbGVJZGVudGlmaWVyIH0pIGVsc2UgewogICAgICAgICAgICB0aHJvdyBFeHRlbnNpb25WYWxpZGF0aW9uRXJyb3IuaW52YWxpZERlc2NyaXB0b3IoIk1pc3NpbmcgZXhpc3RpbmcgYWN0aXZpdHkiKQogICAgICAgIH0KICAgICAgICBsZXQgcGF5bG9hZCA9IEV4dGVuc2lvbkxpdmVBY3Rpdml0eVBheWxvYWQoCiAgICAgICAgICAgIGJ1bmRsZUlkZW50aWZpZXI6IGJ1bmRsZUlkZW50aWZpZXIsCiAgICAgICAgICAgIGRlc2NyaXB0b3I6IGRlc2NyaXB0b3IsCiAgICAgICAgICAgIHJlY2VpdmVkQXQ6IGFjdGl2ZUFjdGl2aXRpZXNbaW5kZXhdLnJlY2VpdmVkQXQKICAgICAgICApCiAgICAgICAgYWN0aXZlQWN0aXZpdGllc1tpbmRleF0gPSBwYXlsb2FkCiAgICAgICAgc29ydEFjdGl2aXRpZXMoKQogICAgICAgIGF1dGhvcml6YXRpb25NYW5hZ2VyLnJlY29yZEFjdGl2aXR5KGZvcjogYnVuZGxlSWRlbnRpZmllciwgc2NvcGU6IC5saXZlQWN0aXZpdGllcykKICAgICAgICBsb2dEaWFnbm9zdGljcygiVXBkYXRlZCBsaXZlIGFjdGl2aXR5IFwoZGVzY3JpcHRvci5pZCkgZm9yIFwoYnVuZGxlSWRlbnRpZmllcikiKQogICAgICAgIGJyb2FkY2FzdFNuYXBzaG90KCkKICAgIH0KCiAgICBmdW5jIGRpc21pc3MoYWN0aXZpdHlJRDogU3RyaW5nLCBidW5kbGVJZGVudGlmaWVyOiBTdHJpbmcpIHsKICAgICAgICBsZXQgcHJldmlvdXNDb3VudCA9IGFjdGl2ZUFjdGl2aXRpZXMuY291bnQKICAgICAgICB3aXRoQW5pbWF0aW9uKC5zcHJpbmcocmVzcG9uc2U6IDAuMywgZGFtcGluZ0ZyYWN0aW9uOiAwLjkpKSB7CiAgICAgICAgICAgIGFjdGl2ZUFjdGl2aXRpZXMucmVtb3ZlQWxsIHsgJDAuZGVzY3JpcHRvci5pZCA9PSBhY3Rpdml0eUlEICYmICQwLmJ1bmRsZUlkZW50aWZpZXIgPT0gYnVuZGxlSWRlbnRpZmllciB9CiAgICAgICAgfQogICAgICAgIGlmIHByZXZpb3VzQ291bnQgIT0gYWN0aXZlQWN0aXZpdGllcy5jb3VudCB7CiAgICAgICAgICAgIExvZ2dlci5sb2coIkRpc21pc3NlZCBleHRlbnNpb24gbGl2ZSBhY3Rpdml0eSBcKGFjdGl2aXR5SUQpIGZyb20gXChidW5kbGVJZGVudGlmaWVyKSIsIGNhdGVnb3J5OiAuZXh0ZW5zaW9ucykKICAgICAgICAgICAgRXh0ZW5zaW9uWFBDU2VydmljZUhvc3Quc2hhcmVkLm5vdGlmeUFjdGl2aXR5RGlzbWlzcyhidW5kbGVJZGVudGlmaWVyOiBidW5kbGVJZGVudGlmaWVyLCBhY3Rpdml0eUlEOiBhY3Rpdml0eUlEKQogICAgICAgICAgICBFeHRlbnNpb25SUENTZXJ2ZXIuc2hhcmVkLm5vdGlmeUFjdGl2aXR5RGlzbWlzcyhidW5kbGVJZGVudGlmaWVyOiBidW5kbGVJZGVudGlmaWVyLCBhY3Rpdml0eUlEOiBhY3Rpdml0eUlEKQogICAgICAgICAgICBsb2dEaWFnbm9zdGljcygiUmVtb3ZlZCBsaXZlIGFjdGl2aXR5IFwoYWN0aXZpdHlJRCkgZm9yIFwoYnVuZGxlSWRlbnRpZmllcik7IHJlbWFpbmluZzogXChhY3RpdmVBY3Rpdml0aWVzLmNvdW50KSIpCiAgICAgICAgICAgIGJyb2FkY2FzdFNuYXBzaG90KCkKICAgICAgICB9CiAgICB9CgogICAgZnVuYyBkaXNtaXNzQWxsKGZvciBidW5kbGVJZGVudGlmaWVyOiBTdHJpbmcpIHsKICAgICAgICBsZXQgaWRzID0gYWN0aXZlQWN0aXZpdGllcwogICAgICAgICAgICAuZmlsdGVyIHsgJDAuYnVuZGxlSWRlbnRpZmllciA9PSBidW5kbGVJZGVudGlmaWVyIH0KICAgICAgICAgICAgLm1hcCB7ICQwLmRlc2NyaXB0b3IuaWQgfQogICAgICAgIHdpdGhBbmltYXRpb24oLnNwcmluZyhyZXNwb25zZTogMC4zLCBkYW1waW5nRnJhY3Rpb246IDAuOSkpIHsKICAgICAgICAgICAgYWN0aXZlQWN0aXZpdGllcy5yZW1vdmVBbGwgeyAkMC5idW5kbGVJZGVudGlmaWVyID09IGJ1bmRsZUlkZW50aWZpZXIgfQogICAgICAgIH0KICAgICAgICBpZHMuZm9yRWFjaCB7CiAgICAgICAgICAgIEV4dGVuc2lvblhQQ1NlcnZpY2VIb3N0LnNoYXJlZC5ub3RpZnlBY3Rpdml0eURpc21pc3MoYnVuZGxlSWRlbnRpZmllcjogYnVuZGxlSWRlbnRpZmllciwgYWN0aXZpdHlJRDogJDApCiAgICAgICAgICAgIEV4dGVuc2lvblJQQ1NlcnZlci5zaGFyZWQubm90aWZ5QWN0aXZpdHlEaXNtaXNzKGJ1bmRsZUlkZW50aWZpZXI6IGJ1bmRsZUlkZW50aWZpZXIsIGFjdGl2aXR5SUQ6ICQwKQogICAgICAgIH0KICAgICAgICBpZiAhaWRzLmlzRW1wdHkgewogICAgICAgICAgICBsb2dEaWFnbm9zdGljcygiUmVtb3ZlZCBhbGwgbGl2ZSBhY3Rpdml0aWVzIGZvciBcKGJ1bmRsZUlkZW50aWZpZXIpOyBpZHM6IFwoaWRzLmpvaW5lZChzZXBhcmF0b3I6ICIsICIpKSIpCiAgICAgICAgICAgIGJyb2FkY2FzdFNuYXBzaG90KCkKICAgICAgICB9CiAgICB9CgogICAgZnVuYyBzb3J0ZWRBY3Rpdml0aWVzKGZvciBjb2V4aXN0ZW5jZTogQm9vbCA9IGZhbHNlKSAtPiBbRXh0ZW5zaW9uTGl2ZUFjdGl2aXR5UGF5bG9hZF0gewogICAgICAgIGFjdGl2ZUFjdGl2aXRpZXMKICAgICAgICAgICAgLmZpbHRlciB7IGNvZXhpc3RlbmNlID8gJDAuZGVzY3JpcHRvci5hbGxvd3NNdXNpY0NvZXhpc3RlbmNlIDogdHJ1ZSB9CiAgICAgICAgICAgIC5zb3J0ZWQoYnk6IGRlc2NyaXB0b3JDb21wYXJhdG9yKQogICAgfQoKICAgIGZ1bmMgcGF5bG9hZChidW5kbGVJZGVudGlmaWVyOiBTdHJpbmcsIGFjdGl2aXR5SUQ6IFN0cmluZykgLT4gRXh0ZW5zaW9uTGl2ZUFjdGl2aXR5UGF5bG9hZD8gewogICAgICAgIGFjdGl2ZUFjdGl2aXRpZXMuZmlyc3QgeyAkMC5idW5kbGVJZGVudGlmaWVyID09IGJ1bmRsZUlkZW50aWZpZXIgJiYgJDAuZGVzY3JpcHRvci5pZCA9PSBhY3Rpdml0eUlEIH0KICAgIH0KCiAgICBwcml2YXRlIGZ1bmMgZGVzY3JpcHRvckNvbXBhcmF0b3IobGhzOiBFeHRlbnNpb25MaXZlQWN0aXZpdHlQYXlsb2FkLCByaHM6IEV4dGVuc2lvbkxpdmVBY3Rpdml0eVBheWxvYWQpIC0+IEJvb2wgewogICAgICAgIGlmIGxocy5kZXNjcmlwdG9yLnByaW9yaXR5ID09IHJocy5kZXNjcmlwdG9yLnByaW9yaXR5IHsKICAgICAgICAgICAgcmV0dXJuIGxocy5yZWNlaXZlZEF0IDwgcmhzLnJlY2VpdmVkQXQKICAgICAgICB9CiAgICAgICAgcmV0dXJuIGxocy5kZXNjcmlwdG9yLnByaW9yaXR5ID4gcmhzLmRlc2NyaXB0b3IucHJpb3JpdHkKICAgIH0KCiAgICBwcml2YXRlIGZ1bmMgc29ydEFjdGl2aXRpZXMoKSB7CiAgICAgICAgYWN0aXZlQWN0aXZpdGllcy5zb3J0KGJ5OiBkZXNjcmlwdG9yQ29tcGFyYXRvcikKICAgIH0KCiAgICBwcml2YXRlIGZ1bmMgYnJvYWRjYXN0U25hcHNob3QoKSB7CiAgICAgICAgZ3VhcmQgIXN1cHByZXNzQnJvYWRjYXN0IGVsc2UgeyByZXR1cm4gfQogICAgICAgIGV2ZW50QnJpZGdlLmJyb2FkY2FzdExpdmVBY3Rpdml0eVNuYXBzaG90KGFjdGl2ZUFjdGl2aXRpZXMpCiAgICAgICAgbG9nRGlhZ25vc3RpY3MoIkJyb2FkY2FzdGVkIGxpdmUgYWN0aXZpdHkgc25hcHNob3QgKGNvdW50OiBcKGFjdGl2ZUFjdGl2aXRpZXMuY291bnQpKSIpCiAgICB9CgogICAgcHJpdmF0ZSBmdW5jIGFwcGx5U25hcHNob3QoXyBwYXlsb2FkczogW0V4dGVuc2lvbkxpdmVBY3Rpdml0eVBheWxvYWRdLCBzb3VyY2VQSUQ6IEludDMyKSB7CiAgICAgICAgZ3VhcmQgc291cmNlUElEICE9IGN1cnJlbnRQcm9jZXNzSUQgZWxzZSB7IHJldHVybiB9CiAgICAgICAgc3VwcHJlc3NCcm9hZGNhc3QgPSB0cnVlCiAgICAgICAgYWN0aXZlQWN0aXZpdGllcyA9IHBheWxvYWRzLnNvcnRlZChieTogZGVzY3JpcHRvckNvbXBhcmF0b3IpCiAgICAgICAgc3VwcHJlc3NCcm9hZGNhc3QgPSBmYWxzZQogICAgICAgIGxvZ0RpYWdub3N0aWNzKCJBcHBsaWVkIGV4dGVybmFsIGxpdmUgYWN0aXZpdHkgc25hcHNob3QgZnJvbSBQSUQgXChzb3VyY2VQSUQpIChjb3VudDogXChwYXlsb2Fkcy5jb3VudCkpIikKICAgIH0KCiAgICBwcml2YXRlIGZ1bmMgdHJpZ2dlclNuZWFrUGVlayhmb3IgZGVzY3JpcHRvcjogQXRvbGxMaXZlQWN0aXZpdHlEZXNjcmlwdG9yLCBidW5kbGVJZGVudGlmaWVyOiBTdHJpbmcsIGNvbmZpZzogQXRvbGxTbmVha1BlZWtDb25maWcpIHsKICAgICAgICBsZXQgY29vcmRpbmF0b3IgPSBEeW5hbWljSXNsYW5kVmlld0Nvb3JkaW5hdG9yLnNoYXJlZAogICAgICAgIGxldCBkdXJhdGlvbiA9IGNvbmZpZy5kdXJhdGlvbiA/PyAyLjUKICAgICAgICBsZXQgYWNjZW50Q29sb3IgPSBkZXNjcmlwdG9yLmFjY2VudENvbG9yLnN3aWZ0VUlDb2xvcgogICAgICAgIGxldCBzdHlsZU92ZXJyaWRlOiBTbmVha1BlZWtTdHlsZT8gPSB7CiAgICAgICAgICAgIGd1YXJkIGxldCByZXF1ZXN0ZWRTdHlsZSA9IGNvbmZpZy5zdHlsZSBlbHNlIHsgcmV0dXJuIG5pbCB9CiAgICAgICAgICAgIHN3aXRjaCByZXF1ZXN0ZWRTdHlsZSB7CiAgICAgICAgICAgIGNhc2UgLmlubGluZToKICAgICAgICAgICAgICAgIGxvZ0RpYWdub3N0aWNzKCJJbmxpbmUgc25lYWsgcGVlayByZXF1ZXN0ZWQgZm9yIFwoZGVzY3JpcHRvci5pZCk7IGhvc3Qgd2lsbCBzaG93IHN0YW5kYXJkIG1vZGUgaW5zdGVhZCIpCiAgICAgICAgICAgICAgICByZXR1cm4gLnN0YW5kYXJkCiAgICAgICAgICAgIGNhc2UgLnN0YW5kYXJkOgogICAgICAgICAgICAgICAgcmV0dXJuIC5zdGFuZGFyZAogICAgICAgICAgICB9CiAgICAgICAgfSgpCiAgICAgICAgCiAgICAgICAgbGV0IHJlc29sdmVkVGl0bGUgPSBkZXNjcmlwdG9yLnNuZWFrUGVla1RpdGxlPy5pc0VtcHR5ID09IGZhbHNlID8gZGVzY3JpcHRvci5zbmVha1BlZWtUaXRsZSEgOiBkZXNjcmlwdG9yLnRpdGxlCiAgICAgICAgbGV0IHJlc29sdmVkU3VidGl0bGUgPSBkZXNjcmlwdG9yLnNuZWFrUGVla1N1YnRpdGxlID8/IGRlc2NyaXB0b3Iuc3VidGl0bGUgPz8gIiIKICAgICAgICAKICAgICAgICAvLyBQYXNzIHRoZSBhY3Rpdml0eSdzIGlkIGFuZCBidW5kbGVJRCB0byB0aGUgc25lYWsgcGVlayBzbyB0aGUgc3BlY2lhbGl6ZWQgdmlldyBjYW4gbG9vayB1cCBkZXRhaWxzIGlmIG5lZWRlZAogICAgICAgIGNvb3JkaW5hdG9yLnRvZ2dsZVNuZWFrUGVlaygKICAgICAgICAgICAgc3RhdHVzOiB0cnVlLAogICAgICAgICAgICB0eXBlOiAuZXh0ZW5zaW9uTGl2ZUFjdGl2aXR5KGJ1bmRsZUlEOiBidW5kbGVJZGVudGlmaWVyLCBhY3Rpdml0eUlEOiBkZXNjcmlwdG9yLmlkKSwKICAgICAgICAgICAgZHVyYXRpb246IGR1cmF0aW9uLAogICAgICAgICAgICB2YWx1ZTogMCwKICAgICAgICAgICAgaWNvbjogIiIsCiAgICAgICAgICAgIHRpdGxlOiByZXNvbHZlZFRpdGxlLAogICAgICAgICAgICBzdWJ0aXRsZTogcmVzb2x2ZWRTdWJ0aXRsZSwKICAgICAgICAgICAgYWNjZW50Q29sb3I6IGFjY2VudENvbG9yLAogICAgICAgICAgICBzdHlsZU92ZXJyaWRlOiBzdHlsZU92ZXJyaWRlCiAgICAgICAgKQogICAgICAgIAogICAgICAgIGxvZ0RpYWdub3N0aWNzKCJUcmlnZ2VyZWQgc25lYWsgcGVlayBmb3IgXChkZXNjcmlwdG9yLmlkKSBmcm9tIFwoYnVuZGxlSWRlbnRpZmllcikgd2l0aCBkdXJhdGlvbiBcKGR1cmF0aW9uKXMiKQogICAgfQoKICAgIHByaXZhdGUgZnVuYyBsb2dEaWFnbm9zdGljcyhfIG1lc3NhZ2U6IFN0cmluZykgewogICAgICAgIGd1YXJkIERlZmF1bHRzWy5leHRlbnNpb25EaWFnbm9zdGljc0xvZ2dpbmdFbmFibGVkXSBlbHNlIHsgcmV0dXJuIH0KICAgICAgICBMb2dnZXIubG9nKG1lc3NhZ2UsIGNhdGVnb3J5OiAuZXh0ZW5zaW9ucykKICAgIH0KfQo=
+/*
+ * Atoll (DynamicIsland)
+ * Copyright (C) 2024-2026 Atoll Contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
+
+import AppKit
+import Foundation
+import Defaults
+import AtollExtensionKit
+import SwiftUI
+
+@MainActor
+final class ExtensionLiveActivityManager: ObservableObject {
+    static let shared = ExtensionLiveActivityManager()
+
+    @Published private(set) var activeActivities: [ExtensionLiveActivityPayload] = []
+
+    private let authorizationManager = ExtensionAuthorizationManager.shared
+    private let maxCapacityKey = Defaults.Keys.extensionLiveActivityCapacity
+    private let eventBridge = ExtensionEventBridge.shared
+    private var liveActivityObserver: NSObjectProtocol?
+    private var suppressBroadcast = false
+    private let currentProcessID = ProcessInfo.processInfo.processIdentifier
+
+    private init() {
+        // Persisted snapshots outlive the apps that presented them: the
+        // snapshot file is only rewritten when the activity set changes, and
+        // nothing dismisses an activity whose presenter is gone. Restoring
+        // one blindly pins it in the notch forever (a one-off test activity
+        // from a helper app stayed on screen for days this way). On launch,
+        // keep only activities whose source app is still installed and that
+        // arrived within the last 24 hours, and persist the cleaned snapshot
+        // so stale entries do not come back.
+        let restored = eventBridge.loadPersistedLiveActivities()
+        let cutoff = Date.now.addingTimeInterval(-24 * 60 * 60)
+        activeActivities = restored.filter { payload in
+            payload.receivedAt >= cutoff &&
+                NSWorkspace.shared.urlForApplication(withBundleIdentifier: payload.bundleIdentifier) != nil
+        }
+        if activeActivities.count != restored.count {
+            eventBridge.broadcastLiveActivitySnapshot(activeActivities)
+        }
+        sortActivities()
+        liveActivityObserver = eventBridge.observeLiveActivitySnapshots { [weak self] payloads, sourcePID in
+            self?.applySnapshot(payloads, sourcePID: sourcePID)
+        }
+    }
+
+    deinit {
+        if let token = liveActivityObserver {
+            eventBridge.removeObserver(token)
+        }
+    }
+
+    func present(descriptor: AtollLiveActivityDescriptor, bundleIdentifier: String) throws {
+        guard authorizationManager.canProcessLiveActivityRequest(from: bundleIdentifier) else {
+            logDiagnostics("Rejected live activity \(descriptor.id) from \(bundleIdentifier): scope disabled or bundle unauthorized")
+            throw ExtensionValidationError.unauthorized
+        }
+        guard descriptor.isValid else {
+            logDiagnostics("Rejected live activity \(descriptor.id) from \(bundleIdentifier): descriptor validation failed")
+            throw ExtensionValidationError.invalidDescriptor("Structure validation failed")
+        }
+
+        let isUpdate: Bool
+        if let index = activeActivities.firstIndex(where: { $0.descriptor.id == descriptor.id && $0.bundleIdentifier == bundleIdentifier }) {
+            let payload = ExtensionLiveActivityPayload(
+                bundleIdentifier: bundleIdentifier,
+                descriptor: descriptor,
+                receivedAt: activeActivities[index].receivedAt
+            )
+            activeActivities[index] = payload
+            sortActivities()
+            authorizationManager.recordActivity(for: bundleIdentifier, scope: .liveActivities)
+            Logger.log("Replaced extension live activity \(descriptor.id) for \(bundleIdentifier)", category: .extensions)
+            isUpdate = true
+        } else {
+            guard activeActivities.count < Defaults[maxCapacityKey] else {
+                logDiagnostics("Rejected live activity \(descriptor.id) from \(bundleIdentifier): capacity limit \(Defaults[maxCapacityKey]) reached")
+                throw ExtensionValidationError.exceedsCapacity
+            }
+
+            let payload = ExtensionLiveActivityPayload(
+                bundleIdentifier: bundleIdentifier,
+                descriptor: descriptor,
+                receivedAt: .now
+            )
+            activeActivities.append(payload)
+            sortActivities()
+            authorizationManager.recordActivity(for: bundleIdentifier, scope: .liveActivities)
+            logDiagnostics("Queued live activity \(descriptor.id) for \(bundleIdentifier); total activities: \(activeActivities.count)")
+            isUpdate = false
+        }
+        
+        broadcastSnapshot()
+        
+        // Trigger sneak peek (defaulting to enabled for legacy descriptors)
+        let resolvedConfig = descriptor.sneakPeekConfig ?? .default
+        if resolvedConfig.enabled {
+            let shouldShow = !isUpdate || resolvedConfig.showOnUpdate
+            if shouldShow {
+                triggerSneakPeek(for: descriptor, bundleIdentifier: bundleIdentifier, config: resolvedConfig)
+            }
+        }
+    }
+
+    func update(descriptor: AtollLiveActivityDescriptor, bundleIdentifier: String) throws {
+        guard descriptor.isValid else {
+            logDiagnostics("Rejected live activity update \(descriptor.id) from \(bundleIdentifier): descriptor validation failed")
+            throw ExtensionValidationError.invalidDescriptor("Structure validation failed")
+        }
+        guard let index = activeActivities.firstIndex(where: { $0.descriptor.id == descriptor.id && $0.bundleIdentifier == bundleIdentifier }) else {
+            throw ExtensionValidationError.invalidDescriptor("Missing existing activity")
+        }
+        let payload = ExtensionLiveActivityPayload(
+            bundleIdentifier: bundleIdentifier,
+            descriptor: descriptor,
+            receivedAt: activeActivities[index].receivedAt
+        )
+        activeActivities[index] = payload
+        sortActivities()
+        authorizationManager.recordActivity(for: bundleIdentifier, scope: .liveActivities)
+        logDiagnostics("Updated live activity \(descriptor.id) for \(bundleIdentifier)")
+        broadcastSnapshot()
+    }
+
+    func dismiss(activityID: String, bundleIdentifier: String) {
+        let previousCount = activeActivities.count
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
+            activeActivities.removeAll { $0.descriptor.id == activityID && $0.bundleIdentifier == bundleIdentifier }
+        }
+        if previousCount != activeActivities.count {
+            Logger.log("Dismissed extension live activity \(activityID) from \(bundleIdentifier)", category: .extensions)
+            ExtensionXPCServiceHost.shared.notifyActivityDismiss(bundleIdentifier: bundleIdentifier, activityID: activityID)
+            ExtensionRPCServer.shared.notifyActivityDismiss(bundleIdentifier: bundleIdentifier, activityID: activityID)
+            logDiagnostics("Removed live activity \(activityID) for \(bundleIdentifier); remaining: \(activeActivities.count)")
+            broadcastSnapshot()
+        }
+    }
+
+    func dismissAll(for bundleIdentifier: String) {
+        let ids = activeActivities
+            .filter { $0.bundleIdentifier == bundleIdentifier }
+            .map { $0.descriptor.id }
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
+            activeActivities.removeAll { $0.bundleIdentifier == bundleIdentifier }
+        }
+        ids.forEach {
+            ExtensionXPCServiceHost.shared.notifyActivityDismiss(bundleIdentifier: bundleIdentifier, activityID: $0)
+            ExtensionRPCServer.shared.notifyActivityDismiss(bundleIdentifier: bundleIdentifier, activityID: $0)
+        }
+        if !ids.isEmpty {
+            logDiagnostics("Removed all live activities for \(bundleIdentifier); ids: \(ids.joined(separator: ", "))")
+            broadcastSnapshot()
+        }
+    }
+
+    func sortedActivities(for coexistence: Bool = false) -> [ExtensionLiveActivityPayload] {
+        activeActivities
+            .filter { coexistence ? $0.descriptor.allowsMusicCoexistence : true }
+            .sorted(by: descriptorComparator)
+    }
+
+    func payload(bundleIdentifier: String, activityID: String) -> ExtensionLiveActivityPayload? {
+        activeActivities.first { $0.bundleIdentifier == bundleIdentifier && $0.descriptor.id == activityID }
+    }
+
+    private func descriptorComparator(lhs: ExtensionLiveActivityPayload, rhs: ExtensionLiveActivityPayload) -> Bool {
+        if lhs.descriptor.priority == rhs.descriptor.priority {
+            return lhs.receivedAt < rhs.receivedAt
+        }
+        return lhs.descriptor.priority > rhs.descriptor.priority
+    }
+
+    private func sortActivities() {
+        activeActivities.sort(by: descriptorComparator)
+    }
+
+    private func broadcastSnapshot() {
+        guard !suppressBroadcast else { return }
+        eventBridge.broadcastLiveActivitySnapshot(activeActivities)
+        logDiagnostics("Broadcasted live activity snapshot (count: \(activeActivities.count))")
+    }
+
+    private func applySnapshot(_ payloads: [ExtensionLiveActivityPayload], sourcePID: Int32) {
+        guard sourcePID != currentProcessID else { return }
+        suppressBroadcast = true
+        activeActivities = payloads.sorted(by: descriptorComparator)
+        suppressBroadcast = false
+        logDiagnostics("Applied external live activity snapshot from PID \(sourcePID) (count: \(payloads.count))")
+    }
+
+    private func triggerSneakPeek(for descriptor: AtollLiveActivityDescriptor, bundleIdentifier: String, config: AtollSneakPeekConfig) {
+        let coordinator = DynamicIslandViewCoordinator.shared
+        let duration = config.duration ?? 2.5
+        let accentColor = descriptor.accentColor.swiftUIColor
+        let styleOverride: SneakPeekStyle? = {
+            guard let requestedStyle = config.style else { return nil }
+            switch requestedStyle {
+            case .inline:
+                logDiagnostics("Inline sneak peek requested for \(descriptor.id); host will show standard mode instead")
+                return .standard
+            case .standard:
+                return .standard
+            }
+        }()
+        
+        let resolvedTitle = descriptor.sneakPeekTitle?.isEmpty == false ? descriptor.sneakPeekTitle! : descriptor.title
+        let resolvedSubtitle = descriptor.sneakPeekSubtitle ?? descriptor.subtitle ?? ""
+        
+        // Pass the activity's id and bundleID to the sneak peek so the specialized view can look up details if needed
+        coordinator.toggleSneakPeek(
+            status: true,
+            type: .extensionLiveActivity(bundleID: bundleIdentifier, activityID: descriptor.id),
+            duration: duration,
+            value: 0,
+            icon: "",
+            title: resolvedTitle,
+            subtitle: resolvedSubtitle,
+            accentColor: accentColor,
+            styleOverride: styleOverride
+        )
+        
+        logDiagnostics("Triggered sneak peek for \(descriptor.id) from \(bundleIdentifier) with duration \(duration)s")
+    }
+
+    private func logDiagnostics(_ message: String) {
+        guard Defaults[.extensionDiagnosticsLoggingEnabled] else { return }
+        Logger.log(message, category: .extensions)
+    }
+}

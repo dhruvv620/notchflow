@@ -1,1 +1,99 @@
-IyEvYmluL2Jhc2gKIwojIE5vdGNoRmxvdyBpbnN0YWxsZXIKIwojIEluc3RhbGwgb3IgdXBkYXRlIHdpdGggb25lIGNvbW1hbmQ6CiMgICAvYmluL2Jhc2ggLWMgIiQoY3VybCAtZnNTTCBodHRwczovL3Jhdy5naXRodWJ1c2VyY29udGVudC5jb20vZGhydXZ2NjIwL25vdGNoZmxvdy9mcmVzaC9yZW1pbmRlcnMtbGlxdWlkLWdsYXNzL2luc3RhbGwuc2gpIgojCiMgRG93bmxvYWRzIHRoZSBsYXRlc3QgcmVsZWFzZSBmcm9tIEdpdEh1YiwgaW5zdGFsbHMgTm90Y2hGbG93LmFwcCBpbnRvCiMgL0FwcGxpY2F0aW9ucyAoZmFsbHMgYmFjayB0byB+L0FwcGxpY2F0aW9ucyksIGFuZCByZW1vdmVzIHRoZSBkb3dubG9hZAojIHF1YXJhbnRpbmUgZmxhZyBzbyBHYXRla2VlcGVyIGRvZXMgbm90IGJsb2NrIHRoZSBmaXJzdCBsYXVuY2guCgpzZXQgLWUKCkFQUF9OQU1FPSJOb3RjaEZsb3ciCkRPV05MT0FEX1VSTD0iaHR0cHM6Ly9naXRodWIuY29tL2RocnV2djYyMC9ub3RjaGZsb3cvcmVsZWFzZXMvbGF0ZXN0L2Rvd25sb2FkL05vdGNoRmxvdy56aXAiCk1JTl9NQUNPUz0iMTQuNiIKCiMgUmV0dXJucyBzdWNjZXNzICgwKSBpZiB2ZXJzaW9uICQxIGlzIGxvd2VyIHRoYW4gdmVyc2lvbiAkMi4KdmVyc2lvbl9sdCgpIHsKICAgIGxvY2FsIElGUz0uCiAgICBsb2NhbCBhPSgkMSkgYj0oJDIpCiAgICBsb2NhbCBpIHggeQogICAgZm9yIGkgaW4gMCAxIDI7IGRvCiAgICAgICAgeD0ke2FbaV06LTB9CiAgICAgICAgeT0ke2JbaV06LTB9CiAgICAgICAgaWYgWyAiJHgiIC1sdCAiJHkiIF07IHRoZW4gcmV0dXJuIDA7IGZpCiAgICAgICAgaWYgWyAiJHgiIC1ndCAiJHkiIF07IHRoZW4gcmV0dXJuIDE7IGZpCiAgICBkb25lCiAgICByZXR1cm4gMQp9CgplY2hvICJJbnN0YWxsaW5nICR7QVBQX05BTUV9Li4uIgoKIyAtLS0gQ2hlY2tzIC0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLQoKIyBDdXJyZW50IGJ1aWxkcyBhcmUgQXBwbGUgU2lsaWNvbiBvbmx5LgppZiBbICIkKHVuYW1lIC1tKSIgIT0gImFybTY0IiBdOyB0aGVuCiAgICBlY2hvICJTb3JyeSAtICR7QVBQX05BTUV9IGN1cnJlbnRseSBydW5zIG9uIEFwcGxlIFNpbGljb24gTWFjcyBvbmx5LiIKICAgIGV4aXQgMQpmaQoKTUFDT1NfVkVSU0lPTj0iJChzd192ZXJzIC1wcm9kdWN0VmVyc2lvbikiCmlmIHZlcnNpb25fbHQgIiRNQUNPU19WRVJTSU9OIiAiJE1JTl9NQUNPUyI7IHRoZW4KICAgIGVjaG8gIlNvcnJ5IC0gJHtBUFBfTkFNRX0gbmVlZHMgbWFjT1MgJHtNSU5fTUFDT1N9IG9yIGxhdGVyLiBZb3UgaGF2ZSAke01BQ09TX1ZFUlNJT059LiIKICAgIGV4aXQgMQpmaQoKIyAtLS0gRG93bmxvYWQgLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLQoKVE1QX0RJUj0iJChta3RlbXAgLWQpIgp0cmFwICdybSAtcmYgIiRUTVBfRElSIicgRVhJVAoKZWNobyAiRG93bmxvYWRpbmcgdGhlIGxhdGVzdCAke0FQUF9OQU1FfSByZWxlYXNlLi4uIgppZiAhIGN1cmwgLWZMIC0tcHJvZ3Jlc3MtYmFyICIkRE9XTkxPQURfVVJMIiAtbyAiJFRNUF9ESVIvJHtBUFBfTkFNRX0uemlwIjsgdGhlbgogICAgZWNobyAiIgogICAgZWNobyAiRG93bmxvYWQgZmFpbGVkLiBUaGUgcmVsZWFzZSBtYXkgbm90IGJlIHB1Ymxpc2hlZCB5ZXQ6IgogICAgZWNobyAiICAkRE9XTkxPQURfVVJMIgogICAgZXhpdCAxCmZpCgojIC0tLSBRdWl0IGFueSBydW5uaW5nIGNvcHkgLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLQojIEEgcnVubmluZyBjb3B5IGtlZXBzIGl0cyBvbGQgY29kZSAoYW5kIGNhbiBibG9jayByZXBsYWNpbmcgdGhlIGJ1bmRsZSkuCgppZiBwZ3JlcCAteCAiJEFQUF9OQU1FIiA+L2Rldi9udWxsIDI+JjE7IHRoZW4KICAgIGVjaG8gIlF1aXR0aW5nIHRoZSBydW5uaW5nIGNvcHkuLi4iCiAgICBvc2FzY3JpcHQgLWUgInRlbGwgYXBwbGljYXRpb24gXCIke0FQUF9OQU1FfVwiIHRvIHF1aXQiID4vZGV2L251bGwgMj4mMSB8fCB0cnVlCiAgICBzbGVlcCAxCiAgICBwa2lsbCAteCAiJEFQUF9OQU1FIiA+L2Rldi9udWxsIDI+JjEgfHwgdHJ1ZQpmaQoKIyAtLS0gSW5zdGFsbCAtLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0KCmlmIFsgLXcgIi9BcHBsaWNhdGlvbnMiIF07IHRoZW4KICAgIElOU1RBTExfRElSPSIvQXBwbGljYXRpb25zIgplbHNlCiAgICBJTlNUQUxMX0RJUj0iJEhPTUUvQXBwbGljYXRpb25zIgogICAgbWtkaXIgLXAgIiRJTlNUQUxMX0RJUiIKZmkKCmVjaG8gIkluc3RhbGxpbmcgdG8gJHtJTlNUQUxMX0RJUn0uLi4iCmRpdHRvIC14IC1rICIkVE1QX0RJUi8ke0FQUF9OQU1FfS56aXAiICIkVE1QX0RJUi91bnppcHBlZCIKCmlmIFsgISAtZCAiJFRNUF9ESVIvdW56aXBwZWQvJHtBUFBfTkFNRX0uYXBwIiBdOyB0aGVuCiAgICBlY2hvICJJbnN0YWxsIGZhaWxlZDogJHtBUFBfTkFNRX0uYXBwIHdhcyBub3QgZm91bmQgaW4gdGhlIGRvd25sb2FkLiIKICAgIGV4aXQgMQpmaQoKcm0gLXJmICIkSU5TVEFMTF9ESVIvJHtBUFBfTkFNRX0uYXBwIgptdiAiJFRNUF9ESVIvdW56aXBwZWQvJHtBUFBfTkFNRX0uYXBwIiAiJElOU1RBTExfRElSLyIKCiMgUmVtb3ZlIHRoZSBxdWFyYW50aW5lIGZsYWcgc28gdGhlIGZpcnN0IGxhdW5jaCBpcyBub3QgYmxvY2tlZC4KeGF0dHIgLWRyIGNvbS5hcHBsZS5xdWFyYW50aW5lICIkSU5TVEFMTF9ESVIvJHtBUFBfTkFNRX0uYXBwIiAyPi9kZXYvbnVsbCB8fCB0cnVlCgplY2hvICIiCmVjaG8gIiR7QVBQX05BTUV9IGlzIGluc3RhbGxlZC4gTGF1bmNoaW5nIGl0IG5vdy4uLiIKb3BlbiAiJElOU1RBTExfRElSLyR7QVBQX05BTUV9LmFwcCIKCmVjaG8gIkRvbmUuIG1hY09TIHdpbGwgYXNrIGZvciBwZXJtaXNzaW9ucyAoUmVtaW5kZXJzLCBNaWNyb3Bob25lLCIKZWNobyAiQWNjZXNzaWJpbGl0eSkgdGhlIGZpcnN0IHRpbWUgYSBmZWF0dXJlIG5lZWRzIHRoZW0gLSBhbGxvdyB0aGUgb25lcyB5b3Ugd2FudC4iCg==
+#!/bin/bash
+#
+# NotchFlow installer
+#
+# Install or update with one command:
+#   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/dhruvv620/notchflow/fresh/reminders-liquid-glass/install.sh)"
+#
+# Downloads the latest release from GitHub, installs NotchFlow.app into
+# /Applications (falls back to ~/Applications), and removes the download
+# quarantine flag so Gatekeeper does not block the first launch.
+
+set -e
+
+APP_NAME="NotchFlow"
+DOWNLOAD_URL="https://github.com/dhruvv620/notchflow/releases/latest/download/NotchFlow.zip"
+MIN_MACOS="14.6"
+
+# Returns success (0) if version $1 is lower than version $2.
+version_lt() {
+    local IFS=.
+    local a=($1) b=($2)
+    local i x y
+    for i in 0 1 2; do
+        x=${a[i]:-0}
+        y=${b[i]:-0}
+        if [ "$x" -lt "$y" ]; then return 0; fi
+        if [ "$x" -gt "$y" ]; then return 1; fi
+    done
+    return 1
+}
+
+echo "Installing ${APP_NAME}..."
+
+# --- Checks ---------------------------------------------------------------
+
+# Current builds are Apple Silicon only.
+if [ "$(uname -m)" != "arm64" ]; then
+    echo "Sorry - ${APP_NAME} currently runs on Apple Silicon Macs only."
+    exit 1
+fi
+
+MACOS_VERSION="$(sw_vers -productVersion)"
+if version_lt "$MACOS_VERSION" "$MIN_MACOS"; then
+    echo "Sorry - ${APP_NAME} needs macOS ${MIN_MACOS} or later. You have ${MACOS_VERSION}."
+    exit 1
+fi
+
+# --- Download -------------------------------------------------------------
+
+TMP_DIR="$(mktemp -d)"
+trap 'rm -rf "$TMP_DIR"' EXIT
+
+echo "Downloading the latest ${APP_NAME} release..."
+if ! curl -fL --progress-bar "$DOWNLOAD_URL" -o "$TMP_DIR/${APP_NAME}.zip"; then
+    echo ""
+    echo "Download failed. The release may not be published yet:"
+    echo "  $DOWNLOAD_URL"
+    exit 1
+fi
+
+# --- Quit any running copy -------------------------------------------------
+# A running copy keeps its old code (and can block replacing the bundle).
+
+if pgrep -x "$APP_NAME" >/dev/null 2>&1; then
+    echo "Quitting the running copy..."
+    osascript -e "tell application \"${APP_NAME}\" to quit" >/dev/null 2>&1 || true
+    sleep 1
+    pkill -x "$APP_NAME" >/dev/null 2>&1 || true
+fi
+
+# --- Install ---------------------------------------------------------------
+
+if [ -w "/Applications" ]; then
+    INSTALL_DIR="/Applications"
+else
+    INSTALL_DIR="$HOME/Applications"
+    mkdir -p "$INSTALL_DIR"
+fi
+
+echo "Installing to ${INSTALL_DIR}..."
+ditto -x -k "$TMP_DIR/${APP_NAME}.zip" "$TMP_DIR/unzipped"
+
+if [ ! -d "$TMP_DIR/unzipped/${APP_NAME}.app" ]; then
+    echo "Install failed: ${APP_NAME}.app was not found in the download."
+    exit 1
+fi
+
+rm -rf "$INSTALL_DIR/${APP_NAME}.app"
+mv "$TMP_DIR/unzipped/${APP_NAME}.app" "$INSTALL_DIR/"
+
+# Remove the quarantine flag so the first launch is not blocked.
+xattr -dr com.apple.quarantine "$INSTALL_DIR/${APP_NAME}.app" 2>/dev/null || true
+
+echo ""
+echo "${APP_NAME} is installed. Launching it now..."
+open "$INSTALL_DIR/${APP_NAME}.app"
+
+echo "Done. macOS will ask for permissions (Reminders, Microphone,"
+echo "Accessibility) the first time a feature needs them - allow the ones you want."
