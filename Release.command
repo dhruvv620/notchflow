@@ -223,7 +223,9 @@ APPCAST
 
 step "Publishing v$VERSION on GitHub"
 git tag -a "v$VERSION" -m "NotchFlow $VERSION"
-git push origin "$BRANCH"
+# The tag carries the release's commit, so the branch itself was pushed
+# earlier and may have moved on meanwhile; that must not stop the release.
+git push -q origin "$BRANCH" 2>/dev/null || printf 'Note: %s on GitHub has newer commits; run git pull --ff-only afterwards.\n' "$BRANCH"
 git push origin "v$VERSION"
 gh release create "v$VERSION" \
     "$OUT/NotchFlow.dmg" "$OUT/NotchFlow.zip" "$OUT/install.sh" "$OUT/appcast.xml" \
