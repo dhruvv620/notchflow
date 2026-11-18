@@ -1,5 +1,5 @@
 /*
- * Atoll (DynamicIsland)
+ * NotchFlow
  * Copyright (C) 2024-2026 Atoll Contributors
  *
  * This program is free software: you can redistribute it and/or modify
@@ -37,12 +37,12 @@ struct DynamicNotchApp: App {
     let updaterController: SPUStandardUpdaterController
     /// Retained delegate instance that dynamically selects the Sparkle feed URL
     /// based on the user's update channel preference.
-    private let updaterDelegate = AtollUpdaterDelegate()
+    private let updaterDelegate = NotchFlowUpdaterDelegate()
 
     init() {
         SettingsCleanup.run()
         // Skip Sparkle's launch-time update check during UI testing.
-        // The AtollUpdaterDelegate overrides the feed URL at runtime
+        // The NotchFlowUpdaterDelegate overrides the feed URL at runtime
         // based on the user's selected update channel.
         updaterController = SPUStandardUpdaterController(
             startingUpdater: NotchFlowUpdates.isEnabled,
@@ -121,8 +121,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     let lockScreenPanelManager = LockScreenPanelManager.shared  // NEW: Lock screen music panel
     let mediaControlsStateCoordinator = MediaControlsStateCoordinator.shared
     let systemTimerBridge = SystemTimerBridge.shared
-    let extensionXPCServiceHost = ExtensionXPCServiceHost.shared
-    let extensionRPCServer = ExtensionRPCServer.shared
     var closeNotchWorkItem: DispatchWorkItem?
     private var previousScreens: [NSScreen]?
     private var onboardingWindowController: NSWindowController?
@@ -247,16 +245,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     func applicationWillTerminate(_ notification: Notification) {
-        let userInfo: [String: Any] = [
-            AtollDistributedNotifications.UserInfoKey.sourcePID: NSNumber(value: ProcessInfo.processInfo.processIdentifier)
-        ]
-        DistributedNotificationCenter.default().postNotificationName(
-            AtollDistributedNotifications.didBecomeIdle,
-            object: nil,
-            userInfo: userInfo,
-            deliverImmediately: true
-        )
-
         // Guarantee the native OSD is usable after we exit: if we were
         // suppressing it, OSDUIHelper is SIGSTOP-frozen and the async restore in
         // enableSystemHUD() would not finish before the process dies. Resume it
@@ -267,8 +255,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         windowSizeUpdateWorkItem?.cancel()
         screenConfigurationWorkItem?.cancel()
         NotificationCenter.default.removeObserver(self)
-        extensionXPCServiceHost.stop()
-        extensionRPCServer.stop()
         
         // Stop AudioTap capture
         AudioTap.shared.stopCapture()
@@ -689,16 +675,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard establishSingleNotchFlowInstance() else { return }
 
-        let userInfo: [String: Any] = [
-            AtollDistributedNotifications.UserInfoKey.sourcePID: NSNumber(value: ProcessInfo.processInfo.processIdentifier)
-        ]
-        DistributedNotificationCenter.default().postNotificationName(
-            AtollDistributedNotifications.didBecomeActive,
-            object: nil,
-            userInfo: userInfo,
-            deliverImmediately: true
-        )
-
         LockScreenLiveActivityWindowManager.shared.configure(viewModel: vm)
         LockScreenManager.shared.configure(viewModel: vm)
         // Legacy extension servers are not needed by this personal build.
@@ -1102,7 +1078,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func installTopMenuItemsIfNeeded() {
         guard let mainMenu = NSApp.mainMenu else { return }
-        if mainMenu.items.contains(where: { $0.identifier?.rawValue == "Atoll.Focus.Menu" }) {
+        if mainMenu.items.contains(where: { $0.identifier?.rawValue == "NotchFlow.Focus.Menu" }) {
             updateFocusMenuState()
             return
         }
@@ -1110,7 +1086,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let insertionIndex = preferredMenuInsertionIndex(in: mainMenu)
 
         let focusMenuItem = NSMenuItem(title: "Focus", action: nil, keyEquivalent: "")
-        focusMenuItem.identifier = NSUserInterfaceItemIdentifier("Atoll.Focus.Menu")
+        focusMenuItem.identifier = NSUserInterfaceItemIdentifier("NotchFlow.Focus.Menu")
         let focusSubmenu = NSMenu(title: "Focus")
 
         let withoutDevTools = NSMenuItem(
@@ -1136,7 +1112,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         focusUseDevToolsMenuItem = useDevTools
 
         let accessibilityMenuItem = NSMenuItem(title: "Accessibility", action: nil, keyEquivalent: "")
-        accessibilityMenuItem.identifier = NSUserInterfaceItemIdentifier("Atoll.Accessibility.Menu")
+        accessibilityMenuItem.identifier = NSUserInterfaceItemIdentifier("NotchFlow.Accessibility.Menu")
         let accessibilitySubmenu = NSMenu(title: "Accessibility")
 
         let requestAccessibility = NSMenuItem(
@@ -1159,7 +1135,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         mainMenu.insertItem(accessibilityMenuItem, at: insertionIndex + 1)
 
         let permissionsMenuItem = NSMenuItem(title: "Permissions", action: nil, keyEquivalent: "")
-        permissionsMenuItem.identifier = NSUserInterfaceItemIdentifier("Atoll.Permissions.Menu")
+        permissionsMenuItem.identifier = NSUserInterfaceItemIdentifier("NotchFlow.Permissions.Menu")
         let permissionsSubmenu = NSMenu(title: "Permissions")
 
         let requestFullDisk = NSMenuItem(
@@ -1191,7 +1167,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         mainMenu.insertItem(permissionsMenuItem, at: insertionIndex + 2)
 
         let toolsMenuItem = NSMenuItem(title: "Tools", action: nil, keyEquivalent: "")
-        toolsMenuItem.identifier = NSUserInterfaceItemIdentifier("Atoll.Tools.Menu")
+        toolsMenuItem.identifier = NSUserInterfaceItemIdentifier("NotchFlow.Tools.Menu")
         let toolsSubmenu = NSMenu(title: "Tools")
 
         let loggingLevelItem = NSMenuItem(title: "Logging Level", action: nil, keyEquivalent: "")
@@ -1300,7 +1276,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func exportLogs() {
         let savePanel = NSSavePanel()
-        savePanel.nameFieldStringValue = "Atoll_Logs.zip"
+        savePanel.nameFieldStringValue = "NotchFlow_Logs.zip"
         savePanel.title = "Export Logs & Crash Reports"
         
         savePanel.begin { response in
@@ -1314,7 +1290,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     let logsFile = tempDir.appendingPathComponent("app_logs.txt")
                     let logProcess = Process()
                     logProcess.executableURL = URL(fileURLWithPath: "/usr/bin/log")
-                    logProcess.arguments = ["show", "--predicate", "subsystem == 'com.Ebullioscopic.Atoll' OR subsystem == 'com.Ebullioscopic.Atoll.dev'", "--info", "--debug", "--last", "2d"]
+                    logProcess.arguments = ["show", "--predicate", "subsystem == 'com.dhruvv620.NotchFlow'", "--info", "--debug", "--last", "2d"]
                     
                     let pipe = Pipe()
                     logProcess.standardOutput = pipe
@@ -1326,13 +1302,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     
                     let diagDir = URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Library/Logs/DiagnosticReports")
                     let allFiles = (try? FileManager.default.contentsOfDirectory(at: diagDir, includingPropertiesForKeys: nil)) ?? []
-                    for file in allFiles where file.lastPathComponent.contains("Atoll") {
+                    for file in allFiles where file.lastPathComponent.contains("NotchFlow") {
                         try? FileManager.default.copyItem(at: file, to: tempDir.appendingPathComponent(file.lastPathComponent))
                     }
                     
                     let sysDiagDir = URL(fileURLWithPath: "/Library/Logs/DiagnosticReports")
                     let sysFiles = (try? FileManager.default.contentsOfDirectory(at: sysDiagDir, includingPropertiesForKeys: nil)) ?? []
-                    for file in sysFiles where file.lastPathComponent.contains("Atoll") {
+                    for file in sysFiles where file.lastPathComponent.contains("NotchFlow") {
                         try? FileManager.default.copyItem(at: file, to: tempDir.appendingPathComponent(file.lastPathComponent))
                     }
                     

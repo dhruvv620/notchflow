@@ -3,7 +3,7 @@ import os
 
 // Codex/ChatGPT rate-limit usage from chatgpt.com/backend-api/wham/usage; request+response shape per OpenUsage.
 struct CodexQuotaClient {
-    private static let log = os.Logger(subsystem: "com.atoll.DynamicIsland", category: "CodexQuota")
+    private static let log = os.Logger(subsystem: "com.dhruvv620.NotchFlow", category: "CodexQuota")
     let session: URLSession
     init(session: URLSession = URLSession(configuration: .ephemeral)) { self.session = session }
 
@@ -39,7 +39,7 @@ struct CodexQuotaClient {
         var request = URLRequest(url: URL(string: "https://chatgpt.com/backend-api/wham/usage")!)
         request.setValue("Bearer \(creds.accessToken)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue("Atoll", forHTTPHeaderField: "User-Agent")
+        request.setValue("NotchFlow", forHTTPHeaderField: "User-Agent")
         if let accountId = creds.accountId, !accountId.isEmpty {
             request.setValue(accountId, forHTTPHeaderField: "ChatGPT-Account-Id")
         }

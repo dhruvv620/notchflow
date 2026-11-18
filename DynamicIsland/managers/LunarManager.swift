@@ -1,5 +1,5 @@
 /*
- * Atoll (DynamicIsland)
+ * NotchFlow
  * Copyright (C) 2024-2026 Atoll Contributors
  *
  * This program is free software: you can redistribute it and/or modify
@@ -50,7 +50,7 @@ enum LunarControlCategory {
 /// - Detect whether Lunar is installed and running
 /// - Observe app launch / termination to connect / disconnect automatically
 /// - Connect to Lunar's TCP socket on localhost:23803 and listen for DDC changes
-/// - Route brightness / contrast / volume events to Atoll's HUD pipeline
+/// - Route brightness / contrast / volume events to NotchFlow's HUD pipeline
 @MainActor
 final class LunarManager: ObservableObject {
     static let shared = LunarManager()
@@ -110,7 +110,7 @@ final class LunarManager: ObservableObject {
         refreshConnectionState()
     }
 
-    /// Called when Atoll is about to quit so Lunar's native OSD is restored.
+    /// Called when NotchFlow is about to quit so Lunar's native OSD is restored.
     func appWillTerminate() {
         setLunarHideOSD(false)
     }

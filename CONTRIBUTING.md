@@ -1,97 +1,52 @@
 <p align="center">
-	<img src=".github/assets/atoll-logo.png" alt="Atoll logo" width="100">
+	<img src="docs/assets/notchflow-icon.png" alt="NotchFlow icon" width="100">
 </p>
 
-# Contributing to Atoll
+# Contributing to NotchFlow
 
-Thank you for your interest in contributing to Atoll! We welcome contributions from everyone—developers, designers, testers, and documentation writers. Please read the following guidelines to help us maintain a collaborative and high-quality project.
+Thanks for wanting to help. Bug reports, ideas, fixes, translations and design work are all welcome.
 
-## Table of Contents
-- [How to Contribute](#how-to-contribute)
-- [Code of Conduct](#code-of-conduct)
-- [Development Setup](#development-setup)
-- [Pull Request Process](#pull-request-process)
-- [Coding Guidelines](#coding-guidelines)
-- [Design Contributions](#design-contributions)
-- [Documentation](#documentation)
-- [Code Review process](#code-review-process)
-- [Community & Support](#community--support)
+## Reporting a bug or an idea
 
-
----
-
-## How to Contribute
-
-1. **Fork the repository** and clone your fork locally.
-2. **Create a feature branch** for your changes: `git switch -c feature/your-feature-name`
-3. **Make your changes** following the guidelines below.
-4. **Test your changes** to ensure they work as expected and do not break existing functionality.
-5. **Commit** with clear, descriptive messages.
-6. **Push** to your fork and submit a **pull request** (PR) to the `main` branch.
-7. **Participate in code review** and address any feedback.
+Open an issue at https://github.com/dhruvv620/notchflow/issues. For a bug, say what you did, what you expected and what happened, and attach the zip from **Export Logs** (NotchFlow's Tools menu) if you can.
 
 ## Code of Conduct
 
-We are committed to fostering a welcoming and inclusive environment. Please read our [Code of Conduct](CODE_OF_CONDUCT.md) before participating.
+Please read the [Code of Conduct](CODE_OF_CONDUCT.md) before taking part.
 
-## Development Setup
+## Development setup
 
-- **Requirements:**
-	- macOS Sonoma 14.0 or later
-	- Xcode 15.0+ with Swift 5.9 toolchain
-	- MacBook with a notch (for full feature testing)
-- **Clone the repo:**
-	```bash
-	git clone https://github.com/Ebullioscopic/Atoll.git
-	cd Atoll
-	open DynamicIsland.xcodeproj
-	```
-- **Build & Run:**
-	- Select your Mac as the run destination in Xcode.
-	- Build and run (Cmd+R).
-	- Grant any requested permissions.
+- macOS 14.6 or later on Apple silicon, ideally a MacBook with a notch.
+- Xcode 26 or later, and [Git LFS](https://git-lfs.com) for the animation assets.
 
-## Pull Request Process
+```bash
+git clone https://github.com/dhruvv620/notchflow.git
+```
+```bash
+cd notchflow && bash Build.command && open -a NotchFlow
+```
 
-- Ensure your branch is up to date with `main` before submitting a PR.
-- Provide a clear description of your changes and the motivation behind them.
-- Reference any related issues or discussions.
-- Add screenshots or screen recordings for UI changes.
-- Ensure the code builds without errors or warnings.
-- Respond promptly to review feedback.
+`Build.command` runs the regression checks in `tests/`, builds and signs a Debug copy, and installs it. You can also open `DynamicIsland.xcodeproj`, choose the **DynamicIsland** scheme and **My Mac**, and press Command-R. (The project and folder are still called DynamicIsland; the app they build is NotchFlow.)
 
-## Coding Guidelines
+## Making a change
 
-- Follow Swift API Design Guidelines.
-- Use meaningful variable and function names.
-- Keep functions focused and concise.
-- Add inline documentation for public APIs and complex logic.
-- Write unit tests for new features where practical.
-- Avoid introducing unnecessary dependencies.
+1. Fork the repository and create a branch: `git switch -c feature/your-feature`.
+2. Keep each change focused, and follow the existing style: Swift API Design Guidelines, small views, and logic that can be tested kept in Foundation-only files under `DynamicIsland/helpers/` with a regression test in `tests/`.
+3. Adding or changing a setting? Read [docs/SETTINGS.md](docs/SETTINGS.md) first; `tests/test_settings_integrity.py` checks its rules.
+4. Run `bash Build.command` and make sure it finishes without errors.
+5. Describe the change for users in the Unreleased section of [CHANGELOG.md](CHANGELOG.md).
+6. Open a pull request with what changed and why, and screenshots or a short recording for anything visible.
 
-## Design Contributions
+## Design
 
-- Submit UI/UX improvements, mockups, or visual assets.
-- Maintain consistency with macOS Human Interface Guidelines.
-- Provide rationale for design decisions.
+Keep to the macOS Human Interface Guidelines and the shared components in `NotchDesignKit.swift`, so tabs look and behave alike. The app icon's source is `docs/assets/AppIcon.svg`.
 
-## Documentation
+## Translations
 
-- Improve user guides, API docs, and troubleshooting sections.
-- Translate documentation into other languages.
-- Clarify setup instructions and add usage examples.
+User-facing text lives in `DynamicIsland/Localizable.xcstrings`; edit it in Xcode's String Catalog editor.
 
-## Code review process
-- All pull requests require review from project maintainers before merging.
-- Automated testing must pass via continuous integration workflows.
-- Changes should not significantly decrease test coverage without justification.
-- Breaking changes require major version updates following semantic versioning.
+## License
 
-## Community & Support
+By contributing, you agree that your contributions are licensed under the [GNU General Public License v3](LICENSE).
 
-- Join our [Discord community](https://discord.gg/zvjB4tJBkt) for discussion, support, and collaboration.
-- Be respectful and constructive in all interactions.
-
----
-
-Thank you for helping make Atoll better!
+Thanks for helping make NotchFlow better!

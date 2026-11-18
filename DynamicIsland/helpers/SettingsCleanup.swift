@@ -11,9 +11,15 @@ enum SettingsCleanup {
         "selectedDownloadIconStyle", "expandedDragDetection", "alwaysHideInFullscreen", "enableWobbleAnimation",
         "autoStartStatsMonitoring", "showTimerPresetsInNotchTab", "timerInputStyle", "colorHistorySize",
         "clipboardHistorySize", "systemHUDSensitivity", "hasSeenOSDAlphaWarning", "enableScreenRecordingPolling",
+        // The third-party extension system (removed with its SDK).
+        "enableThirdPartyExtensions", "enableExtensionLiveActivities", "enableExtensionLockScreenWidgets",
+        "enableExtensionNotchExperiences", "enableExtensionNotchTabs", "enableExtensionNotchMinimalisticOverrides",
+        "enableExtensionNotchInteractiveWebViews", "extensionAuthorizationEntries", "extensionRateLimitRecords",
+        "extensionDiagnosticsLoggingEnabled", "extensionLiveActivityCapacity", "extensionLockScreenWidgetCapacity",
+        "extensionNotchExperienceCapacity", "enableExtensionFileSharing",
     ]
 
-    private static let doneKey = "settingsCleanup.v1"
+    private static let doneKey = "settingsCleanup.v2"
 
     static func run(defaults: UserDefaults = .standard) {
         guard !defaults.bool(forKey: doneKey) else { return }

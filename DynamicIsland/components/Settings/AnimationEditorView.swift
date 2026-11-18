@@ -1,5 +1,5 @@
 /*
- * Atoll (DynamicIsland)
+ * NotchFlow
  * Copyright (C) 2024-2026 Atoll Contributors
  *
  * This program is free software: you can redistribute it and/or modify
@@ -365,7 +365,7 @@ struct AnimationEditorView: View {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("Expand notch to follow animation width")
                                     .fontWeight(.medium)
-                                Text("Enable when scaling beyond 30x20px so the Atoll opens gracefully.")
+                                Text("Enable when scaling beyond 30x20px so the notch opens gracefully.")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }

@@ -1,5 +1,5 @@
 /*
- * Atoll (DynamicIsland)
+ * NotchFlow
  * Copyright (C) 2024-2026 Atoll Contributors
  *
  * This program is free software: you can redistribute it and/or modify
@@ -36,7 +36,7 @@ private enum SpotifyLoginConstants {
     static let googleSignInRedirectURL = URL(string: "https://accounts.spotify.com/en/login")!
 }
 
-private let spotifyLoginLogger = os.Logger(subsystem: "com.Ebullioscopic.Atoll", category: "SpotifyLogin")
+private let spotifyLoginLogger = os.Logger(subsystem: "com.dhruvv620.NotchFlow", category: "SpotifyLogin")
 
 struct SpotifyLoginSheet: View {
     @Environment(\.dismiss) private var dismiss

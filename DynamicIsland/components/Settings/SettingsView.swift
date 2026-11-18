@@ -28,7 +28,6 @@ private enum SettingsTabGroup: String, CaseIterable, Identifiable {
     case notch
     case tools
     case system
-    case integrations
     case info
 
     var id: String { rawValue }
@@ -40,7 +39,6 @@ private enum SettingsTabGroup: String, CaseIterable, Identifiable {
         case .notch:        return String(localized: "In the Notch")
         case .tools:        return String(localized: "Tools")
         case .system:       return String(localized: "System")
-        case .integrations: return String(localized: "Extensions")
         case .info:         return nil
         }
     }
@@ -55,7 +53,6 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
     case lockScreen
     case media
     case devices
-    case extensions
     case timer
     case calendar
     case hudAndOSD
@@ -85,7 +82,6 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .smartTools, .notes, .clipboard, .screenAssistant,
              .colorPicker, .terminal, .stats:                                    return .tools
         case .hudAndOSD, .battery, .devices, .downloads, .lockScreen:           return .system
-        case .extensions:                                                       return .integrations
         case .about:                                                            return .info
         }
     }
@@ -100,7 +96,6 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .lockScreen: return String(localized: "Lock Screen")
         case .media: return String(localized: "Music")
         case .devices: return String(localized: "Devices")
-        case .extensions: return String(localized: "Extensions")
         case .timer: return String(localized: "Timers")
         case .calendar: return String(localized: "Calendar & Todos")
         case .hudAndOSD: return String(localized: "Controls")
@@ -131,7 +126,6 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .lockScreen: return "lock.laptopcomputer"
         case .media: return "music.note"
         case .devices: return "headphones"
-        case .extensions: return "puzzlepiece.extension"
         case .timer: return "timer"
         case .calendar: return "calendar"
         case .hudAndOSD: return "dial.medium.fill"
@@ -162,7 +156,6 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .lockScreen: return .orange
         case .media: return .green
         case .devices: return Color(red: 0.1, green: 0.11, blue: 0.12)
-        case .extensions: return Color(red: 0.557, green: 0.353, blue: 0.957)
         case .timer: return .red
         case .calendar: return .cyan
         case .hudAndOSD: return .indigo
@@ -482,17 +475,6 @@ struct SettingsView: View {
                         Capsule()
                             .fill(Color.blue)
                     )
-            } else if tab == .extensions {
-                Spacer()
-                Text("BETA")
-                    .font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(
-                        Capsule()
-                            .fill(Color.blue)
-                    )
             }
         }
         .padding(.vertical, 4)
@@ -529,8 +511,6 @@ struct SettingsView: View {
             .devices,
             .downloads,
             .lockScreen,
-            // Extensions
-            .extensions,
             // Info
             .about
         ]
@@ -895,12 +875,6 @@ struct SettingsView: View {
             SettingsSearchEntry(tab: .lockScreen, title: "Reminder alignment", keywords: ["reminder", "alignment", "position"], highlightID: SettingsTab.lockScreen.highlightID(for: "Reminder alignment")),
             SettingsSearchEntry(tab: .lockScreen, title: "Reminder vertical offset", keywords: ["reminder", "offset", "position"], highlightID: SettingsTab.lockScreen.highlightID(for: "Reminder vertical offset")),
 
-            // Extensions
-            SettingsSearchEntry(tab: .extensions, title: "Enable third-party extensions", keywords: ["extensions", "authorization", "third party"], highlightID: SettingsTab.extensions.highlightID(for: "Enable third-party extensions")),
-            SettingsSearchEntry(tab: .extensions, title: "Allow extension live activities", keywords: ["extensions", "live activities", "permissions"], highlightID: SettingsTab.extensions.highlightID(for: "Allow extension live activities")),
-            SettingsSearchEntry(tab: .extensions, title: "Allow extension lock screen widgets", keywords: ["extensions", "lock screen", "widgets"], highlightID: SettingsTab.extensions.highlightID(for: "Allow extension lock screen widgets")),
-            SettingsSearchEntry(tab: .extensions, title: "Enable extension diagnostics logging", keywords: ["extensions", "diagnostics", "logging"], highlightID: SettingsTab.extensions.highlightID(for: "Enable extension diagnostics logging")),
-            SettingsSearchEntry(tab: .extensions, title: "Manage app permissions", keywords: ["extensions", "permissions", "apps"], highlightID: SettingsTab.extensions.highlightID(for: "App permissions list")),
 
             // Shortcuts
             SettingsSearchEntry(tab: .shortcuts, title: "Enable global keyboard shortcuts", keywords: ["keyboard", "shortcut"], highlightID: SettingsTab.shortcuts.highlightID(for: "Enable global keyboard shortcuts")),
@@ -1022,10 +996,6 @@ struct SettingsView: View {
         case .devices:
             SettingsForm(tab: .devices) {
                 DevicesSettingsView()
-            }
-        case .extensions:
-            SettingsForm(tab: .extensions) {
-                ExtensionsSettingsView()
             }
         case .timer:
             SettingsForm(tab: .timer) {
@@ -2363,21 +2333,21 @@ private struct ExternalDisplayIntegrationsSection: View {
         switch thirdPartyDDCProvider {
         case .betterDisplay:
             if !betterDisplayManager.isDetected {
-                return "Install [BetterDisplay](https://betterdisplay.pro) to control external display brightness (and optional volume) through Atoll's HUD."
+                return "Install [BetterDisplay](https://betterdisplay.pro) to control external display brightness (and optional volume) through NotchFlow's HUD."
             }
             if !betterDisplayManager.isRunning {
                 return "BetterDisplay is installed but not currently running. Launch BetterDisplay to enable integration."
             }
-            return "BetterDisplay OSD events will be routed through Atoll's active HUD style. Brightness is always routed; volume is routed when external volume control listener is enabled below. Make sure BetterDisplay's OSD integration is enabled in Settings › Application › Integration."
+            return "BetterDisplay OSD events will be routed through NotchFlow's active HUD style. Brightness is always routed; volume is routed when external volume control listener is enabled below. Make sure BetterDisplay's OSD integration is enabled in Settings › Application › Integration."
         case .lunar:
             if !lunarManager.isDetected {
-                return "Install [Lunar](https://lunar.fyi) to control external display brightness, contrast, and optional volume through Atoll's HUD via DDC."
+                return "Install [Lunar](https://lunar.fyi) to control external display brightness, contrast, and optional volume through NotchFlow's HUD via DDC."
             }
             if !lunarManager.isRunning {
                 return "Lunar is installed but not currently running. Launch Lunar to enable integration."
             }
             if lunarManager.isConnected {
-                return "Connected to Lunar's DDC socket. Brightness and contrast adjustments are shown through Atoll's HUD; volume follows when external volume control listener is enabled below."
+                return "Connected to Lunar's DDC socket. Brightness and contrast adjustments are shown through NotchFlow's HUD; volume follows when external volume control listener is enabled below."
             }
             return "Lunar is running but the socket connection is not yet established. It will connect automatically."
         }
@@ -2487,8 +2457,8 @@ private struct ExternalDisplayIntegrationsSection: View {
 
                     Text(
                         enableExternalVolumeControlListener
-                        ? "Atoll's built-in volume key interception is disabled while external volume listening is on. Volume HUD/OSD will follow \(thirdPartyDDCProvider.displayName) payloads."
-                        : "Atoll keeps native volume key interception. External provider volume payloads are ignored while this is off."
+                        ? "NotchFlow's built-in volume key interception is disabled while external volume listening is on. Volume HUD/OSD will follow \(thirdPartyDDCProvider.displayName) payloads."
+                        : "NotchFlow keeps native volume key interception. External provider volume payloads are ignored while this is off."
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -2513,13 +2483,13 @@ private struct ExternalDisplayIntegrationsSection: View {
                     }
                     .buttonStyle(.link)
                 } else {
-                    Text("Enable to route BetterDisplay or Lunar display adjustments through Atoll's active HUD style.")
+                    Text("Enable to route BetterDisplay or Lunar display adjustments through NotchFlow's active HUD style.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
             } footer: {
                 if enableThirdPartyDDCIntegration {
-                    Text("Atoll always listens to selected-provider brightness events, and listens to provider volume events only when external volume listener is enabled.")
+                    Text("NotchFlow always listens to selected-provider brightness events, and listens to provider volume events only when external volume listener is enabled.")
                         .foregroundStyle(.secondary)
                         .font(.caption)
                 }
@@ -3514,20 +3484,6 @@ struct About: View {
                 HStack(spacing: 30) {
                     Spacer(minLength: 0)
                     Button {
-                        NSWorkspace.shared.open(sponsorPage)
-                    } label: {
-                        VStack(spacing: 5) {
-                            Image(systemName: "cup.and.saucer.fill")
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundStyle(.primary)
-                                .shadow(color: .black.opacity(0.15), radius: 2, y: 1)
-                            Text("Donate")
-                                .foregroundStyle(.primary)
-                        }
-                        .contentShape(Rectangle())
-                    }
-                    Spacer(minLength: 0)
-                    Button {
                         NSWorkspace.shared.open(productPage)
                     } label: {
                         VStack(spacing: 5) {
@@ -3544,12 +3500,6 @@ struct About: View {
                     Spacer(minLength: 0)
                 }
                 .buttonStyle(PlainButtonStyle())
-                
-                Text("Your support funds software development learning for students in 9th–12th grade.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.bottom, 5)
 
                 if NotchFlowUpdates.isEnabled {
                     UpdaterSettingsView(updater: updaterController.updater)
@@ -3570,7 +3520,7 @@ struct About: View {
                 VStack(spacing: 0) {
                     Divider()
                         .padding(.bottom, 5)
-                    Text("Made with ❤️ by Ebullioscopic")
+                    Text("NotchFlow is free software under the GPL v3.")
                         .foregroundStyle(.secondary)
                         .padding(.bottom, 7)
                         .multilineTextAlignment(.center)
@@ -4733,7 +4683,7 @@ struct LockScreenSettings: View {
                     }
                     .disabled(!enableLockScreenMediaWidget || !lockScreenMusicFullscreenArtworkEnabled)
                     .settingsHighlight(id: highlightID("Keep album art visible during fullscreen artwork"))
-                    Text("Right-click the album art on the lock screen to set it as the wallpaper. Right-click again or click the background to restore the original wallpaper. If a canvas is available, Atoll can also keep the same album art + player layout on top of the live canvas.")
+                    Text("Right-click the album art on the lock screen to set it as the wallpaper. Right-click again or click the background to restore the original wallpaper. If a canvas is available, NotchFlow can also keep the same album art + player layout on top of the live canvas.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -7588,7 +7538,7 @@ struct NotesSettingsView: View {
                 } header: {
                     Text("Apple Notes")
                 } footer: {
-                    Text("Two-way sync with the macOS Notes app. Notes created in Atoll appear in the Atoll folder in Notes, and your existing Apple Notes are imported into the notch. Grant Automation permission for Notes when prompted.")
+                    Text("Two-way sync with the macOS Notes app. Notes created in NotchFlow appear in the NotchFlow folder in Notes, and your existing Apple Notes are imported into the notch. Grant Automation permission for Notes when prompted.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

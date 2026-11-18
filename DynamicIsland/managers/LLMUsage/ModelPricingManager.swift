@@ -1,5 +1,5 @@
 /*
- * Atoll (DynamicIsland)
+ * NotchFlow
  * Copyright (C) 2024-2026 Atoll Contributors
  *
  * This program is free software: you can redistribute it and/or modify
@@ -56,7 +56,7 @@ class ModelPricingManager: ObservableObject {
     
     @Published private(set) var pricingData: ModelPricingData?
     
-    private let remoteURL = URL(string: "https://raw.githubusercontent.com/Ebullioscopic/Atoll/feat/dynamic-pricing-workflow/DynamicIsland/managers/LLMUsage/pricing.json")!
+    private let remoteURL = URL(string: "https://raw.githubusercontent.com/dhruvv620/notchflow/HEAD/DynamicIsland/managers/LLMUsage/pricing.json")!
     
     private init() {
         loadInitialPricing()

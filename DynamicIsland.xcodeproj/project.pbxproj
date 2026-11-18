@@ -8,7 +8,6 @@
 
 /* Begin PBXBuildFile section */
 		7E1ADF1D2EA209B1001DA867 /* SkyLightWindow in Frameworks */ = {isa = PBXBuildFile; productRef = 7E61181E2E24071E0050006C /* SkyLightWindow */; };
-		7E288D122F1659EF0020C117 /* AtollExtensionKit in Frameworks */ = {isa = PBXBuildFile; productRef = 7E288D112F1659EF0020C117 /* AtollExtensionKit */; };
 		7E6118142E24071E0050006C /* LaunchAtLogin in Frameworks */ = {isa = PBXBuildFile; productRef = 14D032192C68F32E0096E6A1 /* LaunchAtLogin */; };
 		7E6118152E24071E0050006C /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 14D0321C2C68F3350096E6A1 /* Sparkle */; };
 		7E6118162E24071E0050006C /* KeyboardShortcuts in Frameworks */ = {isa = PBXBuildFile; productRef = B18654382C6F4990000B926A /* KeyboardShortcuts */; };
@@ -140,7 +139,6 @@
 				7E6118172E24071E0050006C /* Collections in Frameworks */,
 				7E6118162E24071E0050006C /* KeyboardShortcuts in Frameworks */,
 				7E6118152E24071E0050006C /* Sparkle in Frameworks */,
-				7E288D122F1659EF0020C117 /* AtollExtensionKit in Frameworks */,
 				7E6118142E24071E0050006C /* LaunchAtLogin in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -271,7 +269,6 @@
 				B194240A2CD10017003E5DC2 /* LottieUI */,
 				146BC4362D366E9B0047C66A /* MacroVisionKit */,
 				7E61181E2E24071E0050006C /* SkyLightWindow */,
-				7E288D112F1659EF0020C117 /* AtollExtensionKit */,
 				7EF19C162F577040005B9929 /* SwiftTerm */,
 			);
 			productName = DynamicIsland;
@@ -319,7 +316,6 @@
 				146BC4352D366E9B0047C66A /* XCRemoteSwiftPackageReference "MacroVisionKit" */,
 				7E61181F2E24071E0050006C /* XCRemoteSwiftPackageReference "SkyLightWindow" */,
 				7E09D5962EB7B497005AF41D /* XCRemoteSwiftPackageReference "open-meteo" */,
-				7E288D102F1659EF0020C117 /* XCRemoteSwiftPackageReference "AtollExtensionKit" */,
 				7EF19C152F577040005B9929 /* XCRemoteSwiftPackageReference "SwiftTerm" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -413,7 +409,7 @@
 					"@loader_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.atoll.DynamicIslandUITests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.dhruvv620.NotchFlowUITests;
 				PRODUCT_MODULE_NAME = DynamicIslandUITests;
 				PRODUCT_NAME = DynamicIslandUITests;
 				SDKROOT = macosx;
@@ -440,7 +436,7 @@
 					"@loader_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.atoll.DynamicIslandUITests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.dhruvv620.NotchFlowUITests;
 				PRODUCT_MODULE_NAME = DynamicIslandUITests;
 				PRODUCT_NAME = DynamicIslandUITests;
 				SDKROOT = macosx;
@@ -606,18 +602,18 @@
 				INFOPLIST_KEY_MetalCaptureEnabled = YES;
 				INFOPLIST_KEY_NSContactsUsageDescription = "NotchFlow shows a caller's photo and finds their number to send a message when you decline a call.";
 				INFOPLIST_KEY_NSAppleEventsUsageDescription = "NotchFlow uses AppleScript to control Spotify, Apple Music and Notes, to send the replies you type in the notch through Messages, to read the address of your browser tab during a Pomodoro when the distraction meter is on, and to open Terminal or iTerm when you start an AI agent from the notch.";
-				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Atoll needs Bluetooth access to detect when audio devices connect and display their battery status in the HUD.";
-				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Show calender events inside the notch";
-				INFOPLIST_KEY_NSCalendarsUsageDescription = "Need for Calendar Mode";
-				INFOPLIST_KEY_NSCameraUsageDescription = "We need your camera for Mirror mode";
-				INFOPLIST_KEY_NSDesktopFolderUsageDescription = "Atoll needs access to save screenshots to your desktop.";
-				INFOPLIST_KEY_NSDocumentsFolderUsageDescription = "Atoll needs access to save and read shelf dragged files.";
-				INFOPLIST_KEY_NSDownloadsFolderUsageDescription = "Atoll needs access to read files in the downloads folder.";
+				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "NotchFlow needs Bluetooth access to detect when audio devices connect and display their battery status in the HUD.";
+				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "NotchFlow shows your calendar events, meetings and Join buttons in the notch.";
+				INFOPLIST_KEY_NSCalendarsUsageDescription = "NotchFlow shows your calendar events, meetings and Join buttons in the notch.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "NotchFlow uses the camera only to show the mirror in the notch. Nothing is recorded.";
+				INFOPLIST_KEY_NSDesktopFolderUsageDescription = "NotchFlow needs access to save screenshots to your desktop.";
+				INFOPLIST_KEY_NSDocumentsFolderUsageDescription = "NotchFlow needs access to save and read shelf dragged files.";
+				INFOPLIST_KEY_NSDownloadsFolderUsageDescription = "NotchFlow needs access to read files in the downloads folder.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				INFOPLIST_KEY_NSLocationUsageDescription = "Atoll uses your location to display accurate lock screen weather.";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Atoll uses your location to display accurate lock screen weather.";
-				INFOPLIST_KEY_NSRemindersFullAccessUsageDescription = "Atoll needs Reminders access to show your reminders";
-				INFOPLIST_KEY_NSRemindersUsageDescription = "Atoll needs Reminders access to show your reminders";
+				INFOPLIST_KEY_NSLocationUsageDescription = "NotchFlow uses your location to display accurate lock screen weather.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "NotchFlow uses your location to display accurate lock screen weather.";
+				INFOPLIST_KEY_NSRemindersFullAccessUsageDescription = "NotchFlow needs Reminders access to show your reminders";
+				INFOPLIST_KEY_NSRemindersUsageDescription = "NotchFlow needs Reminders access to show your reminders";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -681,18 +677,18 @@
 				INFOPLIST_KEY_MetalCaptureEnabled = YES;
 				INFOPLIST_KEY_NSContactsUsageDescription = "NotchFlow shows a caller's photo and finds their number to send a message when you decline a call.";
 				INFOPLIST_KEY_NSAppleEventsUsageDescription = "NotchFlow uses AppleScript to control Spotify, Apple Music and Notes, to send the replies you type in the notch through Messages, to read the address of your browser tab during a Pomodoro when the distraction meter is on, and to open Terminal or iTerm when you start an AI agent from the notch.";
-				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Atoll needs Bluetooth access to detect when audio devices connect and display their battery status in the HUD.";
-				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Show calender events inside the notch";
-				INFOPLIST_KEY_NSCalendarsUsageDescription = "Need for Calendar Mode";
-				INFOPLIST_KEY_NSCameraUsageDescription = "We need your camera for Mirror mode";
-				INFOPLIST_KEY_NSDesktopFolderUsageDescription = "Atoll needs access to save screenshots to your desktop.";
-				INFOPLIST_KEY_NSDocumentsFolderUsageDescription = "Atoll needs access to save and read shelf dragged files.";
-				INFOPLIST_KEY_NSDownloadsFolderUsageDescription = "Atoll needs access to read files in the downloads folder.";
+				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "NotchFlow needs Bluetooth access to detect when audio devices connect and display their battery status in the HUD.";
+				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "NotchFlow shows your calendar events, meetings and Join buttons in the notch.";
+				INFOPLIST_KEY_NSCalendarsUsageDescription = "NotchFlow shows your calendar events, meetings and Join buttons in the notch.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "NotchFlow uses the camera only to show the mirror in the notch. Nothing is recorded.";
+				INFOPLIST_KEY_NSDesktopFolderUsageDescription = "NotchFlow needs access to save screenshots to your desktop.";
+				INFOPLIST_KEY_NSDocumentsFolderUsageDescription = "NotchFlow needs access to save and read shelf dragged files.";
+				INFOPLIST_KEY_NSDownloadsFolderUsageDescription = "NotchFlow needs access to read files in the downloads folder.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				INFOPLIST_KEY_NSLocationUsageDescription = "Atoll uses your location to display accurate lock screen weather.";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Atoll uses your location to display accurate lock screen weather.";
-				INFOPLIST_KEY_NSRemindersFullAccessUsageDescription = "Atoll needs Reminders access to show your reminders";
-				INFOPLIST_KEY_NSRemindersUsageDescription = "Atoll needs Reminders access to show your reminders";
+				INFOPLIST_KEY_NSLocationUsageDescription = "NotchFlow uses your location to display accurate lock screen weather.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "NotchFlow uses your location to display accurate lock screen weather.";
+				INFOPLIST_KEY_NSRemindersFullAccessUsageDescription = "NotchFlow needs Reminders access to show your reminders";
+				INFOPLIST_KEY_NSRemindersUsageDescription = "NotchFlow needs Reminders access to show your reminders";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -783,14 +779,6 @@
 				minimumVersion = 1.4.16;
 			};
 		};
-		7E288D102F1659EF0020C117 /* XCRemoteSwiftPackageReference "AtollExtensionKit" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/Ebullioscopic/AtollExtensionKit";
-			requirement = {
-				branch = main;
-				kind = branch;
-			};
-		};
 		7E61181F2E24071E0050006C /* XCRemoteSwiftPackageReference "SkyLightWindow" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/Lakr233/SkyLightWindow";
@@ -872,11 +860,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 14D0321B2C68F3350096E6A1 /* XCRemoteSwiftPackageReference "Sparkle" */;
 			productName = Sparkle;
-		};
-		7E288D112F1659EF0020C117 /* AtollExtensionKit */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 7E288D102F1659EF0020C117 /* XCRemoteSwiftPackageReference "AtollExtensionKit" */;
-			productName = AtollExtensionKit;
 		};
 		7E61181E2E24071E0050006C /* SkyLightWindow */ = {
 			isa = XCSwiftPackageProductDependency;

@@ -1,9 +1,9 @@
 /*
- * Atoll (DynamicIsland)
+ * NotchFlow
  * Copyright (C) 2024-2026 Atoll Contributors
  *
  * Originally from boring.notch project
- * Modified and adapted for Atoll (DynamicIsland)
+ * Modified and adapted for NotchFlow
  * See NOTICE for details.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -596,7 +596,6 @@ struct MusicControlsView: View {
 struct NotchHomeView: View {
     @EnvironmentObject var vm: DynamicIslandViewModel
     @ObservedObject var coordinator = DynamicIslandViewCoordinator.shared
-    @ObservedObject private var extensionNotchExperienceManager = ExtensionNotchExperienceManager.shared
     @ObservedObject private var musicManager = MusicManager.shared
     @Default(.showStandardMediaControls) private var showStandardMediaControls
     @Default(.autoHideInactiveNotchMediaPlayer) private var autoHideInactiveNotchMediaPlayer
@@ -621,14 +620,7 @@ struct NotchHomeView: View {
     private var mainContent: some View {
         Group {
             if Defaults[.enableMinimalisticUI] {
-                if let overridePayload = minimalisticOverridePayload {
-                    ExtensionMinimalisticExperienceView(
-                        payload: overridePayload,
-                        albumArtNamespace: albumArtNamespace
-                    )
-                } else {
-                    MinimalisticMusicPlayerView(albumArtNamespace: albumArtNamespace)
-                }
+                MinimalisticMusicPlayerView(albumArtNamespace: albumArtNamespace)
             } else {
                 VStack(alignment: .leading, spacing: 6) {
                     nowPlayingHeader
@@ -672,10 +664,6 @@ struct NotchHomeView: View {
             MediaSourcePicker()
         }
         .frame(height: 14)
-    }
-
-    private var minimalisticOverridePayload: ExtensionNotchExperiencePayload? {
-        extensionNotchExperienceManager.minimalisticReplacementPayload()
     }
 }
 

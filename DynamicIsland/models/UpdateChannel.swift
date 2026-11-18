@@ -1,5 +1,5 @@
 /*
- * Atoll (DynamicIsland)
+ * NotchFlow
  * Copyright (C) 2024-2026 Atoll Contributors
  *
  * This program is free software: you can redistribute it and/or modify
@@ -50,7 +50,7 @@ enum UpdateChannel: String, CaseIterable, Identifiable, Codable, Defaults.Serial
     }
 
     /// Every channel reads NotchFlow's own feed, published with each GitHub
-    /// release by Release.command. (Atoll's feeds would replace NotchFlow.)
+    /// release by Release.command.
     var feedURL: URL {
         URL(string: "https://github.com/dhruvv620/notchflow/releases/latest/download/appcast.xml")!
     }

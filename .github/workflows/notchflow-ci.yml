@@ -3,7 +3,10 @@ name: NotchFlow Native Build
 on:
   push:
     branches:
-      - fresh/reminders-liquid-glass
+      - main
+      - "claude/**"
+  pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -42,6 +45,10 @@ jobs:
         run: |
           swiftc -swift-version 5 -parse-as-library DynamicIsland/helpers/AgentHookPolicy.swift DynamicIsland/helpers/AgentTranscriptPolicy.swift tests/AgentTranscriptRegression.swift -o /tmp/agent-transcript-tests
           /tmp/agent-transcript-tests
+      - name: Check the welcome chime
+        run: |
+          swiftc -swift-version 5 -parse-as-library DynamicIsland/helpers/WelcomeChimePolicy.swift tests/WelcomeChimeRegression.swift -o /tmp/welcome-chime-tests
+          /tmp/welcome-chime-tests
       - name: Check Cuely voice following
         run: |
           swiftc -swift-version 5 -parse-as-library DynamicIsland/helpers/CuelyVoiceFollowPolicy.swift tests/CuelyVoiceFollowRegression.swift -o /tmp/cuely-follow-tests

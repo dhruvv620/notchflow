@@ -1,77 +1,34 @@
-> **NotchFlow fresh branch:** clean Atoll v2.3.3 plus compact Todos, Clipboard, Cuely transcription, timers, tab gestures, and appearance controls. [Build instructions and validation](NotchFlow/README.md).
+<p align="center">
+  <img src="docs/assets/notchflow-icon.png" alt="NotchFlow icon" width="128">
+</p>
+<h1 align="center">NotchFlow</h1>
+<p align="center">Your MacBook notch, turned into a home for music, timers, messages, AI agents and quick tools.</p>
 
 <p align="center">
-  <img src=".github/assets/atoll-logo.png" alt="Atoll logo" width="120">
-</p>
-<h1 align="center">Atoll - DynamicIsland for macOS</h1>
-<p align="center">
-<a href="https://trendshift.io/repositories/15291" target="_blank"><img src="https://trendshift.io/api/badge/repositories/15291" alt="Ebullioscopic%2FAtoll | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
-</p>
-<p align="center">
-  <a href="https://github.com/Ebullioscopic/Atoll/stargazers">
-    <img src="https://img.shields.io/github/stars/Ebullioscopic/Atoll?style=social" alt="GitHub stars"/>
-  </a>
-  <a href="https://github.com/Ebullioscopic/Atoll/network/members">
-    <img src="https://img.shields.io/github/forks/Ebullioscopic/Atoll?style=social" alt="GitHub forks"/>
-  </a>
-  <a href="https://github.com/Ebullioscopic/Atoll/releases">
-    <img src="https://img.shields.io/github/downloads/Ebullioscopic/Atoll/total?label=Downloads" alt="GitHub downloads"/>
-  </a>
-  <a href="https://discord.gg/PaqFkRTDF8">
-    <img src="https://dcbadge.limes.pink/api/server/https://discord.gg/PaqFkRTDF8?style=flat" alt="Discord server"/>
-  </a>
+  <a href="https://github.com/dhruvv620/notchflow/releases/latest"><img src="https://img.shields.io/github/v/release/dhruvv620/notchflow?label=Download&color=0A84FF" alt="Latest release"></a>
+  <img src="https://img.shields.io/badge/macOS-14.6%2B-black" alt="macOS 14.6 or later">
+  <img src="https://img.shields.io/badge/Apple%20silicon-only-black" alt="Apple silicon">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL%20v3-blue" alt="GPL v3"></a>
 </p>
 
-<p align="center">
-  <a href="https://github.com/sponsors/Ebullioscopic">
-    <img src="https://img.shields.io/badge/Sponsor-Ebullioscopic-ff69b4?style=for-the-badge&logo=github" alt="Sponsor Ebullioscopic"/>
-  </a>
-  <a href="https://github.com/Ebullioscopic/Atoll/releases/latest">
-    <img src="https://img.shields.io/badge/Download-Atoll%20for%20macOS-0A84FF?style=for-the-badge&logo=apple" alt="Download Atoll for macOS"/>
-  </a>
-  <a href="https://www.buymeacoffee.com/kryoscopic">
-    <img src="https://img.shields.io/badge/Buy%20Me%20A%20Coffee-kryoscopic-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=000000" alt="Buy Me a Coffee for kryoscopic"/>
-  </a>
-</p>
+NotchFlow stays out of the way until you need it. Hover over the notch (or swipe down) and it opens into tabs; while it is closed, it shows what matters right now: the song that is playing, a running timer, the next meeting, an agent waiting for you.
 
-<p align="center">
-  <a href="https://discord.gg/PaqFkRTDF8">Join our Discord community</a>
-</p>
+## What's in the notch
 
-Atoll turns the MacBook notch into a focused command surface for media, system insight, and quick utilities. It stays out of the way until needed, then expands with responsive, native SwiftUI animations.
+- **Music**: Apple Music, Spotify, YouTube Music and more, with synced lyrics (also under the closed notch), what plays next, and gesture controls.
+- **Timers and focus**: timers, Pomodoro with a weekly history and streak, optional Focus switching, and a distraction meter that notices when you drift to YouTube or X.
+- **Calendar and Todos**: today's events, Reminders as todos (drop text, links or files to add one), a progress ring for today, and meeting cards with a Join button and a countdown.
+- **Notifications, WhatsApp and calls**: every app's notifications in one inbox with inline replies, WhatsApp chats through a local gateway, and incoming calls with the caller's photo and quick replies.
+- **AI agents**: approve Claude Code, Codex, Cursor and Gemini CLI from the notch, follow what they are doing, read and continue their conversations, and start new tasks without opening a terminal.
+- **Clipboard and Shelf**: clipboard history you can swipe through, and a shelf for files with quick actions (resize, PDF, cut out, zip, AirDrop, WhatsApp).
+- **Smart tools**: copy a tracking number, date, address or flight and the notch offers the right action; smart replies with your own MiniMax key; a build watcher for GitHub Actions; people pins.
+- **Cuely**: a teleprompter for your scripts that listens and follows your voice.
+- **System**: replacement HUDs for volume, brightness and keyboard backlight, battery and charging, Bluetooth devices, privacy indicators, downloads, lock screen widgets, and system stats.
 
-<p align="center">
-  <img src="https://i.postimg.cc/t49mW5yN/Screenshot-2026-03-02-at-6-00-22-PM.png" alt="Atoll lock screen" width="920">
-</p>
+Everything can be switched on or off and rearranged in Settings.
 
+## Install
 
-
-
-
-## Highlights
-- Media controls for Apple Music, Spotify, Cider, and more with inline previews.
-- Live Activities for media playback, Focus, screen recording, privacy indicators, downloads (beta), and battery/charging.
-- Lock screen widgets for media, timers, charging, Bluetooth devices, and weather.
-- Lightweight system insight for CPU, GPU, memory, network, and disk usage.
-- Productivity tools including timers, clipboard history, color picker, and calendar previews.
-- Customization for layouts, animations, hover behavior, and shortcut remapping.
-
-## Other Features
-- Gesture controls for opening/closing the notch and media navigation.
-- Parallax hover interactions with smooth transitions.
-- Lock screen appearance and positioning controls for panels and widgets.
-
-<p align="center">
-  <img src="https://i.postimg.cc/HkLGn6yH/846F86A4_A2F9_4CD6_BC84_1D720D377728_1_201_a.jpg" alt="Atoll preview" width="920">
-</p>
-
-## Requirements
-- macOS 14.6 or later (optimised for macOS 15+).
-- MacBook with a notch (14/16‑inch MBP across Apple silicon generations).
-- Xcode 26+ to build this NotchFlow branch from source.
-- Permissions as needed: Accessibility, Camera, Calendar, Screen Recording, Music, Microphone, and Speech Recognition. Cuely requests its two permissions only after **Start Listening**.
-
-## Installation
 Paste this into Terminal:
 
 ```bash
@@ -80,113 +37,76 @@ curl -fsSL https://github.com/dhruvv620/notchflow/releases/latest/download/insta
 
 Or download [NotchFlow.dmg](https://github.com/dhruvv620/notchflow/releases/latest/download/NotchFlow.dmg), open it and drag NotchFlow into Applications. NotchFlow is not notarized by Apple, so the first time you open it from the DMG, macOS blocks it: go to System Settings > Privacy & Security and click **Open Anyway**. The Terminal line does not need this.
 
-Updates: NotchFlow checks once a day, and **Check for Updates…** is in the menu bar icon and in Settings > About.
+NotchFlow needs an Apple silicon Mac with macOS 14.6 or later. It works best on a MacBook with a notch; on other displays it shows a floating island instead.
+
+**Updates**: NotchFlow checks once a day, and **Check for Updates…** is in the menu bar icon and in Settings > About.
+
+**Permissions**: macOS asks the first time a feature needs something (Accessibility for the HUDs and gestures, Calendar and Reminders, Camera for the mirror, Microphone and Speech Recognition for Cuely, Full Disk Access for the notification inbox). Allow only the ones you want. [docs/PRIVACY.md](docs/PRIVACY.md) explains what each one is used for.
+
+## Getting around
+
+- Hover over the notch to open it, or swipe down with two fingers when hover-to-open is off; swipe up to close.
+- Swipe left or right with two fingers to switch tabs. In the clipboard, a three-finger page swipe turns the page.
+- Settings > Tabs & Features chooses which tabs appear and in what order.
+- Add files to the Shelf from Terminal: `open -a NotchFlow /path/to/file`.
+
+## Troubleshooting
+
+- After granting Accessibility or Screen Recording, quit and reopen NotchFlow.
+- If stats are empty, turn on the categories in Settings > Stats.
+- If music controls don't respond, check that the player is running and that NotchFlow may control it (System Settings > Privacy & Security > Automation).
+- For a bug report, **Export Logs** in NotchFlow's Tools menu saves its logs and crash reports to a zip file.
+
+## Building from source
+
+You need Xcode 26 or later and [Git LFS](https://git-lfs.com) (for the animation assets).
+
+```bash
+git clone https://github.com/dhruvv620/notchflow.git
+```
+```bash
+cd notchflow && bash Build.command && open -a NotchFlow
+```
+
+`Build.command` runs the regression checks, builds a Debug copy, signs it with your Apple Development certificate when you have one (so permissions survive rebuilds), and installs it. The full output is in `Build.log`. To get later changes: `git pull --ff-only && bash Build.command`.
+
+Your Mac keeps one NotchFlow: a development build from `Build.command` replaces the released copy, and the next release (or Check for Updates) replaces it again. Development builds don't check for updates.
 
 ## Publishing a release (maintainer)
+
 One time:
-1) `brew install gh`, then `gh auth login` (GitHub.com, HTTPS, log in with a browser).
-2) Have an Apple Development certificate (Xcode > Settings > Accounts > Manage Certificates). Check with `security find-identity -v -p codesigning`.
+1. `brew install gh`, then `gh auth login` (GitHub.com, HTTPS, log in with a browser).
+2. Have an Apple Development certificate (Xcode > Settings > Accounts > Manage Certificates). Check with `security find-identity -v -p codesigning`.
 
 Every release:
-1) Commit and push your changes.
-2) Run `bash Release.command` (or `bash Release.command 1.2.0` to pick the version; otherwise it uses `VERSION` or the next patch).
+1. Commit and push your changes, and describe them in the Unreleased section of [CHANGELOG.md](CHANGELOG.md).
+2. Run `bash Release.command` (or `bash Release.command 1.2.0` to pick the version; otherwise it uses `VERSION` or the next patch).
 
-It builds and signs NotchFlow, makes `NotchFlow.dmg` and `NotchFlow.zip`, signs the update with a key kept in your login Keychain (created on the first release; back it up as it tells you), and publishes a GitHub release with `appcast.xml`, which everyone's Check for Updates reads. Release notes come from the Unreleased section of CHANGELOG.md.
+It builds and signs NotchFlow, makes `NotchFlow.dmg` and `NotchFlow.zip`, signs the update with a key kept in your login Keychain (created on the first release; back it up as it tells you), publishes a GitHub release with `appcast.xml` (which everyone's Check for Updates reads), and installs the released copy on your Mac.
 
-Your Mac keeps one NotchFlow, in /Applications once you have released:
-- **While developing**, `bash Build.command` replaces it with a development build of your current code (no update checks).
-- **When it's ready**, `bash Release.command` publishes it and puts the released copy back on your Mac. From then on Check for Updates works for you like for your friends.
+## Documentation
 
-## Quick Start
-- Hover near the notch to expand; click to enter controls.
-- Use tabs for Media, Stats, Timers, Clipboard, and more.
-- Adjust layout, appearance, and shortcuts from Settings.
-- Add files to Shelf from Terminal: `open -a Atoll /path/to/file`.
-
-## Settings
-- Choose appearance, animation style, and per‑feature toggles.
-- Remap global shortcuts and adjust hover behaviour.
-- Enable lock screen widgets and select data sources.
-
-## Gesture Controls
-- Two-finger swipe down to open the notch when hover-to-open is disabled; swipe up to close.
-- Enable horizontal media gestures in **Settings → General → Gesture control** to turn the music pane into a trackpad for previous/next or ±10 second seeks.
-- Pick the gesture skip behaviour (track vs ±10s) independently from the skip button configuration so swipes can scrub while buttons change tracks—or vice versa.
-- Horizontal swipes trigger the same haptics and button animations you see in the notch, keeping visual feedback consistent with tap interactions.
-
-## Troubleshooting (Basics)
-- After granting Accessibility or Screen Recording, quit and relaunch the app.
-- If metrics are empty, enable categories in Settings → Stats.
-- Media not responding: verify player is active and Music permission is granted.
+- [docs/SETTINGS.md](docs/SETTINGS.md): how Settings is organized and the rules for adding a setting.
+- [docs/AGENTS.md](docs/AGENTS.md): how the AI agent integration works.
+- [docs/PRIVACY.md](docs/PRIVACY.md): what NotchFlow accesses and where your data stays.
+- [CONTRIBUTING.md](CONTRIBUTING.md) and [CHANGELOG.md](CHANGELOG.md).
 
 ## License
-Atoll is released under the GPL v3 License. Refer to [LICENSE](LICENSE) for the full terms.
+
+NotchFlow is free software under the [GNU General Public License v3](LICENSE). [NOTICE](NOTICE) lists the projects it is based on and their copyrights.
 
 ## Acknowledgments
 
-Atoll builds upon the work of several open-source projects and draws inspiration from innovative macOS applications:
+NotchFlow builds on these open-source projects and services:
 
-- [**Boring.Notch**](https://github.com/TheBoredTeam/boring.notch) - foundational codebase that provided the initial media player integration, AirDrop surface implementation, file dock functionality, and calendar event display. Major architectural patterns and notch interaction models were adapted from this project.
-
-- [**Alcove**](https://tryalcove.com) - primary inspiration for the Minimalistic Mode interface design and the conceptual framework for lock screen widget integration that informed Atoll's compact layout strategy.
-
-- [**Stats**](https://github.com/exelban/stats) - source implementation for CPU temperature monitoring via SMC (System Management Controller) access, frequency sampling through IOReport bindings, and per-core CPU utilisation tracking. The system metrics collection architecture derives from Stats project readers.
-
-- [**Open Meteo**](https://open-meteo.com) - weather apis for the lock screen widgets
-
-- [**SkyLightWindow**](https://github.com/Lakr233/SkyLightWindow) - window rendering for Lock Screen Widgets
-
-- [**rtaudio**](https://github.com/ZephyrCodesStuff/rtaudio) - Live music visualizer using C++ was adapted from this project
-
-- [**SwiftTerm**](https://github.com/migueldeicaza/SwiftTerm) - Terminal tab implementation in the standard mode was adapted from this project
-
-- [**DynamicNotch**](https://github.com/jackson-storm/DynamicNotch) - thanks DynamicNotch for letting us use their battery huds
-
-- Wick - Thanks Nate for allowing us to replicate the iOS like Timer design for the Lock Screen Widget
-
-- [**OpenUsage**](https://github.com/robinebers/openusage) - LLM Usage Tracking features
-
-- [**OpenRouter**](https://openrouter.ai) - API for getting automated model pricing
-
-## Contributors
-
-<a href="https://github.com/Ebullioscopic/Atoll/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=Ebullioscopic/Atoll" />
-</a>
-
-## Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=Ebullioscopic/Atoll&type=timeline&legend=top-left)](https://www.star-history.com/#Ebullioscopic/Atoll&type=timeline&legend=top-left)
-
-## Updating Existing Clones
-If you previously cloned DynamicIsland, update the remote to track the Atoll repository:
-
-```bash
-git remote set-url origin https://github.com/Ebullioscopic/Atoll.git
-```
-
-A heartfelt thanks to [TheBoredTeam](https://github.com/TheBoredTeam) for being supportive and being totally awesome, Atoll would not have been possible without Boring.Notch
-
----
-
-<p align="center">
-  <img src=".github/assets/iosdevcentre.jpeg" alt="iOS Development Centre exterior" width="420">
-  <br>
-  <sub>Backed by</sub>
-  <br>
-  <strong>iOS Development Centre</strong>
-  <br>
-  Powered by Apple and Infosys
-  <br>
-  SRM Institute of Science and Technology, Chennai, India
-</p>
-
-<p align="center">
-  <a href="https://buymeacoffee.com/kryoscopic">
-    <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" width="200" />
-  </a>
-</p>
-
-<p align="center">
-  Your support helps fund teaching children software development.
-</p>
+- [boring.notch](https://github.com/TheBoredTeam/boring.notch): the notch app this code base grew from (media player, shelf, calendar and notch interaction).
+- [Stats](https://github.com/exelban/stats): CPU temperature, frequency and per-core usage readings.
+- [rtaudio](https://github.com/ZephyrCodesStuff/rtaudio): the live music visualizer.
+- [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm): the Terminal tab.
+- [SkyLightWindow](https://github.com/Lakr233/SkyLightWindow): windows for the lock screen widgets.
+- [DynamicNotch](https://github.com/jackson-storm/DynamicNotch): battery HUD designs.
+- [OpenUsage](https://github.com/robinebers/openusage): LLM usage tracking.
+- [GOWA](https://github.com/aldinokemal/go-whatsapp-web-multidevice): the WhatsApp gateway.
+- [Sparkle](https://sparkle-project.org): updates.
+- [Open-Meteo](https://open-meteo.com) for weather and [OpenRouter](https://openrouter.ai) for model pricing.
+- Alcove inspired the minimalistic layout, and Wick the lock screen timer design.

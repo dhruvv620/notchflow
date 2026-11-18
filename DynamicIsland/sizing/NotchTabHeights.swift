@@ -18,8 +18,8 @@ extension NotchViews {
             return .fitsContent(shrinkBy: 0, growBy: MusicLyricsPanel.height + 6)
         case .shelf, .llmUsage, .colorPicker, .clipboard, .cuely, .reminders, .calendar, .copyAction:
             return .preset
-        // Stats and extension tabs keep their own row/preferred-height logic.
-        case .stats, .extensionExperience:
+        // Stats keeps its own row-based height logic.
+        case .stats:
             return .preset
         case .timer:
             // The ruler and presets need this much, even in Compact.

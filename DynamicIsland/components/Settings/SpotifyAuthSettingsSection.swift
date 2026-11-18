@@ -1,5 +1,5 @@
 /*
- * Atoll (DynamicIsland)
+ * NotchFlow
  * Copyright (C) 2024-2026 Atoll Contributors
  *
  * This program is free software: you can redistribute it and/or modify
@@ -107,7 +107,7 @@ struct SpotifyAuthSettingsSection: View {
         } header: {
             Text("Spotify Canvas Session")
         } footer: {
-            Text("Atoll uses the local `sp_dc` cookie only to request Spotify's internal web-player token and fetch the matching Canvas for the current track.")
+            Text("NotchFlow uses the local `sp_dc` cookie only to request Spotify's internal web-player token and fetch the matching Canvas for the current track.")
                 .foregroundStyle(.secondary)
                 .font(.caption)
         }

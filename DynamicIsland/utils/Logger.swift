@@ -1,9 +1,9 @@
 /*
- * Atoll (DynamicIsland)
+ * NotchFlow
  * Copyright (C) 2024-2026 Atoll Contributors
  *
  * Originally from boring.notch project
- * Modified and adapted for Atoll (DynamicIsland)
+ * Modified and adapted for NotchFlow
  * See NOTICE for details.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -35,7 +35,6 @@ enum LogCategory: String {
     case warning = "⚠️"
     case success = "✅"
     case debug = "🔍"
-    case extensions = "🧩"
 
     var osCategoryName: String {
         switch self {
@@ -48,7 +47,6 @@ enum LogCategory: String {
         case .warning: return "warning"
         case .success: return "success"
         case .debug: return "debug"
-        case .extensions: return "extensions"
         }
     }
 
@@ -56,14 +54,14 @@ enum LogCategory: String {
         switch self {
         case .error: return .error
         case .warning: return .warning
-        case .success, .ui, .network, .lifecycle, .memory, .performance, .extensions: return .info
+        case .success, .ui, .network, .lifecycle, .memory, .performance: return .info
         case .debug: return .debug
         }
     }
 }
 
 struct Logger {
-    private static let subsystem = "com.ebullioscopic.Atoll"
+    private static let subsystem = "com.dhruvv620.NotchFlow"
     private static let dateFormatter: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]

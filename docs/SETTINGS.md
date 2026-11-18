@@ -11,7 +11,6 @@ Read this before adding, moving or removing a setting. `tests/test_settings_inte
 | In the Notch | Music, Live Activities, Notifications & Calls, WhatsApp, AI Agents, Calendar & Todos, Timers, Shelf | One page per thing that shows up in the notch (a tab or a closed-notch activity) |
 | Tools | Smart Tools, Notes, Clipboard, Screen Assistant, Color Picker, Terminal, Stats | Features you open and use |
 | System | Controls, Battery, Devices, Download Alerts, Lock Screen | macOS integrations outside the notch panel |
-| Extensions | Extensions | Third-party extensions |
 | (bottom) | About | Version and updates |
 
 The group of each page is set in `SettingsTab.group`, and the order in `availableTabs`

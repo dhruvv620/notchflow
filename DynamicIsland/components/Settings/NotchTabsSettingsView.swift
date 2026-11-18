@@ -6,7 +6,6 @@ import SwiftUI
 struct NotchTabsSettingsView: View {
     let openSettings: (String) -> Void
     @ObservedObject private var preferences = NotchTabPreferences.shared
-    @ObservedObject private var extensions = ExtensionNotchExperienceManager.shared
     @EnvironmentObject private var highlightCoordinator: SettingsHighlightCoordinator
     @Default(.enableMinimalisticUI) private var minimalistic
     @State private var segment = Segment.tabs
@@ -16,10 +15,7 @@ struct NotchTabsSettingsView: View {
         var id: String { rawValue }
     }
     private var descriptors: [TabModel] {
-        let candidates = TabSelectionView.candidateTabs
-        let extensionTabs = candidates.filter { $0.experienceID != nil }
-        let builtins = preferences.orderedBuiltins.map { TabModel(label: $0.title, icon: $0.symbol, view: $0.view) }
-        let all = builtins + extensionTabs
+        let all = preferences.orderedBuiltins.map { TabModel(label: $0.title, icon: $0.symbol, view: $0.view) }
         let ids = NotchTabOrderPolicy.normalizedOrder(Defaults[.notchTabOrder], known: all.map(\.id))
         let lookup = Dictionary(uniqueKeysWithValues: all.map { ($0.id, $0) })
         return ids.compactMap { lookup[$0] }

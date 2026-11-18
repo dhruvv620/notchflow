@@ -1,5 +1,5 @@
 /*
- * Atoll (DynamicIsland)
+ * NotchFlow
  * Copyright (C) 2024-2026 Atoll Contributors
  *
  * This program is free software: you can redistribute it and/or modify
@@ -147,7 +147,7 @@ class LockScreenManager: ObservableObject {
         LockScreenTimerWidgetManager.shared.handleLockStateChange(isLocked: true)
         TimerControlWindowManager.shared.hide(animated: false)
         
-        // THEN trigger lock icon in Atoll (only if enabled in settings)
+        // THEN trigger lock icon in NotchFlow (only if enabled in settings)
         if Defaults[.enableLockScreenLiveActivity] {
             print("[\(timestamp())] LockScreenManager: 🔴 Starting lock icon live activity")
             coordinator.toggleExpandingView(status: true, type: .lockScreen)

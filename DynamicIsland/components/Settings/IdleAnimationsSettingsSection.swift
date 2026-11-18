@@ -1,5 +1,5 @@
 /*
- * Atoll (DynamicIsland)
+ * NotchFlow
  * Copyright (C) 2024-2026 Atoll Contributors
  *
  * This program is free software: you can redistribute it and/or modify
@@ -129,7 +129,7 @@ struct IdleAnimationsSettingsSection: View {
             }
         } footer: {
             if showNotHumanFace {
-                Text("Choose animation to display when Atoll is idle. Tap to select, hold to delete custom animations.")
+                Text("Choose animation to display when NotchFlow is idle. Tap to select, hold to delete custom animations.")
             }
         }
         .fileImporter(

@@ -15,7 +15,7 @@ if [ "${XCODE_MAJOR:-0}" -lt 26 ]; then
     exit 1
 fi
 if ! git lfs version >/dev/null 2>&1; then
-    printf 'Install Git LFS (brew install git-lfs) to download Atoll’s original animation assets, then rerun this script.\n'
+    printf 'Install Git LFS (brew install git-lfs) to download the animation assets, then rerun this script.\n'
     exit 1
 fi
 git -C "$SOURCE_DIR" lfs pull
@@ -217,11 +217,9 @@ BUILT_APP="$DERIVED_DIR/Build/Products/$CONFIGURATION/NotchFlow.app"
 
 # Preserve entitlements needed for Camera, Calendar, Automation, and Cuely's
 # explicitly started microphone/Speech Recognition session.
-# The legacy Mach service is disabled and cannot be signed ad hoc.
 LOCAL_ENTITLEMENTS="$(mktemp "$BUILD_ROOT/local-entitlements.XXXXXX")"
 trap 'rm -f "$LOCAL_ENTITLEMENTS"' EXIT
 cp "$SOURCE_DIR/DynamicIsland/DynamicIsland.entitlements" "$LOCAL_ENTITLEMENTS"
-/usr/libexec/PlistBuddy -c 'Delete :com.apple.security.mach-services' "$LOCAL_ENTITLEMENTS"
 BUNDLE_ID="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$BUILT_APP/Contents/Info.plist")"
 /usr/libexec/PlistBuddy -c "Set :com.apple.security.temporary-exception.mach-lookup.global-name:0 $BUNDLE_ID-spks" "$LOCAL_ENTITLEMENTS"
 /usr/libexec/PlistBuddy -c "Set :com.apple.security.temporary-exception.mach-lookup.global-name:1 $BUNDLE_ID-spki" "$LOCAL_ENTITLEMENTS"

@@ -7,8 +7,8 @@ ROOT = Path(__file__).resolve().parents[1]
 ENTITLEMENTS = ROOT / "DynamicIsland" / "DynamicIsland.entitlements"
 INFO_PLIST = ROOT / "DynamicIsland" / "Info.plist"
 PROJECT = ROOT / "DynamicIsland.xcodeproj" / "project.pbxproj"
-RELEASE_WORKFLOW = ROOT / ".github" / "workflows" / "release.yml"
-CI_WORKFLOW = ROOT / ".github" / "workflows" / "ci.yml"
+BUILD_SCRIPT = ROOT / "Build.command"
+CI_WORKFLOW = ROOT / ".github" / "workflows" / "notchflow-ci.yml"
 MEDIA_KEY_INTERCEPTOR = ROOT / "DynamicIsland" / "managers" / "MediaKeyInterceptor.swift"
 SYSTEM_CHANGES_OBSERVER = ROOT / "DynamicIsland" / "managers" / "SystemChangesObserver.swift"
 SYSTEM_HUD_MANAGER = ROOT / "DynamicIsland" / "managers" / "SystemHUDManager.swift"
@@ -75,38 +75,13 @@ class PrivacyConfigurationTests(unittest.TestCase):
             project.count("INFOPLIST_KEY_NSRemindersFullAccessUsageDescription ="),
         )
 
-    def test_release_resigning_preserves_archived_entitlements(self):
-        workflow = RELEASE_WORKFLOW.read_text()
-
-        self.assertIn(
-            'codesign -d --entitlements :- "$APP_PATH" > "$ENTITLEMENTS_PATH"',
-            workflow,
-        )
-        self.assertIn('--entitlements "$ENTITLEMENTS_PATH"', workflow)
-        self.assertIn(
-            'FINAL_ENTITLEMENTS_PATH="$RUNNER_TEMP/${APP_NAME}-final.entitlements"',
-            workflow,
-        )
-        self.assertIn(
-            'codesign -d --entitlements :- "$APP_PATH" > "$FINAL_ENTITLEMENTS_PATH"',
-            workflow,
-        )
-        self.assertIn(
-            '/usr/libexec/PlistBuddy -c "Print :com.apple.security.device.camera" "$FINAL_ENTITLEMENTS_PATH" | grep -qx "true"',
-            workflow,
-        )
-        self.assertIn(
-            '/usr/libexec/PlistBuddy -c "Print :com.apple.security.device.audio-input" "$FINAL_ENTITLEMENTS_PATH" | grep -qx "true"',
-            workflow,
-        )
-        self.assertIn(
-            '/usr/libexec/PlistBuddy -c "Print :com.apple.developer.speech-recognition" "$FINAL_ENTITLEMENTS_PATH" | grep -qx "true"',
-            workflow,
-        )
-        self.assertIn(
-            '/usr/libexec/PlistBuddy -c "Print :com.apple.security.automation.apple-events" "$FINAL_ENTITLEMENTS_PATH" | grep -qx "true"',
-            workflow,
-        )
+    def test_signing_keeps_the_app_entitlements(self):
+        # Build.command (also used by Release.command) signs with a copy of the
+        # repository's entitlements, so camera, microphone, speech and
+        # automation survive re-signing.
+        script = BUILD_SCRIPT.read_text()
+        self.assertIn('cp "$SOURCE_DIR/DynamicIsland/DynamicIsland.entitlements" "$LOCAL_ENTITLEMENTS"', script)
+        self.assertIn('--options runtime --entitlements "$LOCAL_ENTITLEMENTS" "$BUILT_APP"', script)
 
     def test_ci_checks_the_privacy_configuration(self):
         workflow = CI_WORKFLOW.read_text()

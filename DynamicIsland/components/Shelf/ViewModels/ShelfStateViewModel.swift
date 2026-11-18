@@ -1,9 +1,9 @@
 /*
- * Atoll (DynamicIsland)
+ * NotchFlow
  * Copyright (C) 2024-2026 Atoll Contributors
  *
  * Originally from boring.notch project
- * Modified and adapted for Atoll (DynamicIsland)
+ * Modified and adapted for NotchFlow
  * See NOTICE for details.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -67,16 +67,12 @@ final class ShelfStateViewModel: ObservableObject {
         }
         items = merged
         invalidateURLCache()
-        if !addedIDs.isEmpty {
-            ExtensionRPCServer.shared.notifyShelfItemsChanged(itemIDs: addedIDs, action: "added")
-        }
     }
 
     func remove(_ item: ShelfItem) {
         item.cleanupStoredData()
         items.removeAll { $0.id == item.id }
         invalidateURLCache()
-        ExtensionRPCServer.shared.notifyShelfItemsChanged(itemIDs: [item.id.uuidString], action: "removed")
     }
 
     func updateBookmark(for item: ShelfItem, bookmark: Data) {

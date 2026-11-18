@@ -8,13 +8,13 @@
 		<true/>
 	</dict>
 	<key>NSAppleMusicUsageDescription</key>
-	<string>Atoll uses Apple Music to fetch animated artwork for the lock screen wallpaper.</string>
+	<string>NotchFlow uses Apple Music to fetch animated artwork for the lock screen wallpaper.</string>
 	<key>NSAudioCaptureUsageDescription</key>
 	<string>NotchFlow uses audio capture to display the real-time music waveform visualizer.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>NotchFlow uses the microphone only while you read a script in Cuely, so it can follow your place.</string>
 	<key>NSScreenCaptureUsageDescription</key>
-	<string>Atoll needs screen recording permission to capture screenshots for the AI assistant feature.</string>
+	<string>NotchFlow needs screen recording permission to capture screenshots for the AI assistant feature.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>NotchFlow's Cuely recognizes your speech only while you read a script, to keep your place. Nothing is saved. If on-device recognition is unavailable, audio is sent to Apple's speech service.</string>
 	<key>SUEnableAutomaticChecks</key>

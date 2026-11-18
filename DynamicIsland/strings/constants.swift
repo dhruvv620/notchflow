@@ -1,5 +1,5 @@
 /*
- * Atoll (DynamicIsland)
+ * NotchFlow
  * Copyright (C) 2024-2026 Atoll Contributors
  *
  * This program is free software: you can redistribute it and/or modify
@@ -18,7 +18,7 @@
 
 import Foundation
 
-let productPage = URL(string: "https://github.com/Ebullioscopic/DynamicIsland")!
-let sponsorPage = URL(string: "https://www.buymeacoffee.com/kryoscopic")!
+let productPage = URL(string: "https://github.com/dhruvv620/notchflow")!
+let privacyPage = URL(string: "https://github.com/dhruvv620/notchflow/blob/HEAD/docs/PRIVACY.md")!
 
 

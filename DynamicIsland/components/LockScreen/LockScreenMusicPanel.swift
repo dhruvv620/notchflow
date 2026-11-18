@@ -1,5 +1,5 @@
 /*
- * Atoll (DynamicIsland)
+ * NotchFlow
  * Copyright (C) 2024-2026 Atoll Contributors
  *
  * This program is free software: you can redistribute it and/or modify
@@ -195,7 +195,7 @@ struct LockScreenMusicPanel: View {
             parallaxResumeWorkItem = nil
             isParallaxSuspended = false
         }
-        .onReceive(NotificationCenter.default.publisher(for: .atollArtworkWallpaperDismissed)) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .artworkWallpaperDismissed)) { _ in
             withAnimation(.easeInOut(duration: 0.28)) {
                 isArtworkFullscreen = false
             }
@@ -482,7 +482,7 @@ struct LockScreenMusicPanel: View {
         FullScreenArtworkWindowManager.shared.onDismiss = {
             Task { @MainActor in
                 withAnimation(.easeInOut(duration: 0.28)) {
-                    NotificationCenter.default.post(name: .atollArtworkWallpaperDismissed, object: nil)
+                    NotificationCenter.default.post(name: .artworkWallpaperDismissed, object: nil)
                 }
             }
         }
@@ -1610,5 +1610,5 @@ final class RightClickNSView: NSView {
 }
 
 extension Notification.Name {
-    static let atollArtworkWallpaperDismissed = Notification.Name("atollArtworkWallpaperDismissed")
+    static let artworkWallpaperDismissed = Notification.Name("artworkWallpaperDismissed")
 }

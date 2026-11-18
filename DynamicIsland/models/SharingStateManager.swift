@@ -1,9 +1,9 @@
 /*
- * Atoll (DynamicIsland)
+ * NotchFlow
  * Copyright (C) 2024-2026 Atoll Contributors
  *
  * Originally from boring.notch project
- * Modified and adapted for Atoll (DynamicIsland)
+ * Modified and adapted for NotchFlow
  * See NOTICE for details.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -25,7 +25,7 @@ import Combine
 import Foundation
 
 extension Notification.Name {
-	static let sharingDidFinish = Notification.Name("com.ebullioscopic.sharingDidFinish")
+	static let sharingDidFinish = Notification.Name("com.notchflow.sharingDidFinish")
 }
 
 @MainActor

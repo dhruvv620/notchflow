@@ -1,5 +1,5 @@
 /*
- * Atoll (DynamicIsland)
+ * NotchFlow
  * Copyright (C) 2024-2026 Atoll Contributors
  *
  * This program is free software: you can redistribute it and/or modify
@@ -80,7 +80,7 @@ private let volumeControlTargets: Set<String> = [
 ///
 /// Responsibilities:
 /// - Detect whether BetterDisplay is installed
-/// - Observe OSD notifications from BetterDisplay and route them to Atoll's HUD pipeline
+/// - Observe OSD notifications from BetterDisplay and route them to NotchFlow's HUD pipeline
 /// - Provide request/response primitives for controlling display properties
 @MainActor
 final class BetterDisplayManager: ObservableObject {
@@ -236,7 +236,7 @@ final class BetterDisplayManager: ObservableObject {
         }
     }
 
-    /// Route a decoded BetterDisplay OSD notification to the active Atoll HUD variant.
+    /// Route a decoded BetterDisplay OSD notification to the active NotchFlow HUD variant.
     private func routeOSDToHUD(_ osd: BetterDisplayOSDNotification) {
         let category = classifyControlTarget(osd.controlTarget, systemIconID: osd.systemIconID)
         let normalizedValue = normalizeValue(osd.value, maxValue: osd.maxValue)

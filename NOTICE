@@ -1,7 +1,16 @@
-Atoll (DynamicIsland) - NOTICE
+NotchFlow - NOTICE
 
-This product includes software derived from the boring.notch project,
-modified and adapted for Atoll (DynamicIsland). The boring.notch project
-is licensed under the GNU General Public License v3.0.
+NotchFlow is free software: you can redistribute it and/or modify it under
+the terms of the GNU General Public License version 3 or later. See LICENSE
+for the full text.
 
-See the LICENSE file for the full GPL v3 text.
+NotchFlow is a modified version of Atoll (DynamicIsland),
+Copyright (C) 2024-2026 Atoll Contributors, which is itself derived from the
+boring.notch project. Both are licensed under the GNU General Public License
+v3.0. Their copyright notices are kept in the source files they apply to,
+and media inherited from them (sounds, animations and artwork other than the
+NotchFlow icon) remains the copyright of its authors.
+
+Parts adapted from other projects keep their own notices in the files
+concerned, including rtaudio (Copyright (C) 2026 ZephyrCodesStuff) for the
+live music visualizer. ReadMe.md lists the other projects NotchFlow builds on.

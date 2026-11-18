@@ -1,5 +1,5 @@
 /*
- * Atoll (DynamicIsland)
+ * NotchFlow
  * Copyright (C) 2024-2026 Atoll Contributors
  *
  * This program is free software: you can redistribute it and/or modify
@@ -27,7 +27,7 @@ final class SystemKeyboardBacklightController {
 
     var onBacklightChange: ((Float) -> Void)?
 
-    private let workerQueue = DispatchQueue(label: "com.atoll.keyboardBacklight", qos: .userInitiated)
+    private let workerQueue = DispatchQueue(label: "com.notchflow.keyboardBacklight", qos: .userInitiated)
     private let notificationCenter = NotificationCenter.default
     private var isRunning = false
 

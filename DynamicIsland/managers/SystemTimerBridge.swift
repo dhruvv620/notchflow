@@ -1,5 +1,5 @@
 /*
- * Atoll (DynamicIsland)
+ * NotchFlow
  * Copyright (C) 2024-2026 Atoll Contributors
  *
  * This program is free software: you can redistribute it and/or modify
@@ -27,7 +27,7 @@ import os
 final class SystemTimerBridge {
     static let shared = SystemTimerBridge()
 
-    private let logger = os.Logger(subsystem: "com.Ebullioscopic.Atoll", category: "SystemTimerBridge")
+    private let logger = os.Logger(subsystem: "com.dhruvv620.NotchFlow", category: "SystemTimerBridge")
 
     private struct TimerMetadata: Equatable {
         enum State: Int {

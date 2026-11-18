@@ -18,9 +18,7 @@ struct NotchPageIndicators: View {
             HStack(spacing: style == .dots ? 5 : 7) {
                 ForEach(tabs) { tab in
                     let selected = tab.view == coordinator.currentView
-                        && (tab.view != .extensionExperience || tab.experienceID == coordinator.selectedExtensionExperienceID)
                     Button {
-                        coordinator.selectedExtensionExperienceID = tab.experienceID
                         coordinator.currentView = tab.view
                     } label: {
                         Group {

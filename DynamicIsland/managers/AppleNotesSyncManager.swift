@@ -1,5 +1,5 @@
 /*
- * Atoll (DynamicIsland)
+ * NotchFlow
  * Copyright (C) 2024-2026 Atoll Contributors
  *
  * This program is free software: you can redistribute it and/or modify
@@ -30,7 +30,7 @@ enum AppleNotesSyncError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .automationDenied:
-            return String(localized: "Allow Atoll to control Notes in System Settings → Privacy & Security → Automation.")
+            return String(localized: "Allow NotchFlow to control Notes in System Settings → Privacy & Security → Automation.")
         case .scriptFailed(let message):
             return message
         }
@@ -43,7 +43,7 @@ struct RemoteAppleNote: Sendable {
     let content: String
     let creationDate: Date
     let modificationDate: Date
-    let atollId: UUID?
+    let notchFlowId: UUID?
 }
 
 @MainActor
@@ -53,10 +53,10 @@ final class AppleNotesSyncManager: ObservableObject {
     @Published private(set) var isSyncing = false
     @Published private(set) var lastError: String?
 
-    private static let syncFolderName = "Atoll"
+    private static let syncFolderName = "NotchFlow"
     private static let fieldSeparator = "\u{241F}"
     private static let recordSeparator = "\u{241E}"
-    private static let atollTagPattern = #"<!--atoll:id=([0-9A-Fa-f-]{36})-->"#
+    private static let tagPattern = #"<!--notchflow:id=([0-9A-Fa-f-]{36})-->"#
 
     private var syncTask: Task<Void, Never>?
 
@@ -142,8 +142,8 @@ final class AppleNotesSyncManager: ObservableObject {
         }
 
         for remote in remoteNotes where !linkedRemoteIds.contains(remote.id) {
-            if let atollId = remote.atollId,
-               let index = notes.firstIndex(where: { $0.id == atollId }) {
+            if let notchFlowId = remote.notchFlowId,
+               let index = notes.firstIndex(where: { $0.id == notchFlowId }) {
                 linkedRemoteIds.insert(remote.id)
                 notes[index].appleNotesId = remote.id
                 if remote.modificationDate > notes[index].modificationDate {
@@ -216,8 +216,8 @@ final class AppleNotesSyncManager: ObservableObject {
                 if password protected of n is false then
                     set notePlain to plaintext of n
                     set notePlain to my sanitizeField(notePlain, fieldSep, recordSep)
-                    set atollId to my extractAtollId(body of n)
-                    set chunk to (id of n) & fieldSep & (name of n) & fieldSep & ((creation date of n) - epoch as string) & fieldSep & ((modification date of n) - epoch as string) & fieldSep & notePlain & fieldSep & atollId
+                    set notchFlowId to my extractNotchFlowId(body of n)
+                    set chunk to (id of n) & fieldSep & (name of n) & fieldSep & ((creation date of n) - epoch as string) & fieldSep & ((modification date of n) - epoch as string) & fieldSep & notePlain & fieldSep & notchFlowId
                     set end of chunks to chunk
                 end if
             end repeat
@@ -236,13 +236,13 @@ final class AppleNotesSyncManager: ObservableObject {
             return parts as text
         end sanitizeField
 
-        on extractAtollId(noteBody)
-            if noteBody does not contain "atoll:id=" then return ""
-            set AppleScript's text item delimiters to "atoll:id="
+        on extractNotchFlowId(noteBody)
+            if noteBody does not contain "notchflow:id=" then return ""
+            set AppleScript's text item delimiters to "notchflow:id="
             set tail to item 2 of (text items of noteBody)
             set AppleScript's text item delimiters to "-->"
             return item 1 of (text items of tail)
-        end extractAtollId
+        end extractNotchFlowId
         """
 
         let output = try await runScriptReturningString(script)
@@ -264,9 +264,9 @@ final class AppleNotesSyncManager: ObservableObject {
                       let modified = parseAppleScriptSeconds(String(fields[3])) else { return nil }
 
                 let content = String(fields[4])
-                let atollId = fields.count > 5
+                let notchFlowId = fields.count > 5
                     ? UUID(uuidString: String(fields[5]))
-                    : extractAtollId(from: content)
+                    : extractNotchFlowId(from: content)
 
                 return RemoteAppleNote(
                     id: id,
@@ -274,7 +274,7 @@ final class AppleNotesSyncManager: ObservableObject {
                     content: content,
                     creationDate: created,
                     modificationDate: modified,
-                    atollId: atollId
+                    notchFlowId: notchFlowId
                 )
             }
     }
@@ -287,8 +287,8 @@ final class AppleNotesSyncManager: ObservableObject {
         return Date(timeIntervalSince1970: seconds)
     }
 
-    private func extractAtollId(from content: String) -> UUID? {
-        guard let regex = try? NSRegularExpression(pattern: Self.atollTagPattern) else { return nil }
+    private func extractNotchFlowId(from content: String) -> UUID? {
+        guard let regex = try? NSRegularExpression(pattern: Self.tagPattern) else { return nil }
         let range = NSRange(content.startIndex..<content.endIndex, in: content)
         guard let match = regex.firstMatch(in: content, range: range),
               let idRange = Range(match.range(at: 1), in: content) else { return nil }
@@ -368,7 +368,7 @@ final class AppleNotesSyncManager: ObservableObject {
             }
             .joined()
 
-        return html + "<!--atoll:id=\(note.id.uuidString)-->"
+        return html + "<!--notchflow:id=\(note.id.uuidString)-->"
     }
 
     private func appleScriptEscape(_ value: String) -> String {

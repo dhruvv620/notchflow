@@ -1,5 +1,5 @@
 /*
- * Atoll (DynamicIsland)
+ * NotchFlow
  * Copyright (C) 2024-2026 Atoll Contributors
  *
  * This program is free software: you can redistribute it and/or modify
@@ -67,7 +67,7 @@ class LockScreenPanelManager {
         }
 
         NotificationCenter.default.post(
-            name: .atollLockScreenPanelFrameDidChange,
+            name: .lockScreenPanelFrameDidChange,
             object: self,
             userInfo: userInfo
         )
@@ -378,5 +378,5 @@ class LockScreenPanelManager {
 }
 
 extension Notification.Name {
-    static let atollLockScreenPanelFrameDidChange = Notification.Name("atollLockScreenPanelFrameDidChange")
+    static let lockScreenPanelFrameDidChange = Notification.Name("lockScreenPanelFrameDidChange")
 }
