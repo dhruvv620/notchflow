@@ -13,22 +13,22 @@
 	<string>NotchFlow uses audio capture to display the real-time music waveform visualizer.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>NotchFlow uses the microphone only while you read a script in Cuely, so it can follow your place.</string>
-	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>NotchFlow's Cuely recognizes your speech only while you read a script, to keep your place. Nothing is saved. If on-device recognition is unavailable, audio is sent to Apple's speech service.</string>
 	<key>NSScreenCaptureUsageDescription</key>
 	<string>Atoll needs screen recording permission to capture screenshots for the AI assistant feature.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>NotchFlow's Cuely recognizes your speech only while you read a script, to keep your place. Nothing is saved. If on-device recognition is unavailable, audio is sent to Apple's speech service.</string>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
 	<key>SUEnableDownloaderService</key>
 	<true/>
 	<key>SUEnableInstallerLauncherService</key>
 	<true/>
-	<key>SUEnableAutomaticChecks</key>
-	<true/>
 	<key>SUFeedURL</key>
 	<string>https://github.com/dhruvv620/notchflow/releases/latest/download/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>CORrce6E/sZYHq4MwvThR3VbB/nqe3u/bUIpyQEr9FQ=</string>
 	<key>SUScheduledCheckInterval</key>
 	<integer>86400</integer>
-	<key>SUPublicEDKey</key>
-	<string>q2YQaJ1umGkaIJWMGN9Isj5fx/YlUtxnzHEBqFtfZcg=</string>
 	<key>UTImportedTypeDeclarations</key>
 	<array>
 		<dict/>
