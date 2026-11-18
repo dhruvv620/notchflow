@@ -96,13 +96,21 @@ SPARKLE_BIN="$(/usr/bin/dirname "$SIGN_UPDATE")"
 
 # The private key lives in your login Keychain (created once); only the
 # public half goes into the app, so updates signed on this Mac are trusted.
-PUBLIC_KEY="$("$SPARKLE_BIN/generate_keys" -p 2>/dev/null || true)"
-if [ -z "$PUBLIC_KEY" ]; then
+# A valid key is base64 for exactly 32 bytes; anything else (a message from
+# generate_keys, for example) must never be written into the app.
+is_valid_key() {
+    [ "$(printf '%s' "$1" | /usr/bin/base64 -D 2>/dev/null | /usr/bin/wc -c | /usr/bin/tr -d ' ')" = 32 ]
+}
+read_public_key() {
+    "$SPARKLE_BIN/generate_keys" -p 2>/dev/null | /usr/bin/grep -Eo '[A-Za-z0-9+/]{43}=' | /usr/bin/tail -1 || true
+}
+PUBLIC_KEY="$(read_public_key)"
+if ! is_valid_key "$PUBLIC_KEY"; then
     step "Creating your update signing key in the login Keychain (one time)"
-    "$SPARKLE_BIN/generate_keys" >/dev/null
-    PUBLIC_KEY="$("$SPARKLE_BIN/generate_keys" -p)"
+    "$SPARKLE_BIN/generate_keys" >/dev/null 2>&1 || true
+    PUBLIC_KEY="$(read_public_key)"
 fi
-[ -n "$PUBLIC_KEY" ] || fail "Could not read the update signing key from the Keychain."
+is_valid_key "$PUBLIC_KEY" || fail "Could not read a valid update signing key from Sparkle's generate_keys (got '$PUBLIC_KEY'). Run \"$SPARKLE_BIN/generate_keys\" yourself to see what it says."
 CURRENT_KEY="$(/usr/libexec/PlistBuddy -c 'Print :SUPublicEDKey' "$INFO_PLIST" 2>/dev/null || true)"
 if [ "$CURRENT_KEY" != "$PUBLIC_KEY" ]; then
     step "Putting your public update key into the app"
