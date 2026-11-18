@@ -175,13 +175,20 @@ printf '\nChecking WhatsApp message parsing...\n'
     -clonedSourcePackagesDirPath "$BUILD_ROOT/Packages" \
     -onlyUsePackageVersionsFromResolvedFile
 
+# Release.command sets the version shown to users and the build number
+# Sparkle compares; local builds keep the project's own values.
+VERSION_SETTINGS=()
+if [ -n "${NOTCHFLOW_MARKETING_VERSION:-}" ]; then VERSION_SETTINGS+=("MARKETING_VERSION=$NOTCHFLOW_MARKETING_VERSION"); fi
+if [ -n "${NOTCHFLOW_BUILD_NUMBER:-}" ]; then VERSION_SETTINGS+=("CURRENT_PROJECT_VERSION=$NOTCHFLOW_BUILD_NUMBER"); fi
+
 /usr/bin/xcodebuild build \
     -project "$SOURCE_DIR/DynamicIsland.xcodeproj" -scheme DynamicIsland \
     -configuration "$CONFIGURATION" -destination 'platform=macOS' \
     -derivedDataPath "$DERIVED_DIR" \
     -clonedSourcePackagesDirPath "$BUILD_ROOT/Packages" \
     -disableAutomaticPackageResolution -onlyUsePackageVersionsFromResolvedFile \
-    CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO DEVELOPMENT_TEAM=''
+    CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO DEVELOPMENT_TEAM='' \
+    ${VERSION_SETTINGS[@]+"${VERSION_SETTINGS[@]}"}
 
 BUILT_APP="$DERIVED_DIR/Build/Products/$CONFIGURATION/NotchFlow.app"
 [ -d "$BUILT_APP" ] || { printf 'Expected app was not produced: %s\n' "$BUILT_APP"; exit 1; }
@@ -229,6 +236,14 @@ done < <(/usr/bin/find "$BUILT_APP/Contents" -depth -type d \
     \( -name '*.framework' -o -name '*.xpc' -o -name '*.app' \) -print0)
 /usr/bin/codesign --force --sign "$SIGNING_IDENTITY" --options runtime --entitlements "$LOCAL_ENTITLEMENTS" "$BUILT_APP"
 /usr/bin/codesign --verify --deep --strict "$BUILT_APP"
+
+# Release.command packages the signed app itself and leaves your installed copy alone.
+if [ "${NOTCHFLOW_SKIP_INSTALL:-0}" = 1 ]; then
+    printf '%s\n' "$BUILT_APP" > "$BUILD_ROOT/last-built-app.txt"
+    printf '%s\n' "$SIGNING_IDENTITY" > "$BUILD_ROOT/last-signing-identity.txt"
+    printf '\nBuilt and signed %s (not installed).\n' "$BUILT_APP"
+    exit 0
+fi
 
 INSTALL_APP="$HOME/Applications/NotchFlow.app"
 BACKUP_ROOT="$HOME/Library/Application Support/NotchFlow/Build Backups"

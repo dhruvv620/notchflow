@@ -44,11 +44,11 @@ struct DynamicNotchApp: App {
         // The AtollUpdaterDelegate overrides the feed URL at runtime
         // based on the user's selected update channel.
         updaterController = SPUStandardUpdaterController(
-            startingUpdater: false,
+            startingUpdater: !AppRuntimeEnvironment.isUITesting,
             updaterDelegate: updaterDelegate, userDriverDelegate: nil)
 
-        // Initialize the settings window controller with the updater controller
-        // Personal fork: official Atoll updates would replace this build.
+        // Updates come from NotchFlow's own GitHub releases (see Release.command).
+        SettingsWindowController.shared.setUpdaterController(updaterController)
     }
 
     var body: some Scene {
@@ -56,7 +56,10 @@ struct DynamicNotchApp: App {
             Button("Settings") {
                 SettingsWindowController.shared.showWindow()
             }
-            Text("NotchFlow local build")
+            Text("NotchFlow \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")")
+            Button("Check for Updates…") {
+                updaterController.checkForUpdates(nil)
+            }
             Divider()
             Button("Restart NotchFlow") {
                 guard let bundleIdentifier = Bundle.main.bundleIdentifier else { return }

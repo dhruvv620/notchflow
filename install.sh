@@ -3,7 +3,10 @@
 # NotchFlow installer
 #
 # Install or update with one command:
-#   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/dhruvv620/notchflow/fresh/reminders-liquid-glass/install.sh)"
+#   curl -fsSL https://github.com/dhruvv620/notchflow/releases/latest/download/install.sh | bash
+#
+# Release.command publishes this file with every release, next to
+# NotchFlow.zip, NotchFlow.dmg and the appcast.xml the app's updater reads.
 #
 # Downloads the latest release from GitHub, installs NotchFlow.app into
 # /Applications (falls back to ~/Applications), and removes the download

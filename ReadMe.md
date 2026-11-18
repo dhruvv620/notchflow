@@ -72,9 +72,21 @@ Atoll turns the MacBook notch into a focused command surface for media, system i
 - Permissions as needed: Accessibility, Camera, Calendar, Screen Recording, Music, Microphone, and Speech Recognition. Cuely requests its two permissions only after **Start Listening**.
 
 ## Installation
-1) Download the latest DMG [here](https://github.com/Ebullioscopic/Atoll/releases/latest).
-2) Open the DMG and drag Atoll into Applications.
-3) Launch Atoll and grant the requested permissions.
+Paste this into Terminal:
+
+```bash
+curl -fsSL https://github.com/dhruvv620/notchflow/releases/latest/download/install.sh | bash
+```
+
+Or download [NotchFlow.dmg](https://github.com/dhruvv620/notchflow/releases/latest/download/NotchFlow.dmg), open it and drag NotchFlow into Applications. NotchFlow is not notarized by Apple, so the first time you open it from the DMG, macOS blocks it: go to System Settings > Privacy & Security and click **Open Anyway**. The Terminal line does not need this.
+
+Updates: NotchFlow checks once a day, and **Check for Updates…** is in the menu bar icon and in Settings > About.
+
+## Publishing a release (maintainer)
+1) Install the GitHub CLI once: `brew install gh`, then `gh auth login`.
+2) Commit your changes, then run `bash Release.command` (or `bash Release.command 2.5.0` to pick the version).
+
+It builds and signs NotchFlow, makes `NotchFlow.dmg` and `NotchFlow.zip`, signs the update with a key kept in your login Keychain (created on the first release), and publishes a GitHub release with `appcast.xml`, which everyone's Check for Updates reads. Release notes come from the Unreleased section of CHANGELOG.md.
 
 ## Quick Start
 - Hover near the notch to expand; click to enter controls.
