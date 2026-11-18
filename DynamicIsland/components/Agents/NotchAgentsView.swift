@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+import AppKit
 import Defaults
 import SwiftUI
 
@@ -8,6 +9,7 @@ struct NotchAgentsView: View {
     @ObservedObject private var hub = AgentHub.shared
     @EnvironmentObject private var vm: DynamicIslandViewModel
     @State private var interactionToken = UUID()
+    @State private var composing = false
 
     var body: some View {
         Group {
@@ -20,10 +22,18 @@ struct NotchAgentsView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-            } else if hub.sessions.isEmpty {
-                emptyState
             } else {
-                sessionList
+                VStack(alignment: .leading, spacing: NotchTokens.Spacing.s) {
+                    header
+                    if composing {
+                        AgentTaskComposer { composing = false }
+                    }
+                    if hub.sessions.isEmpty {
+                        if !composing { emptyState }
+                    } else {
+                        sessionList
+                    }
+                }
             }
         }
         .notchTabPadding()
@@ -32,17 +42,34 @@ struct NotchAgentsView: View {
             // Keep the notch open while you decide.
             vm.setAutoCloseSuppression(!empty, token: interactionToken)
         }
+        .onChange(of: composing) { _, open in
+            vm.setAutoCloseSuppression(open || !hub.requests.isEmpty, token: interactionToken)
+        }
         .onAppear { vm.setAutoCloseSuppression(!hub.requests.isEmpty, token: interactionToken) }
         .onDisappear { vm.setAutoCloseSuppression(false, token: interactionToken) }
     }
 
+    private var header: some View {
+        HStack(spacing: NotchTokens.Spacing.s) {
+            Text("AI Agents").font(NotchTokens.Typography.title)
+            if !hub.sessions.isEmpty {
+                NotchBadge(text: "\(hub.sessions.count)")
+            }
+            Spacer(minLength: 0)
+            NotchPillButton(title: composing ? "Cancel" : "New task", symbol: composing ? "xmark" : "plus", prominent: !composing) {
+                withAnimation(NotchTokens.Motion.standard) { composing.toggle() }
+            }
+        }
+    }
+
     private var emptyState: some View {
-        NotchEmptyState(symbol: "sparkles", title: "No agents running",
-                        detail: AgentSetup.isClaudeCodeConnected
-                            ? "Start Claude Code in a terminal. Its approvals, questions and progress show up here."
-                            : "Connect Claude Code in Settings > AI Agents to approve it from the notch.") {
-            if !AgentSetup.isClaudeCodeConnected {
-                NotchPillButton(title: "Set up", symbol: "gearshape", prominent: true) {
+        let connected = AgentSetup.anyAgentConnected
+        return NotchEmptyState(symbol: "sparkles", title: "No agents running",
+                               detail: connected
+                                   ? "Start one with New task, or in any terminal. Approvals, questions and progress show up here."
+                                   : "Connect Claude Code, Codex, Cursor or Gemini in Settings > AI Agents to work with them from the notch.") {
+            if !connected {
+                NotchPillButton(title: "Set up", symbol: "gearshape") {
                     SettingsWindowController.shared.showWindow()
                 }
             }
@@ -51,7 +78,6 @@ struct NotchAgentsView: View {
 
     private var sessionList: some View {
         VStack(alignment: .leading, spacing: NotchTokens.Spacing.s) {
-            NotchSectionHeader(title: "Sessions")
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(spacing: NotchTokens.Spacing.xs) {
                     ForEach(hub.sessions) { session in
@@ -278,30 +304,64 @@ private struct AgentButton: View {
 private struct AgentSessionRow: View {
     let session: AgentSession
     @ObservedObject private var hub = AgentHub.shared
+    @State private var replying = false
+    @State private var reply = ""
+    @FocusState private var replyFocused: Bool
 
     var body: some View {
-        NotchRow(title: session.project, subtitle: subtitle, action: { hub.openWindow(bundleID: session.appBundleID) }) {
-            ZStack {
-                Circle().fill(color.opacity(0.18)).frame(width: 24, height: 24)
-                if session.isWorking {
-                    ProgressView().controlSize(.mini)
+        VStack(alignment: .leading, spacing: NotchTokens.Spacing.xs) {
+            NotchRow(title: session.project, subtitle: subtitle, action: {
+                if hub.canReply(to: session) {
+                    withAnimation(NotchTokens.Motion.standard) { replying.toggle() }
                 } else {
-                    Image(systemName: symbol).font(.system(size: 10, weight: .bold)).foregroundStyle(color)
+                    hub.openWindow(bundleID: session.appBundleID)
                 }
-            }
-        } trailing: {
-            HStack(spacing: NotchTokens.Spacing.xs) {
-                if let started = session.turnStartedAt, session.isWorking {
-                    TimelineView(.periodic(from: .now, by: 1)) { context in
-                        Text(elapsed(since: started, now: context.date))
-                            .font(NotchTokens.Typography.caption.monospacedDigit())
-                            .foregroundStyle(.secondary)
+            }) {
+                ZStack {
+                    Circle().fill(color.opacity(0.18)).frame(width: 24, height: 24)
+                    if session.isWorking {
+                        ProgressView().controlSize(.mini)
+                    } else {
+                        Image(systemName: symbol).font(.system(size: 10, weight: .bold)).foregroundStyle(color)
                     }
                 }
-                NotchIconButton(symbol: "xmark", help: "Remove from the list", size: 18) { hub.dismiss(session) }
+            } trailing: {
+                HStack(spacing: NotchTokens.Spacing.xs) {
+                    if let started = session.turnStartedAt, session.isWorking {
+                        TimelineView(.periodic(from: .now, by: 1)) { context in
+                            Text(elapsed(since: started, now: context.date))
+                                .font(NotchTokens.Typography.caption.monospacedDigit())
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    if hub.canReply(to: session) {
+                        NotchIconButton(symbol: "arrowshape.turn.up.left", help: "Reply from the notch", size: 18) {
+                            withAnimation(NotchTokens.Motion.standard) { replying.toggle() }
+                        }
+                    }
+                    if session.appBundleID != nil {
+                        NotchIconButton(symbol: "arrow.up.forward.app", help: "Show its window", size: 18) {
+                            hub.openWindow(bundleID: session.appBundleID)
+                        }
+                    }
+                    NotchIconButton(symbol: "xmark", help: "Remove from the list", size: 18) { hub.dismiss(session) }
+                }
+            }
+            if replying && hub.canReply(to: session) {
+                NotchComposeField(placeholder: "Reply to \(session.agent.displayName) in \(session.project)", text: $reply,
+                                  onSend: send, onCancel: { replying = false }, isFocused: $replyFocused)
+                    .padding(.leading, 30)
+                    .onAppear { replyFocused = true }
             }
         }
         .help(session.lastPrompt.map { "Asked: \($0)" } ?? session.cwd)
+        .onChange(of: hub.canReply(to: session)) { _, canReply in if !canReply { replying = false } }
+    }
+
+    private func send() {
+        hub.reply(to: session, text: reply)
+        reply = ""
+        replying = false
     }
 
     private var subtitle: String {
@@ -365,6 +425,24 @@ struct AgentLiveActivity: View {
             .onAppear { withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) { pulse = true } }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("\(request.agent.displayName) in \(request.project) needs you")
+        } else if let waiting = hub.waitingInWindowSessions.first {
+            ClosedNotchWings(isHovering: isHovering) {
+                Image(systemName: waiting.agent.symbol)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Color.orange)
+                    .opacity(pulse ? 1 : 0.5)
+                Text(waiting.project)
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.85))
+                    .lineLimit(1)
+            } trailing: {
+                Text("Needs you")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(Color.orange)
+            }
+            .onAppear { withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) { pulse = true } }
+            .onTapGesture { hub.openWindow(bundleID: waiting.appBundleID) }
+            .help("\(waiting.agent.displayName) is asking in its window")
         } else if let done = hub.announcement {
             ClosedNotchWings(isHovering: isHovering) {
                 Image(systemName: "checkmark.circle.fill")
@@ -409,5 +487,85 @@ struct AgentLiveActivity: View {
     private func doneLabel(_ session: AgentSession) -> String {
         if case .done(let summary) = session.state, session.agent == .script, !summary.isEmpty { return summary }
         return "Done"
+    }
+}
+
+// MARK: - New task
+
+/// Starts an agent with a first prompt in a new Terminal or iTerm window.
+private struct AgentTaskComposer: View {
+    let onStarted: () -> Void
+    @ObservedObject private var hub = AgentHub.shared
+    @Default(.agentLaunchAgent) private var agentValue
+    @Default(.agentRecentProjects) private var recentProjects
+    @State private var directory = ""
+    @State private var prompt = ""
+    @FocusState private var promptFocused: Bool
+
+    private var agent: AgentHookPolicy.LaunchAgent { AgentHookPolicy.LaunchAgent(rawValue: agentValue) ?? .claude }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: NotchTokens.Spacing.s) {
+            HStack(spacing: NotchTokens.Spacing.s) {
+                Menu {
+                    ForEach(AgentHookPolicy.LaunchAgent.allCases, id: \.rawValue) { option in
+                        Button(option.title) { agentValue = option.rawValue }
+                    }
+                } label: {
+                    Label(agent.title, systemImage: "sparkles")
+                        .font(NotchTokens.Typography.captionEmphasis)
+                }
+                .menuStyle(.borderlessButton)
+                .fixedSize()
+                Text("in").font(NotchTokens.Typography.caption).foregroundStyle(.secondary)
+                Menu {
+                    ForEach(recentProjects, id: \.self) { path in
+                        Button((path as NSString).lastPathComponent) { directory = path }
+                    }
+                    if !recentProjects.isEmpty { Divider() }
+                    Button("Choose a folder…", action: chooseFolder)
+                    Button("Home folder") { directory = "" }
+                } label: {
+                    Label(directory.isEmpty ? "Home folder" : (directory as NSString).lastPathComponent, systemImage: "folder")
+                        .font(NotchTokens.Typography.captionEmphasis)
+                }
+                .menuStyle(.borderlessButton)
+                .fixedSize()
+                Spacer(minLength: 0)
+            }
+            NotchComposeField(placeholder: "What should \(agent.title) do?", text: $prompt, onSend: start,
+                              onCancel: onStarted, isFocused: $promptFocused)
+            if let error = hub.launchError {
+                Text(error).font(NotchTokens.Typography.caption).foregroundStyle(.orange).lineLimit(2)
+            } else {
+                Text("Opens in \(Defaults[.agentTerminalApp]) so you can watch it; its approvals and progress come back here.")
+                    .font(NotchTokens.Typography.caption).foregroundStyle(.secondary)
+            }
+        }
+        .padding(NotchTokens.Spacing.m)
+        .background { NotchElementSurface(cornerRadius: NotchTokens.Radius.card) }
+        .onAppear {
+            if directory.isEmpty { directory = recentProjects.first ?? "" }
+            promptFocused = true
+        }
+    }
+
+    private func start() {
+        hub.startTask(agent: agent, prompt: prompt, directory: directory)
+        prompt = ""
+        onStarted()
+    }
+
+    private func chooseFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Use Folder"
+        NSApp.activate(ignoringOtherApps: true)
+        if panel.runModal() == .OK, let url = panel.url {
+            directory = url.path
+            hub.rememberProject(url.path)
+        }
     }
 }

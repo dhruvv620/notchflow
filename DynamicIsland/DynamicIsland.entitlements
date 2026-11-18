@@ -28,6 +28,8 @@
 		<string>company.thebrowser.Browser</string>
 		<string>com.brave.Browser</string>
 		<string>com.microsoft.edgemac</string>
+		<string>com.apple.Terminal</string>
+		<string>com.googlecode.iterm2</string>
 	</array>
     <key>com.apple.security.temporary-exception.mach-lookup.global-name</key>
     <array>

@@ -946,7 +946,8 @@ struct SettingsView: View {
             // Terminal
             SettingsSearchEntry(tab: .terminal, title: "Enable terminal", keywords: ["terminal", "guake", "shell"], highlightID: SettingsTab.terminal.highlightID(for: "Enable terminal")),
             SettingsSearchEntry(tab: .agents, title: "AI Agents", keywords: ["agents","ai","claude","approve","permission"], highlightID: SettingsTab.agents.highlightID(for: "AI Agents")),
-            SettingsSearchEntry(tab: .agents, title: "Claude Code", keywords: ["claude code","hooks","connect","approve","terminal"], highlightID: SettingsTab.agents.highlightID(for: "Claude Code")),
+            SettingsSearchEntry(tab: .agents, title: "Connect an agent", keywords: ["claude code","codex","cursor","gemini","hooks","connect","approve"], highlightID: SettingsTab.agents.highlightID(for: "Connect an agent")),
+            SettingsSearchEntry(tab: .agents, title: "Open new tasks in", keywords: ["terminal","iterm","new task","start agent"], highlightID: SettingsTab.agents.highlightID(for: "Open new tasks in")),
             SettingsSearchEntry(tab: .agents, title: "Wait for an answer in the notch", keywords: ["approval","timeout","wait"], highlightID: SettingsTab.agents.highlightID(for: "Wait for an answer in the notch")),
             SettingsSearchEntry(tab: .agents, title: "Ask in the agent's window when it is in front", keywords: ["terminal","front","approval"], highlightID: SettingsTab.agents.highlightID(for: "Ask in the agent's window when it is in front")),
             SettingsSearchEntry(tab: .agents, title: "Show working agents under the closed notch", keywords: ["status","working","closed notch"], highlightID: SettingsTab.agents.highlightID(for: "Show working agents under the closed notch")),

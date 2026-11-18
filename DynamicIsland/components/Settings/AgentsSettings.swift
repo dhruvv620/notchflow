@@ -9,10 +9,11 @@ struct AgentsSettings: View {
     @ObservedObject private var hub = AgentHub.shared
     @Default(.enableAgentsFeature) private var enabled
     @Default(.agentApprovalWaitSeconds) private var waitSeconds
-    @State private var claudeConnected = AgentSetup.isClaudeCodeConnected
+    @Default(.agentTerminalApp) private var terminalApp
+    @State private var connected: Set<String> = []
     @State private var commandCurrent = AgentSetup.isCommandCurrent
     @State private var message: String?
-    @State private var confirmConnect = false
+    @State private var pendingConnect: AgentSetup.Connector?
     @State private var copiedPath = false
 
     // SettingsTab is private to SettingsView.swift; ids follow its "<tab>-<title>" form.
@@ -39,46 +40,49 @@ struct AgentsSettings: View {
             }
 
             if enabled {
-                claudeCodeSection
+                agentsSection
                 approvalsSection
+                newTaskSection
                 commandSection
                 otherAgentsSection
             }
         }
         .onAppear(perform: refresh)
-        .alert("Connect Claude Code?", isPresented: $confirmConnect) {
-            Button("Connect") { connectClaudeCode() }
+        .alert("Connect \(pendingConnect?.agent.displayName ?? "")?",
+               isPresented: Binding(get: { pendingConnect != nil }, set: { if !$0 { pendingConnect = nil } })) {
+            Button("Connect") { if let connector = pendingConnect { connect(connector) } }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text(AgentSetup.claudeCodeChangeSummary + "\n\nYour existing settings and hooks are kept, and a backup of settings.json is saved next to it.")
+            if let connector = pendingConnect {
+                Text(AgentSetup.changeSummary(connector) + "\n\nYour existing settings and hooks are kept, and a backup is saved next to the file.")
+            }
         }
     }
 
-    // MARK: Claude Code
+    // MARK: Agents
 
-    private var claudeCodeSection: some View {
+    private var agentsSection: some View {
         Section {
-            HStack(spacing: 10) {
-                Image(systemName: "sparkle").foregroundStyle(.orange).frame(width: 20)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Claude Code")
-                    Text(claudeConnected
-                         ? "Connected. New Claude Code sessions report to the notch."
-                         : "Not connected")
-                        .font(.caption).foregroundStyle(.secondary)
+            Text("Connect the agents you use. Each one keeps its own settings; NotchFlow only adds its hooks.")
+                .font(.caption).foregroundStyle(.secondary)
+                .settingsHighlight(id: highlightID("Connect an agent"))
+            ForEach(AgentSetup.connectors) { connector in
+                let isConnected = connected.contains(connector.id)
+                HStack(spacing: 10) {
+                    Image(systemName: connector.agent.symbol).foregroundStyle(.orange).frame(width: 20)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(connector.agent.displayName)
+                        Text(isConnected ? "Connected · \(connector.summary)" : connector.summary)
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    if isConnected {
+                        Button("Disconnect", role: .destructive) { disconnect(connector) }
+                    } else {
+                        Button("Connect") { pendingConnect = connector }
+                            .buttonStyle(.borderedProminent)
+                    }
                 }
-                Spacer()
-                if claudeConnected {
-                    Button("Disconnect", role: .destructive) { disconnectClaudeCode() }
-                } else {
-                    Button("Connect") { confirmConnect = true }
-                        .buttonStyle(.borderedProminent)
-                }
-            }
-            .settingsHighlight(id: highlightID("Claude Code"))
-            if claudeConnected {
-                Text("Already running sessions pick it up after you restart them. Approvals wait in the notch; everything else (progress, questions, done) appears as it happens.")
-                    .font(.caption).foregroundStyle(.secondary)
             }
             if let message {
                 Text(message).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
@@ -86,7 +90,7 @@ struct AgentsSettings: View {
         } header: {
             Text("Agents")
         } footer: {
-            Text("Claude Code's hooks call the notchflow command, which asks NotchFlow and passes your answer back. If NotchFlow is closed, Claude Code asks in the terminal as usual.")
+            Text("Each agent's hooks call the notchflow command, which asks NotchFlow and passes your answer back. If NotchFlow is closed or you don't answer, the agent asks in its own window as usual. The Claude and ChatGPT apps show up through Notifications & Calls; they can't be approved from another app.")
         }
     }
 
@@ -160,36 +164,51 @@ struct AgentsSettings: View {
 
     private var otherAgentsSection: some View {
         Section {
-            Text("Claude and ChatGPT apps: their notifications already appear in Notifications & Calls. They cannot be approved from another app.")
-                .font(.caption).foregroundStyle(.secondary)
-            Text("Codex, Gemini CLI and Cursor: coming next through the same notchflow command. Any tool that can run a command can already use notchflow ask and notify.")
+            Text("Any tool that can run a command can use `notchflow ask` and `notchflow notify`, so scripts and other agents can ask you something in the notch today.")
                 .font(.caption).foregroundStyle(.secondary)
         } header: {
-            Text("Other agents")
+            Text("Other agents and scripts")
+        }
+    }
+
+    // MARK: New task
+
+    private var newTaskSection: some View {
+        Section {
+            Picker("Open new tasks in", selection: $terminalApp) {
+                ForEach(AgentHookPolicy.TerminalApp.allCases, id: \.rawValue) { Text($0.rawValue).tag($0.rawValue) }
+            }
+            .settingsHighlight(id: highlightID("Open new tasks in"))
+            Text("New task in the AI Agents tab opens the agent in a new window there with your prompt, in the folder you pick. macOS asks once to let NotchFlow control the terminal.")
+                .font(.caption).foregroundStyle(.secondary)
+        } header: {
+            Text("New tasks")
         }
     }
 
     // MARK: Actions
 
     private func refresh() {
-        claudeConnected = AgentSetup.isClaudeCodeConnected
+        connected = Set(AgentSetup.connectors.filter(AgentSetup.isConnected).map(\.id))
         commandCurrent = AgentSetup.isCommandCurrent
     }
 
-    private func connectClaudeCode() {
+    private func connect(_ connector: AgentSetup.Connector) {
         do {
-            let backup = try AgentSetup.connectClaudeCode(waitSeconds: waitSeconds)
-            message = "Connected. " + (backup.map { "Backup: \($0.path)" } ?? "Created ~/.claude/settings.json.")
+            let backup = try AgentSetup.connect(connector, waitSeconds: waitSeconds)
+            message = "\(connector.agent.displayName) connected. " + (connector.afterConnecting ?? "")
+                + (backup.map { " Backup: \($0.path)" } ?? "")
         } catch {
             message = error.localizedDescription
         }
+        pendingConnect = nil
         refresh()
     }
 
-    private func disconnectClaudeCode() {
+    private func disconnect(_ connector: AgentSetup.Connector) {
         do {
-            let backup = try AgentSetup.disconnectClaudeCode()
-            message = "Disconnected; only NotchFlow's hooks were removed." + (backup.map { " Backup: \($0.path)" } ?? "")
+            let backup = try AgentSetup.disconnect(connector)
+            message = "\(connector.agent.displayName) disconnected; only NotchFlow's hooks were removed." + (backup.map { " Backup: \($0.path)" } ?? "")
         } catch {
             message = error.localizedDescription
         }

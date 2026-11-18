@@ -9,7 +9,7 @@ import Foundation
 /// running it prints nothing and exits 0, so an agent's hook never gets in
 /// the way.
 enum AgentSetup {
-    static let scriptVersion = 1
+    static let scriptVersion = 2
 
     enum SetupError: LocalizedError {
         case invalidSettings(URL)
@@ -45,67 +45,113 @@ enum AgentSetup {
         }
     }
 
-    // MARK: Claude Code
+    // MARK: Agents
 
-    static func readClaudeSettings() throws -> [String: Any] {
-        guard FileManager.default.fileExists(atPath: claudeSettingsURL.path) else { return [:] }
-        let data = try Data(contentsOf: claudeSettingsURL)
+    /// An agent NotchFlow can connect to: where its hook settings live and what to tell the user.
+    struct Connector: Identifiable {
+        let agent: AgentKind
+        let target: AgentHookPolicy.HookTarget
+        /// Path under the home folder.
+        let relativePath: String
+        let summary: String
+        /// Shown after connecting (e.g. Codex's trust step).
+        let afterConnecting: String?
+        var id: String { target.id }
+        var settingsURL: URL { home.appendingPathComponent(relativePath) }
+        var displayPath: String { "~/" + relativePath }
+    }
+
+    static let connectors: [Connector] = [
+        Connector(agent: .claudeCode, target: AgentHookPolicy.claudeCode, relativePath: ".claude/settings.json",
+                  summary: "Approve, answer questions, reply after a turn, and follow progress.",
+                  afterConnecting: "Restart running Claude Code sessions to pick it up."),
+        Connector(agent: .codex, target: AgentHookPolicy.codex, relativePath: ".codex/hooks.json",
+                  summary: "Approve and follow progress.",
+                  afterConnecting: "Open Codex and trust the NotchFlow hooks in /hooks; Codex only runs hooks you have reviewed."),
+        Connector(agent: .cursor, target: AgentHookPolicy.cursor, relativePath: ".cursor/hooks.json",
+                  summary: "Approve risky commands and MCP tools; follow progress. Other commands follow Cursor's own rules.",
+                  afterConnecting: "Restart Cursor (and cursor-agent) to pick it up."),
+        Connector(agent: .gemini, target: AgentHookPolicy.gemini, relativePath: ".gemini/settings.json",
+                  summary: "Follow progress and see when it needs you. Gemini's own prompt handles approvals.",
+                  afterConnecting: "Restart Gemini CLI to pick it up."),
+    ]
+
+    static func connector(for agent: AgentKind) -> Connector? { connectors.first { $0.agent == agent } }
+
+    static func readSettings(_ connector: Connector) throws -> [String: Any] {
+        let url = connector.settingsURL
+        guard FileManager.default.fileExists(atPath: url.path) else { return [:] }
+        let data = try Data(contentsOf: url)
         if data.allSatisfy({ $0 == 0x20 || $0 == 0x0A || $0 == 0x0D || $0 == 0x09 }) { return [:] }
         guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            throw SetupError.invalidSettings(claudeSettingsURL)
+            throw SetupError.invalidSettings(url)
         }
         return object
     }
 
-    static var isClaudeCodeConnected: Bool {
-        (try? readClaudeSettings()).map(AgentHookPolicy.isInstalled) ?? false
+    static func isConnected(_ connector: Connector) -> Bool {
+        (try? readSettings(connector)).map { AgentHookPolicy.isInstalled($0, target: connector.target) } ?? false
     }
 
-    /// Adds NotchFlow's hooks to ~/.claude/settings.json (keeping everything
-    /// else) and installs the command they call. Returns the backup's location.
+    /// Adds NotchFlow's hooks to the agent's settings (keeping everything else)
+    /// and installs the command they call. Returns the backup's location.
     @discardableResult
-    static func connectClaudeCode(waitSeconds: Int) throws -> URL? {
+    static func connect(_ connector: Connector, waitSeconds: Int) throws -> URL? {
         try installCommand()
-        let settings = try readClaudeSettings()
-        let backup = try backupClaudeSettings()
-        let updated = AgentHookPolicy.installing(into: settings, executable: commandURL.path, waitSeconds: waitSeconds)
-        try writeClaudeSettings(updated)
+        let settings = try readSettings(connector)
+        let backup = try backup(connector)
+        let updated = AgentHookPolicy.installing(into: settings, executable: commandURL.path,
+                                                 waitSeconds: waitSeconds, target: connector.target)
+        try write(updated, to: connector)
         return backup
     }
 
     /// Removes only NotchFlow's hooks; the user's own hooks and settings stay.
     @discardableResult
-    static func disconnectClaudeCode() throws -> URL? {
-        let settings = try readClaudeSettings()
-        guard AgentHookPolicy.isInstalled(settings) else { return nil }
-        let backup = try backupClaudeSettings()
-        try writeClaudeSettings(AgentHookPolicy.removing(from: settings))
+    static func disconnect(_ connector: Connector) throws -> URL? {
+        let settings = try readSettings(connector)
+        guard AgentHookPolicy.isInstalled(settings, target: connector.target) else { return nil }
+        let backup = try backup(connector)
+        try write(AgentHookPolicy.removing(from: settings, target: connector.target), to: connector)
         return backup
     }
 
     /// A readable list of what connecting adds, shown before the user confirms.
-    static var claudeCodeChangeSummary: String {
-        let events = AgentHookPolicy.hookPlan.map { entry -> String in
-            let what = entry.waits ? "waits for your answer" : "status, runs in the background"
+    static func changeSummary(_ connector: Connector) -> String {
+        let events = connector.target.plan.map { entry -> String in
+            let what: String
+            switch entry.mode {
+            case .waits: what = "waits for your answer"
+            case .status: what = "status only"
+            case .reply: what = "after each turn, waits in the background for a reply from the notch"
+            }
             return "• \(entry.event)\(entry.matcher.map { " (\($0))" } ?? ""): \(what)"
         }
-        return "Adds these hooks to ~/.claude/settings.json, each running \(commandURL.path):\n" + events.joined(separator: "\n")
+        return "Adds these hooks to \(connector.displayPath), each running \(commandURL.path):\n" + events.joined(separator: "\n")
     }
 
-    private static func backupClaudeSettings() throws -> URL? {
-        guard FileManager.default.fileExists(atPath: claudeSettingsURL.path) else { return nil }
+    // Claude Code shorthands.
+    static var claudeCode: Connector { connectors[0] }
+    static var isClaudeCodeConnected: Bool { isConnected(claudeCode) }
+    static var anyAgentConnected: Bool { connectors.contains(where: isConnected) }
+
+    private static func backup(_ connector: Connector) throws -> URL? {
+        let url = connector.settingsURL
+        guard FileManager.default.fileExists(atPath: url.path) else { return nil }
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyyMMdd-HHmmss"
-        let backup = claudeSettingsURL.deletingLastPathComponent()
-            .appendingPathComponent("settings.json.notchflow-backup-\(formatter.string(from: Date()))")
-        try FileManager.default.copyItem(at: claudeSettingsURL, to: backup)
+        let backup = url.deletingLastPathComponent()
+            .appendingPathComponent("\(url.lastPathComponent).notchflow-backup-\(formatter.string(from: Date()))")
+        try? FileManager.default.removeItem(at: backup)
+        try FileManager.default.copyItem(at: url, to: backup)
         return backup
     }
 
-    private static func writeClaudeSettings(_ settings: [String: Any]) throws {
-        try FileManager.default.createDirectory(at: claudeSettingsURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+    private static func write(_ settings: [String: Any], to connector: Connector) throws {
+        let url = connector.settingsURL
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         let data = try JSONSerialization.data(withJSONObject: settings, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
-        try data.write(to: claudeSettingsURL, options: .atomic)
+        try data.write(to: url, options: .atomic)
     }
 
     // MARK: The script
@@ -114,7 +160,7 @@ enum AgentSetup {
     #!/bin/bash
     # notchflow: lets AI agents and scripts talk to NotchFlow, the notch app.
     # Installed by NotchFlow (Settings > AI Agents); reinstalling replaces this file.
-    NF_SCRIPT_VERSION=1
+    NF_SCRIPT_VERSION=2
     BRIDGE="$HOME/Library/Application Support/NotchFlow/agent-bridge.env"
 
     nf_value() { /usr/bin/sed -n "s/^$1=//p" "$BRIDGE" 2>/dev/null | /usr/bin/head -n 1; }
@@ -143,8 +189,8 @@ enum AgentSetup {
           Shows a message under the notch.
       notchflow status
           Checks that NotchFlow is running.
-      notchflow hook claude-code
-          Used by Claude Code's hooks (connect it in NotchFlow > Settings > AI Agents).
+      notchflow hook <claude-code|codex|cursor|gemini>
+          Used by the agents' hooks (connect them in NotchFlow > Settings > AI Agents).
     USAGE
     }
 
@@ -155,6 +201,13 @@ enum AgentSetup {
       hook)
         agent="${1:-claude-code}"
         path="/v1/hook/$agent"
+        if [ "${2:-}" = "reply" ]; then
+          # Runs in the background after a turn (asyncRewake). A reply typed in
+          # the notch comes back here; exit 2 hands it to the agent.
+          reply="$(nf_call POST "$path/reply" --max-time 3600 -H "Content-Type: application/json" --data-binary @- 2>/dev/null)"
+          if [ -n "$reply" ]; then printf '%s\n' "$reply" >&2; exit 2; fi
+          exit 0
+        fi
         [ "${2:-}" = "status" ] && path="$path/status"
         # Never get in the agent's way: if NotchFlow is not running or anything
         # fails, print nothing, and the agent carries on as if there were no hook.

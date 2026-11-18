@@ -359,7 +359,8 @@ struct ContentView: View {
 
     /// An agent needs you, just finished, or (optionally) is working.
     private var isAgentActivityVisible: Bool {
-        let hasSomething = !agentHub.requests.isEmpty || agentHub.announcement != nil
+        let hasSomething = !agentHub.requests.isEmpty || !agentHub.waitingInWindowSessions.isEmpty
+            || agentHub.announcement != nil
             || (agentShowWorkingInClosedNotch && !agentHub.workingSessions.isEmpty)
         return hasSomething && canShowClosedActivity
     }

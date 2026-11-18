@@ -14,15 +14,27 @@ extension Defaults.Keys {
     static let agentAskInWindowWhenInFront = Key<Bool>("agentAskInWindowWhenInFront", default: true)
     /// Show "working" status under the closed notch (needs-you and done always show).
     static let agentShowWorkingInClosedNotch = Key<Bool>("agentShowWorkingInClosedNotch", default: true)
+    /// Where "New task" opens agents: Terminal or iTerm.
+    static let agentTerminalApp = Key<String>("agentTerminalApp", default: AgentHookPolicy.TerminalApp.terminal.rawValue)
+    /// The agent "New task" starts, remembered between uses.
+    static let agentLaunchAgent = Key<String>("agentLaunchAgent", default: AgentHookPolicy.LaunchAgent.claude.rawValue)
+    /// Recently used project folders, newest first.
+    static let agentRecentProjects = Key<[String]>("agentRecentProjects", default: [])
 }
 
 enum AgentKind: String, Sendable {
     case claudeCode = "claude-code"
+    case codex
+    case gemini
+    case cursor
     case script
 
     var displayName: String {
         switch self {
         case .claudeCode: return "Claude Code"
+        case .codex: return "Codex"
+        case .gemini: return "Gemini CLI"
+        case .cursor: return "Cursor"
         case .script: return "Script"
         }
     }
@@ -30,7 +42,20 @@ enum AgentKind: String, Sendable {
     var symbol: String {
         switch self {
         case .claudeCode: return "sparkle"
+        case .codex: return "chevron.left.forwardslash.chevron.right"
+        case .gemini: return "diamond.fill"
+        case .cursor: return "cursorarrow.rays"
         case .script: return "terminal"
+        }
+    }
+
+    var hookTarget: AgentHookPolicy.HookTarget? {
+        switch self {
+        case .claudeCode: return AgentHookPolicy.claudeCode
+        case .codex: return AgentHookPolicy.codex
+        case .gemini: return AgentHookPolicy.gemini
+        case .cursor: return AgentHookPolicy.cursor
+        case .script: return nil
         }
     }
 }
@@ -95,12 +120,16 @@ final class AgentHub: ObservableObject {
     @Published private(set) var announcement: AgentSession?
     @Published private(set) var bridgeError: String?
     @Published private(set) var isBridgeRunning = false
+    /// Claude Code sessions that finished a turn and can take a reply from the notch.
+    @Published private(set) var replyableSessionIDs: Set<String> = []
+    @Published private(set) var launchError: String?
 
     /// Readable outside the main actor, for the tab list.
     nonisolated(unsafe) static var hasPendingRequest = false
 
     private var server: AgentBridgeServer?
     private var waiters: [UUID: CheckedContinuation<AgentDecision, Never>] = [:]
+    private var replyWaiters: [String: CheckedContinuation<String?, Never>] = [:]
     private var hookInputs: [UUID: AgentHookEvent] = [:]
     private var announcementWork: DispatchWorkItem?
     private var subscriptions = Set<AnyCancellable>()
@@ -122,6 +151,10 @@ final class AgentHub: ObservableObject {
                 if change.newValue { self?.startBridge() } else { self?.stopBridge() }
             }
             .store(in: &subscriptions)
+        // Keep the installed notchflow command current with this version of the app.
+        if FileManager.default.fileExists(atPath: AgentSetup.commandURL.path), !AgentSetup.isCommandCurrent {
+            try? AgentSetup.installCommand()
+        }
         // Sessions that went quiet (terminal closed without SessionEnd) are dropped.
         Timer.publish(every: 300, on: .main, in: .common).autoconnect()
             .sink { [weak self] _ in self?.pruneStaleSessions() }
@@ -157,6 +190,7 @@ final class AgentHub: ObservableObject {
         isBridgeRunning = false
         try? FileManager.default.removeItem(at: Self.bridgeFileURL)
         for id in Array(waiters.keys) { finish(id, with: .inWindow) }
+        for id in Array(replyWaiters.keys) { cancelReply(for: id) }
     }
 
     private static func writeBridgeFile(port: UInt16, token: String) throws {
@@ -174,9 +208,23 @@ final class AgentHub: ObservableObject {
         switch (request.method, request.path) {
         case ("GET", "/v1/health"):
             return .text("NotchFlow is running and listening for agents.\n")
-        case ("POST", "/v1/hook/claude-code"), ("POST", "/v1/hook/claude-code/status"):
-            guard let event = AgentHookEvent.parse(request.body) else { return .empty }
-            return await handleClaudeCode(event, app: app, waits: !request.path.hasSuffix("/status"))
+        case ("POST", let path) where path.hasPrefix("/v1/hook/"):
+            let parts = path.dropFirst("/v1/hook/".count).split(separator: "/").map(String.init)
+            guard let agent = parts.first.flatMap(AgentKind.init(rawValue:)), agent != .script else { return .empty }
+            let mode = parts.count > 1 ? parts[1] : "waits"
+            guard Defaults[.enableAgentsFeature] else { return .empty }
+            switch agent {
+            case .cursor:
+                guard let event = AgentHookPolicy.cursorEvent(from: request.body) else { return .empty }
+                return await handleCursor(event, app: app, waits: mode == "waits")
+            case .gemini:
+                guard let event = AgentHookEvent.parse(request.body) else { return .empty }
+                return handleGemini(event, app: app)
+            default:
+                guard let event = AgentHookEvent.parse(request.body) else { return .empty }
+                if mode == "reply" { return await waitForReply(event) }
+                return await handleClaudeStyle(event, agent: agent, app: app, waits: mode == "waits")
+            }
         case ("POST", "/v1/ask"):
             let fields = AgentBridgeServer.formFields(request.body)
             let options = (fields["options"] ?? "Yes,No").split(separator: ",")
@@ -196,21 +244,33 @@ final class AgentHub: ObservableObject {
         }
     }
 
-    /// `waits` is false for background (status) hooks: they update the status
-    /// and never open an approval or a question.
-    private func handleClaudeCode(_ event: AgentHookEvent, app: String?, waits: Bool) async -> AgentBridgeServer.Response {
+    private func trackedSession(for event: AgentHookEvent, agent: AgentKind, app: String?) -> AgentSession {
         var session = sessions.first { $0.id == event.sessionID }
-            ?? AgentSession(id: event.sessionID, agent: .claudeCode, project: event.projectName, cwd: event.cwd,
+            ?? AgentSession(id: event.sessionID, agent: agent, project: event.projectName, cwd: event.cwd,
                             appBundleID: app, state: .ready, updatedAt: Date())
-        if !event.cwd.isEmpty { session.cwd = event.cwd; session.project = event.projectName }
+        if !event.cwd.isEmpty {
+            session.cwd = event.cwd
+            session.project = event.projectName
+            rememberProject(event.cwd)
+        }
         if let app { session.appBundleID = app }
         session.updatedAt = Date()
+        return session
+    }
+
+    /// Claude Code and Codex share hook events and answers. `waits` is false
+    /// for background (status) hooks: they update the status and never open an
+    /// approval or a question.
+    private func handleClaudeStyle(_ event: AgentHookEvent, agent: AgentKind, app: String?, waits: Bool) async -> AgentBridgeServer.Response {
+        var session = trackedSession(for: event, agent: agent, app: app)
 
         switch event.name {
         case "SessionStart":
+            cancelReply(for: session.id)
             session.state = .ready
         case "UserPromptSubmit":
             finishPending(for: session.id)
+            cancelReply(for: session.id)
             session.lastPrompt = event.message
             session.turnStartedAt = Date()
             session.state = .working("Thinking")
@@ -226,7 +286,7 @@ final class AgentHub: ObservableObject {
                 }
                 session.state = .waiting("Has a question for you")
                 upsert(session)
-                let request = AgentRequest(sessionID: session.id, agent: .claudeCode, project: session.project,
+                let request = AgentRequest(sessionID: session.id, agent: agent, project: session.project,
                                            appBundleID: session.appBundleID, kind: .question(questions))
                 let decision = await wait(for: request)
                 updateState(of: session.id, to: .working("Continuing"))
@@ -250,7 +310,7 @@ final class AgentHub: ObservableObject {
             }
             session.state = .waiting(title)
             upsert(session)
-            let request = AgentRequest(sessionID: session.id, agent: .claudeCode, project: session.project,
+            let request = AgentRequest(sessionID: session.id, agent: agent, project: session.project,
                                        appBundleID: session.appBundleID,
                                        kind: .permission(title: title, detail: detail, risk: risk,
                                                          canAlwaysAllow: risk != .danger && !event.permissionSuggestions.isEmpty))
@@ -282,13 +342,14 @@ final class AgentHub: ObservableObject {
             }
         case "Stop":
             finishPending(for: session.id)
-            let summary = AgentHookPolicy.summary(of: event.message)
+            let summary = AgentHookPolicy.summary(of: event.response)
             session.state = .done(summary.isEmpty ? "Finished" : summary)
             upsert(session)
             announce(session)
             return .empty
         case "SessionEnd":
             finishPending(for: session.id)
+            cancelReply(for: session.id)
             sessions.removeAll { $0.id == session.id }
             return .empty
         default:
@@ -296,6 +357,158 @@ final class AgentHub: ObservableObject {
         }
         upsert(session)
         return .empty
+    }
+
+    // MARK: Gemini CLI (status only)
+
+    private func handleGemini(_ event: AgentHookEvent, app: String?) -> AgentBridgeServer.Response {
+        var session = trackedSession(for: event, agent: .gemini, app: app)
+        switch event.name {
+        case "SessionStart":
+            session.state = .ready
+        case "BeforeAgent":
+            session.lastPrompt = event.message
+            session.turnStartedAt = Date()
+            session.state = .working("Thinking")
+        case "BeforeTool":
+            session.state = .working(AgentHookPolicy.activity(tool: event.toolName ?? "", input: event.toolInput))
+        case "Notification":
+            // ToolPermission: Gemini is asking in its terminal.
+            session.state = .waiting(event.message ?? "Needs your permission")
+        case "AfterAgent":
+            let summary = AgentHookPolicy.summary(of: event.response)
+            session.state = .done(summary.isEmpty ? "Finished" : summary)
+            upsert(session)
+            announce(session)
+            return .empty
+        case "SessionEnd":
+            sessions.removeAll { $0.id == session.id }
+            return .empty
+        default:
+            break
+        }
+        upsert(session)
+        return .empty
+    }
+
+    // MARK: Cursor
+
+    private func handleCursor(_ event: AgentHookEvent, app: String?, waits: Bool) async -> AgentBridgeServer.Response {
+        var session = trackedSession(for: event, agent: .cursor, app: app)
+        switch event.name {
+        case "beforeShellExecution", "beforeMCPExecution":
+            let tool = event.toolName ?? ""
+            let (title, detail) = AgentHookPolicy.describe(tool: tool, input: event.toolInput)
+            let risk = AgentHookPolicy.risk(tool: tool, input: event.toolInput)
+            // Ordinary commands follow Cursor's own rules; only risky ones and MCP tools come to the notch.
+            guard waits, risk != .normal, !skipNotch(for: session) else {
+                session.state = .working(AgentHookPolicy.activity(tool: tool, input: event.toolInput))
+                upsert(session)
+                return .empty
+            }
+            session.state = .waiting(title)
+            upsert(session)
+            let request = AgentRequest(sessionID: session.id, agent: .cursor, project: session.project,
+                                       appBundleID: session.appBundleID,
+                                       kind: .permission(title: title, detail: detail, risk: risk, canAlwaysAllow: false))
+            switch await wait(for: request) {
+            case .allow, .allowAlways:
+                updateState(of: session.id, to: .working("Continuing"))
+                return .json(AgentHookPolicy.cursorAnswer(.allow))
+            case .deny(let message):
+                updateState(of: session.id, to: .working("Changing course"))
+                return .json(AgentHookPolicy.cursorAnswer(.deny, userMessage: "Declined in NotchFlow", agentMessage: message))
+            default:
+                updateState(of: session.id, to: .waiting("Asking in Cursor: \(title)"))
+                return .json(AgentHookPolicy.cursorAnswer(.ask))
+            }
+        case "beforeSubmitPrompt":
+            session.lastPrompt = event.message
+            session.turnStartedAt = Date()
+            session.state = .working("Thinking")
+            upsert(session)
+            return .json(AgentHookPolicy.json(["continue": true]))
+        case "afterFileEdit":
+            session.state = .working(AgentHookPolicy.activity(tool: "Edit", input: event.toolInput))
+        case "stop":
+            finishPending(for: session.id)
+            let status = event.detail ?? "completed"
+            session.state = .done(status == "completed" ? "Finished" : status.capitalized)
+            upsert(session)
+            announce(session)
+            return .empty
+        default:
+            break
+        }
+        upsert(session)
+        return .empty
+    }
+
+    // MARK: Replying from the notch (Claude Code)
+
+    /// The reply hook runs in the background after each Claude Code turn and
+    /// waits here; a reply typed in the notch wakes Claude with it.
+    private func waitForReply(_ event: AgentHookEvent) async -> AgentBridgeServer.Response {
+        guard event.name == "Stop" else { return AgentBridgeServer.Response(status: 204) }
+        let id = event.sessionID
+        cancelReply(for: id)
+        replyableSessionIDs.insert(id)
+        let reply: String? = await withCheckedContinuation { continuation in
+            replyWaiters[id] = continuation
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(nanoseconds: 30 * 60 * 1_000_000_000)
+                self?.cancelReply(for: id)
+            }
+        }
+        guard let reply else { return AgentBridgeServer.Response(status: 204) }
+        return .text(AgentHookPolicy.replyMessage(reply))
+    }
+
+    func canReply(to session: AgentSession) -> Bool { replyableSessionIDs.contains(session.id) }
+
+    /// Sends a reply typed in the notch to a Claude Code session that finished its turn.
+    func reply(to session: AgentSession, text: String) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, let continuation = replyWaiters.removeValue(forKey: session.id) else { return }
+        replyableSessionIDs.remove(session.id)
+        if let index = sessions.firstIndex(where: { $0.id == session.id }) {
+            sessions[index].lastPrompt = trimmed
+            sessions[index].turnStartedAt = Date()
+            sessions[index].state = .working("Thinking")
+        }
+        continuation.resume(returning: trimmed)
+    }
+
+    private func cancelReply(for sessionID: String) {
+        replyableSessionIDs.remove(sessionID)
+        replyWaiters.removeValue(forKey: sessionID)?.resume(returning: nil)
+    }
+
+    // MARK: Starting a task in a terminal
+
+    func startTask(agent: AgentHookPolicy.LaunchAgent, prompt: String, directory: String) {
+        launchError = nil
+        Defaults[.agentLaunchAgent] = agent.rawValue
+        if !directory.isEmpty { rememberProject(directory) }
+        let terminal = AgentHookPolicy.TerminalApp(rawValue: Defaults[.agentTerminalApp]) ?? .terminal
+        let command = AgentHookPolicy.launchCommand(agent: agent, prompt: prompt, directory: directory)
+        let script = AgentHookPolicy.appleScript(running: command, in: terminal)
+        Task { @MainActor in
+            do {
+                try await AppleScriptHelper.executeVoid(script)
+            } catch {
+                launchError = "Could not open \(terminal.rawValue): \(error.localizedDescription). Allow NotchFlow to control it in System Settings > Privacy & Security > Automation."
+            }
+        }
+    }
+
+    var recentProjects: [String] { Defaults[.agentRecentProjects] }
+
+    func rememberProject(_ path: String) {
+        guard !path.isEmpty else { return }
+        var list = Defaults[.agentRecentProjects].filter { $0 != path }
+        list.insert(path, at: 0)
+        Defaults[.agentRecentProjects] = Array(list.prefix(8))
     }
 
     /// Let the agent ask in its own window when that window is in front of you.
@@ -401,4 +614,9 @@ final class AgentHub: ObservableObject {
 
     var waitingCount: Int { requests.count }
     var workingSessions: [AgentSession] { sessions.filter(\.isWorking) }
+    /// Sessions asking in their own window (no request in the notch).
+    var waitingInWindowSessions: [AgentSession] {
+        let withRequests = Set(requests.compactMap(\.sessionID))
+        return sessions.filter { $0.isWaiting && !withRequests.contains($0.id) }
+    }
 }
