@@ -95,6 +95,14 @@ printf '\nChecking native hosting and communications...\n'
 /usr/bin/xcrun swiftc -swift-version 5 -parse-as-library "$SOURCE_DIR/DynamicIsland/Communications/CommunicationModels.swift" "$SOURCE_DIR/DynamicIsland/Communications/NotificationCardPolicy.swift" "$SOURCE_DIR/tests/NotificationCardRegression.swift" -o "$BUILD_ROOT/NotificationCardRegression"
 "$BUILD_ROOT/NotificationCardRegression"
 
+printf '\nChecking WhatsApp message parsing...\n'
+/usr/bin/xcrun swiftc -swift-version 5 -parse-as-library \
+    "$SOURCE_DIR/DynamicIsland/managers/WhatsApp/WhatsAppModels.swift" \
+    "$SOURCE_DIR/DynamicIsland/managers/WhatsApp/WhatsAppGatewayClient.swift" \
+    "$SOURCE_DIR/DynamicIsland/managers/WhatsApp/WhatsAppGatewayInstaller.swift" \
+    "$SOURCE_DIR/tests/WhatsAppRegression.swift" -o "$BUILD_ROOT/WhatsAppRegression"
+"$BUILD_ROOT/WhatsAppRegression"
+
 /usr/bin/xcodebuild -resolvePackageDependencies \
     -project "$SOURCE_DIR/DynamicIsland.xcodeproj" -scheme DynamicIsland \
     -clonedSourcePackagesDirPath "$BUILD_ROOT/Packages" \

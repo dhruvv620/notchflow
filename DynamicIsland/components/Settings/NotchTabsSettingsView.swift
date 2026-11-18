@@ -129,7 +129,10 @@ struct NotchTabsSettingsView: View {
                     }
                     featureToggle("Calendar", symbol: "calendar", key: .showCalendar, destination: "calendar")
                     }
+                    Group {
                     featureToggle("Communications", symbol: "bell.badge", key: .communicationsEnabled, destination: "communications")
+                    featureToggle("WhatsApp", symbol: "message.fill", key: .enableWhatsAppFeature, destination: "whatsapp")
+                    }
                     featureToggle("Todos", symbol: "checklist", key: .enableRemindersFeature, destination: "calendar")
                     featureToggle("Clipboard", symbol: "doc.on.clipboard", key: .enableClipboardManager, destination: "clipboard")
                     featureToggle("Cuely", symbol: "text.quote", key: .enableCuelyFeature, destination: "tabsAndFeatures")

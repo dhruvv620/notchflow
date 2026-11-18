@@ -15,7 +15,7 @@ extension Notification.Name {
 }
 
 enum NotchBuiltinTab: String, CaseIterable, Identifiable {
-    case music, shelf, timers, stats, usage, notes, clipboard, cuely, todos, notifications, calendar, terminal
+    case music, shelf, timers, stats, usage, notes, clipboard, cuely, todos, notifications, whatsapp, calendar, terminal
     var id: String { rawValue }
     var title: String {
         switch self {
@@ -29,6 +29,7 @@ enum NotchBuiltinTab: String, CaseIterable, Identifiable {
         case .cuely: return "Cuely"
         case .todos: return "Todos"
         case .notifications: return "Notifications"
+        case .whatsapp: return "WhatsApp"
         case .calendar: return "Calendar"
         case .terminal: return "Terminal"
         }
@@ -45,6 +46,7 @@ enum NotchBuiltinTab: String, CaseIterable, Identifiable {
         case .cuely: return "text.quote"
         case .todos: return "checklist"
         case .notifications: return "bell.badge"
+        case .whatsapp: return "message.fill"
         case .calendar: return "calendar"
         case .terminal: return "apple.terminal"
         }
@@ -61,6 +63,7 @@ enum NotchBuiltinTab: String, CaseIterable, Identifiable {
         case .cuely: return .cuely
         case .todos: return .reminders
         case .notifications: return .notifications
+        case .whatsapp: return .whatsapp
         case .calendar: return .calendar
         case .terminal: return .terminal
         }
@@ -80,6 +83,7 @@ enum NotchBuiltinTab: String, CaseIterable, Identifiable {
         case .cuely: return Defaults[.enableCuelyFeature]
         case .todos: return Defaults[.enableRemindersFeature]
         case .notifications: return Defaults[.communicationsEnabled]
+        case .whatsapp: return Defaults[.enableWhatsAppFeature]
         case .calendar: return Defaults[.showCalendar]
         case .terminal: return Defaults[.enableTerminalFeature]
         }
@@ -96,6 +100,7 @@ enum NotchBuiltinTab: String, CaseIterable, Identifiable {
         case .cuely: return "tabsAndFeatures"
         case .todos: return "calendar"
         case .notifications: return "communications"
+        case .whatsapp: return "whatsapp"
         case .calendar: return "calendar"
         case .terminal: return "terminal"
         }
@@ -140,6 +145,7 @@ final class NotchTabPreferences: ObservableObject {
         changes.append(Defaults.publisher(.enableExtensionNotchExperiences, options: []).map { _ in true }.eraseToAnyPublisher())
         changes.append(Defaults.publisher(.enableExtensionNotchTabs, options: []).map { _ in true }.eraseToAnyPublisher())
         changes.append(Defaults.publisher(.communicationsEnabled, options: []).map { _ in true }.eraseToAnyPublisher())
+        changes.append(Defaults.publisher(.enableWhatsAppFeature, options: []).map { _ in true }.eraseToAnyPublisher())
         Publishers.MergeMany(changes)
             .receive(on: RunLoop.main).sink { [weak self] _ in
             self?.revision += 1

@@ -84,6 +84,7 @@ public enum NotchViews {
     case reminders
     case notifications
     case calendar
+    case whatsapp
     case extensionExperience
 }
 

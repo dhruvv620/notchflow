@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **WhatsApp in the notch (experimental)**: a WhatsApp tab lists recent chats with unread counts, opens a conversation beside the list, and sends replies without leaving the notch. New messages are announced in the closed notch; opening the notch while one shows goes straight to that chat. Link once from Settings > WhatsApp by scanning a QR code with your phone (WhatsApp > Settings > Linked devices). It runs through [GOWA](https://github.com/aldinokemal/go-whatsapp-web-multidevice), an open-source WhatsApp multi-device gateway that NotchFlow downloads on request (checked against the release's published SHA-256), runs on 127.0.0.1 only behind a per-launch password, and stops when NotchFlow quits. New messages arrive at once through a signed local webhook. Groups can stay quiet unless you are mentioned, announcements can pause during a Focus, chats can be ignored, and read receipts are sent only when you open a conversation (or, with that off, only when you reply). Unofficial and off by default; enable it under Tabs & Features.
 
 ### Changed
 

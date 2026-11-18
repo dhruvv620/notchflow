@@ -268,6 +268,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Restore Lunar's native OSD if integration was active
         LunarManager.shared.appWillTerminate()
+
+        // Stop the WhatsApp gateway child process so it does not outlive NotchFlow.
+        WhatsAppManager.shared.applicationWillTerminate()
     }
     
     @objc func onScreenLocked(_: Notification) {
@@ -564,7 +567,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         } else if coordinator.currentView == .notes {
             let preferredHeight = coordinator.notesLayoutState.preferredHeight
             baseSize.height = min(max(baseSize.height, preferredHeight), baseSize.height + 40)
-        } else if coordinator.currentView == .terminal {
+        } else if coordinator.currentView == .terminal || coordinator.currentView == .whatsapp {
             baseSize.height += 40
         }
         
@@ -800,6 +803,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }.store(in: &cancellables)
 
         MemoryUsageMonitor.shared.startMonitoring()
+
+        WhatsAppManager.shared.start()
 
         ReminderLiveActivityManager.shared.$activeWindowReminders
             .receive(on: RunLoop.main)

@@ -46,6 +46,7 @@ struct TabModel: Identifiable {
 struct TabSelectionView: View {
     @ObservedObject private var preferences = NotchTabPreferences.shared
     @ObservedObject private var appearance = NotchAppearanceModel.shared
+    @ObservedObject private var whatsApp = WhatsAppManager.shared
     @ObservedObject var coordinator = DynamicIslandViewCoordinator.shared
     @ObservedObject private var extensionNotchExperienceManager = ExtensionNotchExperienceManager.shared
     @StateObject private var quickShareService = QuickShareService.shared
@@ -108,6 +109,9 @@ struct TabSelectionView: View {
         }
         if Defaults[.communicationsEnabled] {
             tabsArray.append(TabModel(label: "Notifications", icon: "bell.badge", view: .notifications))
+        }
+        if Defaults[.enableWhatsAppFeature] {
+            tabsArray.append(TabModel(label: "WhatsApp", icon: "message.fill", view: .whatsapp))
         }
         if Defaults[.showCalendar] {
             tabsArray.append(TabModel(label: "Calendar", icon: "calendar", view: .calendar))
@@ -183,6 +187,15 @@ struct TabSelectionView: View {
                                 .contentShape(Capsule())
                         }
                         .buttonStyle(.plain)
+                        .overlay(alignment: .topTrailing) {
+                            if tab.view == .whatsapp && whatsApp.totalUnread > 0 {
+                                Circle()
+                                    .fill(Color.whatsAppGreen)
+                                    .frame(width: 7, height: 7)
+                                    .offset(x: -3, y: 4)
+                                    .allowsHitTesting(false)
+                            }
+                        }
                         .background {
                             if selected {
                                 Capsule().fill(Color.white.opacity(0.10))

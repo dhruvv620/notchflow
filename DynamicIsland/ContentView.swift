@@ -60,6 +60,7 @@ struct ContentView: View {
     @ObservedObject var localSendService = LocalSendService.shared
     @State private var downloadManager = DownloadManager.shared
     @ObservedObject var shelfState = ShelfStateViewModel.shared
+    @ObservedObject var whatsAppManager = WhatsAppManager.shared
     
     @Default(.enableStatsFeature) var enableStatsFeature
     @Default(.showCpuGraph) var showCpuGraph
@@ -176,7 +177,7 @@ struct ContentView: View {
             return CGSize(width: baseSize.width, height: resolvedHeight)
         }
 
-        if coordinator.currentView == .terminal {
+        if coordinator.currentView == .terminal || coordinator.currentView == .whatsapp {
             let terminalHeight = baseSize.height + 40
             return CGSize(width: baseSize.width, height: terminalHeight)
         }
@@ -331,12 +332,26 @@ struct ContentView: View {
     /// measured closed bounds. Include hover growth and the temporary battery
     /// HUD's real dimensions rather than treating every closed surface as the
     /// physical camera cutout.
+    private var isWhatsAppBannerVisible: Bool {
+        whatsAppManager.banner != nil
+            && vm.notchState == .closed
+            && !vm.hideOnClosed
+            && !lockScreenManager.isLocked
+            && !isCurrentScreenExpansionVisible
+    }
+
     private var closedInputFallbackSize: CGSize {
         let hoverGrowth: CGFloat = isHovering ? 8 : 0
         let baseHeight = vm.effectiveClosedNotchHeight
         let closedPadding = activeCornerRadiusInsets.closed.bottom * 2
         var width = vm.closedNotchSize.width + baseHeight * 2 + closedPadding
         var height = baseHeight + hoverGrowth
+
+        if isWhatsAppBannerVisible {
+            // The announcement adds a line of text under the notch; keep it clickable.
+            width = max(width, vm.closedNotchSize.width + baseHeight * 2 + 20 + closedPadding)
+            height += WhatsAppMessageLiveActivity.messageLineHeight
+        }
 
         if isBatteryHUDVisibleOnCurrentScreen, let kind = batteryModel.activeTemporaryHUDKind {
             let batteryWidth = vm.closedNotchSize.width + hoverGrowth
@@ -835,6 +850,14 @@ struct ContentView: View {
                 syncStickyTerminalOutsideClickMonitor()
             }
             .onChange(of: vm.notchState) { _, state in
+                // Opening the notch while a WhatsApp message is announced goes
+                // straight to that conversation, like tapping a notification.
+                if state == .open, let banner = whatsAppManager.banner, !enableMinimalisticUI,
+                   Defaults[.enableWhatsAppFeature] {
+                    coordinator.currentView = .whatsapp
+                    whatsAppManager.openChat(banner.chatJID)
+                    whatsAppManager.dismissBanner()
+                }
                 if state == .open {
                     suppressMusicControlWindowUpdates()
                     cancelMusicControlWindowSync()
@@ -1019,6 +1042,15 @@ struct ContentView: View {
                       } else if vm.notchState == .closed && capsLockManager.isCapsLockActive && Defaults[.enableCapsLockIndicator] && !vm.hideOnClosed && !lockScreenManager.isLocked {
                           InlineHUD(type: .constant(.capsLock), value: .constant(1.0), icon: .constant(""), hoverAnimation: $isHovering, gestureProgress: $gestureProgress)
                               .transition(AnyTransition.move(edge: .trailing).combined(with: .opacity))
+                      } else if isWhatsAppBannerVisible, let banner = whatsAppManager.banner {
+                          WhatsAppMessageLiveActivity(banner: banner, isHovering: isHovering) {
+                              coordinator.currentView = .whatsapp
+                              whatsAppManager.openChat(banner.chatJID)
+                              whatsAppManager.dismissBanner()
+                              vm.open()
+                          }
+                          .id("whatsapp-\(banner.id)")
+                          .transition(.opacity.animation(.smooth(duration: 0.25)))
                       } else if canShowMusicDuringExpansion && musicPairingEligible {
                           MusicLiveActivity(secondary: musicSecondary)
                               .id("closed-music-live-activity")
@@ -1223,6 +1255,7 @@ struct ContentView: View {
         case .clipboard: CompactClipboardView()
         case .cuely: NotchCuelyView()
         case .terminal: NotchTerminalView()
+        case .whatsapp: NotchWhatsAppView()
         case .extensionExperience:
             if let payload = currentExtensionTabPayload() {
                 NotchScrollableContent { ExtensionNotchExperienceTabView(payload: payload) }

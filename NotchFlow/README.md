@@ -161,3 +161,14 @@ The prior window-layout crash is addressed by explicitly disabling NSHostingView
 Validation includes synthetic notification parsing, source/action filtering, call classification, ring priority, bounded history/stale actions and a native animated-hosting regression. These tests do not send real messages or place calls. Before relying on the prototype, verify on your Mac: grant/deny/revoke Accessibility; Messages/WhatsApp visible banners and a deliberate test reply; FaceTime/Continuity answer/decline; Teams/Zoom join/mute/leave plus native confirmation; minimized/background windows; call end/missed call and two simultaneous sources; previews off, Focus/lock, sleep/wake; composition preempted by a call; and repeated opening/closing without a blocked background area or layout crash.
 
 API references: [AXUIElement](https://developer.apple.com/documentation/applicationservices/axuielement), [User notification scope](https://developer.apple.com/documentation/usernotifications/unusernotificationcenter), [Call observer platform availability](https://developer.apple.com/documentation/callkit/cxcallobserver).
+
+## WhatsApp (experimental)
+
+Turn on **WhatsApp** in **Settings > Tabs & Features**, then open **Settings > WhatsApp**:
+
+1. Click **Install**. NotchFlow downloads the GOWA gateway (about 30 MB) from its GitHub release and verifies it against the published SHA-256 before installing it.
+2. Click **Show QR Code** and scan it from your phone: WhatsApp > Settings > Linked devices > Link a device. The Mac appears there as "NotchFlow".
+
+The WhatsApp tab then shows your recent chats with unread counts; click one to read it and reply. New messages are announced under the closed notch; click the announcement or open the notch to jump to that chat. Right-click a chat to mark it read or ignore it.
+
+GOWA runs as a child process of NotchFlow, listens on 127.0.0.1 only, uses a password generated at each launch, and stops when NotchFlow quits. Its session, database and log live in `~/Library/Application Support/NotchFlow/WhatsAppGateway`. Unread counts are NotchFlow's own: messages from before you linked never count, and a chat clears when you read it in NotchFlow, read it on your phone, or reply. Text replies only for now; photos, voice notes and documents show as labels. This is an unofficial integration; use it with your own account.

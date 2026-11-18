@@ -381,7 +381,7 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
             return adjustedSize
         }
 
-        if coordinator.currentView == .terminal {
+        if coordinator.currentView == .terminal || coordinator.currentView == .whatsapp {
             adjustedSize.height = baseSize.height + 40
             return adjustedSize
         }
