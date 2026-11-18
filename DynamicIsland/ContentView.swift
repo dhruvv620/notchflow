@@ -1083,6 +1083,7 @@ struct ContentView: View {
                       } else if vm.notchState == .open {
                           DynamicIslandHeader()
                               .frame(height: expandedHeaderHeight)
+                              .transition(.notchMorph)
                        } else {
                            Rectangle().fill(.clear).frame(width: vm.closedNotchSize.width - 20, height: vm.effectiveClosedNotchHeight)
                        }
@@ -1204,6 +1205,8 @@ struct ContentView: View {
                   .frame(height: max(0, dynamicNotchSize.height - expandedHeaderHeight - 8))
                   .zIndex(1)
                   .animation(.smooth(duration: 0.28), value: coordinator.currentView)
+                  // Unfold out of the notch with the shape, not after it.
+                  .transition(.notchMorph)
               }
           }
       }
