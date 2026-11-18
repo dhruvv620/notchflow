@@ -146,6 +146,9 @@ private struct WhatsAppChatListColumn: View {
                                 Button("Mark as Read") {
                                     Task { await manager.markChatRead(chat.id) }
                                 }
+                                Button("Add to Todos") {
+                                    Task { await RemindersManager.shared.capture(TodoCapturePolicy.followUpTitle(sender: chat.displayName, body: chat.preview ?? "")) }
+                                }
                                 Button("Ignore This Chat") {
                                     manager.setIgnored(true, chatID: chat.id)
                                 }

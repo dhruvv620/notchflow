@@ -23,6 +23,7 @@ struct NotchRemindersView: View {
     @State private var keepDateAsText = false
     @State private var interactionToken = UUID()
     @FocusState private var titleFocused: Bool
+    @State private var isDropTargeted = false
 
     private var scopedReminders: [ReminderItem] {
         manager.reminders.filter { manager.selectedListID == nil || $0.listID == manager.selectedListID }
@@ -58,6 +59,26 @@ struct NotchRemindersView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 5)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        // Drop text, a link, a file or an email here to make it a todo.
+        .onDrop(of: [.plainText, .utf8PlainText, .url, .fileURL], isTargeted: $isDropTargeted) { providers in
+            manager.captureDropped(providers)
+        }
+        .overlay {
+            if isDropTargeted {
+                RoundedRectangle(cornerRadius: NotchTokens.Radius.card)
+                    .strokeBorder(appearance.accentColor, style: StrokeStyle(lineWidth: 2, dash: [6]))
+                    .background(appearance.accentColor.opacity(0.08), in: RoundedRectangle(cornerRadius: NotchTokens.Radius.card))
+                    .overlay {
+                        Label("Drop to add a todo", systemImage: "plus.circle.fill")
+                            .font(NotchTokens.Typography.headline)
+                            .foregroundStyle(appearance.accentColor)
+                    }
+                    .padding(4)
+                    .allowsHitTesting(false)
+                    .transition(.opacity)
+            }
+        }
+        .animation(NotchTokens.Motion.hover, value: isDropTargeted)
         .environment(\.colorScheme, .dark)
         .task {
             manager.showCompleted = showingDone

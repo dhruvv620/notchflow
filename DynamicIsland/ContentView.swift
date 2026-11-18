@@ -63,6 +63,8 @@ struct ContentView: View {
     @ObservedObject var shelfState = ShelfStateViewModel.shared
     @ObservedObject var whatsAppManager = WhatsAppManager.shared
     @ObservedObject var meetingManager = MeetingManager.shared
+    @ObservedObject var remindersManager = RemindersManager.shared
+    @Default(.showTodayProgressRing) var showTodayProgressRing
     
     @Default(.enableStatsFeature) var enableStatsFeature
     @Default(.showCpuGraph) var showCpuGraph
@@ -322,6 +324,19 @@ struct ContentView: View {
     /// measured closed bounds. Include hover growth and the temporary battery
     /// HUD's real dimensions rather than treating every closed surface as the
     /// physical camera cutout.
+    /// The todo ring fills an otherwise idle closed notch.
+    private var isTodayRingVisible: Bool {
+        showTodayProgressRing
+            && Defaults[.enableRemindersFeature]
+            && remindersManager.access == .authorized
+            && remindersManager.todayProgress.total > 0
+            && vm.notchState == .closed
+            && !vm.hideOnClosed
+            && !lockScreenManager.isLocked
+            && !isCurrentScreenExpansionVisible
+            && !musicManager.isPlaying
+    }
+
     private var isMeetingActivityVisible: Bool {
         meetingManager.showsCountdown
             && vm.notchState == .closed
@@ -1105,6 +1120,9 @@ struct ContentView: View {
                           ShelfInlineLiveActivity()
                               .transition(.opacity.animation(.smooth(duration: 0.25)))
                       } else if !coordinator.expandingView.show && vm.notchState == .closed && (!musicManager.isPlaying && musicManager.isPlayerIdle) && Defaults[.showNotHumanFace] && !vm.hideOnClosed  {
+                      } else if isTodayRingVisible {
+                          TodayProgressActivity(isHovering: isHovering)
+                              .transition(.opacity.animation(.smooth(duration: 0.25)))
                       } else if !isCurrentScreenExpansionVisible && vm.notchState == .closed && (!musicManager.isPlaying && musicManager.isPlayerIdle) && Defaults[.showNotHumanFace] && !vm.hideOnClosed  {
                           DynamicIslandFaceAnimation().animation(.interactiveSpring, value: musicManager.isPlayerIdle)
                       } else if vm.notchState == .open {

@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Todos from anywhere and today's progress**: drop text, a link, a file or an email address on the Todos tab to add it as a todo (a trailing date such as "tomorrow 7 pm" is read like in the Add form), or choose Add to Todos on a notification or a WhatsApp chat ("Reply to Selene: …"). When the closed notch is otherwise idle and todos are due today, it shows a progress ring with done/total (overdue todos count as due); off with Settings > Calendar > Show today's progress.
 - **Shelf quick actions**: selecting files on the Shelf shows an action bar: Resize (half size, fit 2048 px or 1080 px), PDF, Cut Out (remove background), Zip, AirDrop, and WhatsApp, which sends the files to one of your recent chats through the linked account (images as photos, other files as documents). Results land back on the Shelf.
 
 ### Fixed

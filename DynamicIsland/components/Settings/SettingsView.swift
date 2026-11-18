@@ -3269,6 +3269,14 @@ struct CalendarSettings: View {
                 Text("View and create reminders in your Apple Reminders lists from the notch. This is separate from the upcoming-reminder live activity.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                Defaults.Toggle(key: .showTodayProgressRing) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Show today's progress in the closed notch")
+                        Text("A ring of todos done against those due today, when nothing else is showing. Drop text, links or files on the Todos tab to add todos.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
 
             if !calendarManager.hasCalendarAccess || !calendarManager.hasReminderAccess {

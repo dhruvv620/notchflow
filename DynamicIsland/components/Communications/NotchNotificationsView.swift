@@ -433,6 +433,9 @@ private struct NotificationCard: View {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString([item.title, item.subtitle, item.body].filter { !$0.isEmpty }.joined(separator: "\n"), forType: .string)
         }
+        Button("Add to Todos") {
+            Task { await RemindersManager.shared.capture(TodoCapturePolicy.followUpTitle(sender: item.headline, body: item.body)) }
+        }
         Divider()
         Button("Dismiss") { withAnimation(.snappy) { hub.dismiss(item) } }
         if item.bundleIdentifier != nil {
