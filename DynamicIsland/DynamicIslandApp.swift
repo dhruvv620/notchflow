@@ -1076,12 +1076,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             adjustWindowPosition(changeAlpha: true)
         }
         
-        // Skip onboarding window and welcome sound under UI testing.
+        // Skip onboarding under UI testing. Its first page writes "hello" with its own chime.
         if coordinator.firstLaunch && !AppRuntimeEnvironment.isUITesting {
             DispatchQueue.main.async {
                 self.showOnboardingWindow()
             }
-            playWelcomeSound()
         }
         
         previousScreens = NSScreen.screens
@@ -1480,11 +1479,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             KeyboardShortcuts.disable(name)
         }
-    }
-    
-    func playWelcomeSound() {
-        let audioPlayer = AudioPlayer()
-        audioPlayer.play(fileName: "dynamic", fileExtension: "m4a")
     }
     
     func deviceHasNotch() -> Bool {

@@ -67,6 +67,12 @@ printf '\nChecking Cuely voice following...\n'
     "$SOURCE_DIR/tests/CuelyVoiceFollowRegression.swift" -o "$BUILD_ROOT/CuelyVoiceFollowRegression"
 "$BUILD_ROOT/CuelyVoiceFollowRegression"
 
+printf '\nChecking the welcome chime...\n'
+/usr/bin/xcrun swiftc -swift-version 5 -parse-as-library \
+    "$SOURCE_DIR/DynamicIsland/helpers/WelcomeChimePolicy.swift" \
+    "$SOURCE_DIR/tests/WelcomeChimeRegression.swift" -o "$BUILD_ROOT/WelcomeChimeRegression"
+"$BUILD_ROOT/WelcomeChimeRegression"
+
 printf '\nChecking timer modes, tab ordering and visible input regions...\n'
 /usr/bin/xcrun swiftc -swift-version 5 -parse-as-library \
     "$SOURCE_DIR/DynamicIsland/helpers/TimerModeLifecycle.swift" \

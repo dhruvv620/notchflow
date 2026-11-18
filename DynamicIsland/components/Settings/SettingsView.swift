@@ -3507,6 +3507,10 @@ struct About: View {
                     Text("Version info")
                 }
 
+                Section {
+                    Button("Say hello again") { HelloWindowController.shared.show() }
+                }
+
                 HStack(spacing: 30) {
                     Spacer(minLength: 0)
                     Button {

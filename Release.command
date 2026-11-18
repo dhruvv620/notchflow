@@ -53,6 +53,12 @@ cd "$SOURCE_DIR"
 BRANCH="$(git rev-parse --abbrev-ref HEAD)"
 [ "$BRANCH" != HEAD ] || fail "Check out a branch first."
 git fetch --tags origin >/dev/null 2>&1 || true
+# Release from the latest pushed code, so the commits made below never leave
+# your branch out of step with GitHub.
+if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
+    git pull -q --ff-only origin "$BRANCH" || fail "Your $BRANCH has commits GitHub doesn't have (or the other way round).
+To match GitHub exactly:  git fetch origin && git reset --hard origin/$BRANCH"
+fi
 
 # --- Version --------------------------------------------------------------------
 
@@ -67,8 +73,13 @@ else
     fi
 fi
 [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "Use a version like 2.5.0 (got '$VERSION')."
-if git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null || gh release view "v$VERSION" --repo "$REPO" >/dev/null 2>&1; then
+if gh release view "v$VERSION" --repo "$REPO" >/dev/null 2>&1; then
     fail "v$VERSION is already released. Pass a newer version, e.g.  bash Release.command $(next_patch "$VERSION")"
+fi
+# A tag left by a run that stopped before publishing is made again below.
+if git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then
+    git tag -d "v$VERSION" >/dev/null
+    git push -q origin ":refs/tags/v$VERSION" >/dev/null 2>&1 || true
 fi
 
 # Sparkle offers an update only when its build number is higher than the
@@ -105,10 +116,12 @@ read_public_key() {
     "$SPARKLE_BIN/generate_keys" -p 2>/dev/null | /usr/bin/grep -Eo '[A-Za-z0-9+/]{43}=' | /usr/bin/tail -1 || true
 }
 PUBLIC_KEY="$(read_public_key)"
+NEW_KEY=0
 if ! is_valid_key "$PUBLIC_KEY"; then
     step "Creating your update signing key in the login Keychain (one time)"
     "$SPARKLE_BIN/generate_keys" >/dev/null 2>&1 || true
     PUBLIC_KEY="$(read_public_key)"
+    NEW_KEY=1
 fi
 is_valid_key "$PUBLIC_KEY" || fail "Could not read a valid update signing key from Sparkle's generate_keys (got '$PUBLIC_KEY'). Run \"$SPARKLE_BIN/generate_keys\" yourself to see what it says."
 CURRENT_KEY="$(/usr/libexec/PlistBuddy -c 'Print :SUPublicEDKey' "$INFO_PLIST" 2>/dev/null || true)"
@@ -124,6 +137,8 @@ if [ "$(/usr/bin/tr -d '[:space:]' < VERSION)" != "$VERSION" ]; then
     git add VERSION
     git commit -q -m "Release v$VERSION"
 fi
+# Push those commits now: if a later step fails, git pull still works.
+git push -q origin "$BRANCH"
 
 # --- Build ---------------------------------------------------------------------------
 
@@ -220,3 +235,10 @@ printf '  Or the disk image:\n'
 printf '    https://github.com/%s/releases/latest/download/NotchFlow.dmg\n\n' "$REPO"
 printf 'Anyone who already has NotchFlow gets it from Check for Updates (and an automatic\n'
 printf 'check once a day).\n'
+if [ "$NEW_KEY" = 1 ]; then
+    printf '\nImportant: your update signing key was just created. Back it up now:\n'
+    printf '    "%s/generate_keys" -x ~/Desktop/notchflow-update-key.txt\n' "$SPARKLE_BIN"
+    printf 'and keep that file somewhere safe (not in git). Without it, a new Mac cannot\n'
+    printf 'publish updates that existing copies accept. On a new Mac, import it with:\n'
+    printf '    "%s/generate_keys" -f notchflow-update-key.txt\n' "$SPARKLE_BIN"
+fi

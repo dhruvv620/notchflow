@@ -83,10 +83,17 @@ Or download [NotchFlow.dmg](https://github.com/dhruvv620/notchflow/releases/late
 Updates: NotchFlow checks once a day, and **Check for Updates…** is in the menu bar icon and in Settings > About.
 
 ## Publishing a release (maintainer)
-1) Install the GitHub CLI once: `brew install gh`, then `gh auth login`.
-2) Commit your changes, then run `bash Release.command` (or `bash Release.command 2.5.0` to pick the version).
+One time:
+1) `brew install gh`, then `gh auth login` (GitHub.com, HTTPS, log in with a browser).
+2) Have an Apple Development certificate (Xcode > Settings > Accounts > Manage Certificates). Check with `security find-identity -v -p codesigning`.
 
-It builds and signs NotchFlow, makes `NotchFlow.dmg` and `NotchFlow.zip`, signs the update with a key kept in your login Keychain (created on the first release), and publishes a GitHub release with `appcast.xml`, which everyone's Check for Updates reads. Release notes come from the Unreleased section of CHANGELOG.md.
+Every release:
+1) Commit and push your changes.
+2) Run `bash Release.command` (or `bash Release.command 1.2.0` to pick the version; otherwise it uses `VERSION` or the next patch).
+
+It builds and signs NotchFlow, makes `NotchFlow.dmg` and `NotchFlow.zip`, signs the update with a key kept in your login Keychain (created on the first release; back it up as it tells you), and publishes a GitHub release with `appcast.xml`, which everyone's Check for Updates reads. Release notes come from the Unreleased section of CHANGELOG.md.
+
+Copies built with `Build.command` are for development: they don't check for updates. Install the released copy (the Terminal line above) to get updates like your friends.
 
 ## Quick Start
 - Hover near the notch to expand; click to enter controls.
