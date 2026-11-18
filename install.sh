@@ -11,6 +11,9 @@
 # Downloads the latest release from GitHub, installs NotchFlow.app into
 # /Applications (falls back to ~/Applications), and removes the download
 # quarantine flag so Gatekeeper does not block the first launch.
+#
+# Release.command runs it with the zip it just published (bash install.sh
+# path/to/NotchFlow.zip) so the developer's Mac gets the released copy too.
 
 set -e
 
@@ -53,12 +56,16 @@ fi
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
-echo "Downloading the latest ${APP_NAME} release..."
-if ! curl -fL --progress-bar "$DOWNLOAD_URL" -o "$TMP_DIR/${APP_NAME}.zip"; then
-    echo ""
-    echo "Download failed. The release may not be published yet:"
-    echo "  $DOWNLOAD_URL"
-    exit 1
+if [ -n "${1:-}" ]; then
+    cp "$1" "$TMP_DIR/${APP_NAME}.zip"
+else
+    echo "Downloading the latest ${APP_NAME} release..."
+    if ! curl -fL --progress-bar "$DOWNLOAD_URL" -o "$TMP_DIR/${APP_NAME}.zip"; then
+        echo ""
+        echo "Download failed. The release may not be published yet:"
+        echo "  $DOWNLOAD_URL"
+        exit 1
+    fi
 fi
 
 # --- Quit any running copy -------------------------------------------------
@@ -90,6 +97,18 @@ fi
 
 rm -rf "$INSTALL_DIR/${APP_NAME}.app"
 mv "$TMP_DIR/unzipped/${APP_NAME}.app" "$INSTALL_DIR/"
+
+# Keep a single copy: a development build left in the other Applications
+# folder is moved aside (not deleted).
+for OTHER_DIR in "/Applications" "$HOME/Applications"; do
+    [ "$OTHER_DIR" = "$INSTALL_DIR" ] && continue
+    if [ -d "$OTHER_DIR/${APP_NAME}.app" ] && [ -w "$OTHER_DIR" ]; then
+        BACKUPS="$HOME/Library/Application Support/${APP_NAME}/Build Backups"
+        mkdir -p "$BACKUPS"
+        mv "$OTHER_DIR/${APP_NAME}.app" "$BACKUPS/${APP_NAME} Other Copy $(date +%Y%m%d-%H%M%S).app"
+        echo "Moved an older copy from ${OTHER_DIR} to ${BACKUPS}."
+    fi
+done
 
 # Remove the quarantine flag so the first launch is not blocked.
 xattr -dr com.apple.quarantine "$INSTALL_DIR/${APP_NAME}.app" 2>/dev/null || true

@@ -267,9 +267,18 @@ if [ "${NOTCHFLOW_SKIP_INSTALL:-0}" = 1 ]; then
     exit 0
 fi
 
-INSTALL_APP="$HOME/Applications/NotchFlow.app"
+# Keep one NotchFlow on this Mac. A released copy (installed by install.sh or
+# Release.command) lives in /Applications; this build replaces it there, and
+# the next release or Check for Updates replaces this build again.
+if [ -d "/Applications/NotchFlow.app" ] && [ -w "/Applications" ]; then
+    INSTALL_APP="/Applications/NotchFlow.app"
+    OTHER_APP="$HOME/Applications/NotchFlow.app"
+else
+    INSTALL_APP="$HOME/Applications/NotchFlow.app"
+    OTHER_APP="/Applications/NotchFlow.app"
+fi
 BACKUP_ROOT="$HOME/Library/Application Support/NotchFlow/Build Backups"
-mkdir -p "$HOME/Applications"
+mkdir -p "$(/usr/bin/dirname "$INSTALL_APP")"
 mkdir -p "$BACKUP_ROOT"
 
 # Never rename an application bundle while its executable is still running.
@@ -319,6 +328,12 @@ while IFS= read -r -d '' legacy_backup; do
     /bin/mv "$legacy_backup" "$destination"
 done < <(/usr/bin/find "$HOME/Applications" -maxdepth 1 -type d -name 'NotchFlow Backup *.app' -print0)
 
+# A second copy elsewhere would show up twice in permissions and Open With.
+if [ -d "$OTHER_APP" ] && [ -w "$(/usr/bin/dirname "$OTHER_APP")" ]; then
+    /bin/mv "$OTHER_APP" "$BACKUP_ROOT/NotchFlow Other Copy $(date +%Y%m%d-%H%M%S).app"
+    printf 'Moved the second copy at %s to %s\n' "$OTHER_APP" "$BACKUP_ROOT"
+fi
+
 if [ -e "$INSTALL_APP" ]; then
     BACKUP_APP="$BACKUP_ROOT/NotchFlow Backup $(date +%Y%m%d-%H%M%S).app"
     /bin/mv "$INSTALL_APP" "$BACKUP_APP"
@@ -326,6 +341,10 @@ if [ -e "$INSTALL_APP" ]; then
 fi
 /usr/bin/ditto "$BUILT_APP" "$INSTALL_APP"
 printf '\nInstalled %s\nAny previous running copy was stopped before its bundle was backed up.\n' "$INSTALL_APP"
+if [ "$CONFIGURATION" != Release ]; then
+    printf 'This is a development build: it does not check for updates. Run Release.command\n'
+    printf 'to publish it, which also puts the released copy back on this Mac.\n'
+fi
 printf 'Reminders is a tab in Standard UI. Liquid Glass is in Settings > Appearance.\n'
 printf 'Cuely is off by default; enable it in Settings > Tabs & Features > Features.\n'
 /usr/bin/open -R "$INSTALL_APP"

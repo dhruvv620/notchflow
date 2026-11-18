@@ -93,7 +93,9 @@ Every release:
 
 It builds and signs NotchFlow, makes `NotchFlow.dmg` and `NotchFlow.zip`, signs the update with a key kept in your login Keychain (created on the first release; back it up as it tells you), and publishes a GitHub release with `appcast.xml`, which everyone's Check for Updates reads. Release notes come from the Unreleased section of CHANGELOG.md.
 
-Copies built with `Build.command` are for development: they don't check for updates. Install the released copy (the Terminal line above) to get updates like your friends.
+Your Mac keeps one NotchFlow, in /Applications once you have released:
+- **While developing**, `bash Build.command` replaces it with a development build of your current code (no update checks).
+- **When it's ready**, `bash Release.command` publishes it and puts the released copy back on your Mac. From then on Check for Updates works for you like for your friends.
 
 ## Quick Start
 - Hover near the notch to expand; click to enter controls.

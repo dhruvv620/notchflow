@@ -6,12 +6,13 @@
 #   bash Release.command 2.5.0      # a version you choose
 #
 # What it does:
-#   1. Builds a signed Release copy with Build.command (your installed copy is untouched).
+#   1. Builds a signed Release copy with Build.command.
 #   2. Packages NotchFlow.dmg (drag to Applications) and NotchFlow.zip (installer and updates).
 #   3. Signs the update with your private update key, which stays in your login Keychain.
 #   4. Publishes a GitHub release with the DMG, the zip, install.sh and appcast.xml.
 #      The app's Check for Updates reads that appcast.xml, so everyone who has
 #      NotchFlow is offered the new version.
+#   5. Installs the released copy on this Mac, replacing a development build.
 #
 # Needs: Xcode 26, the GitHub CLI (brew install gh, then gh auth login),
 # and a clean git tree (a release is built from what is committed).
@@ -228,7 +229,11 @@ gh release create "v$VERSION" \
     "$OUT/NotchFlow.dmg" "$OUT/NotchFlow.zip" "$OUT/install.sh" "$OUT/appcast.xml" \
     --repo "$REPO" --title "NotchFlow $VERSION" --notes-file "$NOTES" --latest --verify-tag
 
-printf '\nNotchFlow %s is out. Send your friends either of these:\n\n' "$VERSION"
+step "Installing the released copy on this Mac"
+/bin/bash "$SOURCE_DIR/install.sh" "$OUT/NotchFlow.zip" \
+    || printf 'Could not install it here; run the install line below yourself.\n'
+
+printf '\nNotchFlow %s is out, and this Mac now runs it. Send your friends either of these:\n\n' "$VERSION"
 printf '  Install with one line (Terminal):\n'
 printf '    curl -fsSL https://github.com/%s/releases/latest/download/install.sh | bash\n\n' "$REPO"
 printf '  Or the disk image:\n'
