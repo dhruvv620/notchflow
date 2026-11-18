@@ -33,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Shelf quick actions**: selecting files on the Shelf shows an action bar: Resize (half size, fit 2048 px or 1080 px), PDF, Cut Out (remove background), Zip, AirDrop, and WhatsApp, which sends the files to one of your recent chats through the linked account (images as photos, other files as documents). Results land back on the Shelf.
 
 ### Fixed
+- **"Unable to Check For Updates" on launch**: local builds from Build.command no longer start the updater (they update with git pull); Check for Updates is shown only in release builds made with Release.command. About no longer lists the update settings twice.
 - **Settings that did nothing were removed**: the custom music animation ("Coming soon") and Lottie visualizer list, colour history size, timer input style and preset-list switches, expanded shelf drag area, album-art blur (replaced by Artwork glow), the Atoll release name, and ten other stored settings no code read. Their saved values are cleared once on launch. Unused code from Atoll was deleted too (custom updater windows, old status bar menu, AirDrop and drag views, volume manager, HUD debugger).
 - **The accent color now reaches everything**: timer icons, system indicators and HUDs used an old accent setting that could no longer be changed (stuck on blue); they now follow the accent chosen in Appearance.
 - **Light mode**: a Download Alerts label was drawn in white and disappeared in light mode.

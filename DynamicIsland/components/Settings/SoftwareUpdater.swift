@@ -23,6 +23,19 @@
 import SwiftUI
 import Sparkle
 
+/// Whether this copy updates itself. Local builds from Build.command (Debug)
+/// are updated with git pull, and Sparkle refuses to start in them, so only
+/// release builds (Release.command) check for updates.
+enum NotchFlowUpdates {
+    static var isEnabled: Bool {
+        #if DEBUG
+        return false
+        #else
+        return !AppRuntimeEnvironment.isUITesting
+        #endif
+    }
+}
+
 final class CheckForUpdatesViewModel: ObservableObject {
     @Published var canCheckForUpdates = false
 

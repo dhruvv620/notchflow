@@ -3507,8 +3507,6 @@ struct About: View {
                     Text("Version info")
                 }
 
-                UpdaterSettingsView(updater: updaterController.updater)
-
                 HStack(spacing: 30) {
                     Spacer(minLength: 0)
                     Button {
@@ -3549,11 +3547,21 @@ struct About: View {
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.bottom, 5)
 
-                UpdaterSettingsView(updater: updaterController.updater)
-                Section {
-                    Text("Updates come from NotchFlow's releases on GitHub (dhruvv620/notchflow). Use Check for Updates in the toolbar or the menu bar icon.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                if NotchFlowUpdates.isEnabled {
+                    UpdaterSettingsView(updater: updaterController.updater)
+                    Section {
+                        Text("Updates come from NotchFlow's releases on GitHub (dhruvv620/notchflow). Use Check for Updates in the toolbar or the menu bar icon.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                } else {
+                    Section {
+                        Text("This is a local build from Build.command: update it with git pull and bash Build.command. Copies made with Release.command update themselves.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } header: {
+                        Text("Updates")
+                    }
                 }
                 VStack(spacing: 0) {
                     Divider()
@@ -3572,7 +3580,9 @@ struct About: View {
             //                openWindow(id: "onboarding")
             //            }
             //            .controlSize(.extraLarge)
-            CheckForUpdatesView(updater: updaterController.updater)
+            if NotchFlowUpdates.isEnabled {
+                CheckForUpdatesView(updater: updaterController.updater)
+            }
         }
         .navigationTitle("About")
     }
