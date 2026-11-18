@@ -132,6 +132,19 @@ class DynamicIslandViewCoordinator: ObservableObject {
     
     @Published var statsSecondRowExpansion: CGFloat = 1
     @Published var notesLayoutState: NotesLayoutState = .list
+
+    /// Content heights tabs have reported, for tabs whose rule fits content.
+    @Published private(set) var reportedContentHeights: [NotchViews: CGFloat] = [:]
+
+    /// Lets a tab say how much room its content needs. The notch animates to
+    /// the height its rule allows; nil returns the tab to its default height.
+    func reportContentHeight(_ height: CGFloat?, for view: NotchViews) {
+        let value = height.map { NotchTabHeightPolicy.quantized($0) }
+        guard reportedContentHeights[view] != value else { return }
+        withAnimation(.smooth(duration: NotchTabHeightPolicy.animationDuration)) {
+            reportedContentHeights[view] = value
+        }
+    }
     @Published var selectedExtensionExperienceID: String?
     
     

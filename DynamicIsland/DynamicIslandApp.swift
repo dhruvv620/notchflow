@@ -129,6 +129,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // Debouncing mechanism for window size updates
     private var windowSizeUpdateWorkItem: DispatchWorkItem?
     private var screenConfigurationWorkItem: DispatchWorkItem?
+    private var pendingWindowShrink: DispatchWorkItem?
 //    let calendarManager = CalendarManager.shared
 //    let webcamManager = WebcamManager.shared
 //    var closeNotchWorkItem: DispatchWorkItem?
@@ -496,7 +497,27 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func updateWindowSizeForTabSwitch() {
         let requiredSize = calculateRequiredNotchSize()
-        resizeWindows(to: requiredSize, animated: false, force: true)
+        vm.refreshAppearanceSize()
+        for viewModel in viewModels.values { viewModel.refreshAppearanceSize() }
+
+        pendingWindowShrink?.cancel()
+        pendingWindowShrink = nil
+        let currentHeight: CGFloat = Defaults[.showOnAllDisplays]
+            ? (windows.values.map(\.frame.height).max() ?? 0)
+            : (window?.frame.height ?? 0)
+        guard NotchTabHeightPolicy.shouldDeferWindowResize(currentHeight: currentHeight, targetHeight: requiredSize.height) else {
+            // Growing: make room before the panel animates into it.
+            resizeWindows(to: requiredSize, animated: false, force: true)
+            return
+        }
+        // Shrinking: let the panel finish animating, then fit the window.
+        let shrink = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.pendingWindowShrink = nil
+            self.resizeWindows(to: self.calculateRequiredNotchSize(), animated: false, force: true)
+        }
+        pendingWindowShrink = shrink
+        DispatchQueue.main.asyncAfter(deadline: .now() + NotchTabHeightPolicy.animationDuration + 0.05, execute: shrink)
     }
     
     private func calculateRequiredNotchSize() -> CGSize {
@@ -563,15 +584,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Use minimalistic or normal size based on settings
         var baseSize = Defaults[.enableMinimalisticUI] ? minimalisticOpenNotchSize(isDynamicIslandMode: shouldUseDynamicIslandMode(for: vm.screen)) : openNotchSize
         
-        // Use a consistent height for different view types
-        if coordinator.currentView == .timer {
-            baseSize.height = max(baseSize.height, 224)
-        } else if coordinator.currentView == .notes {
-            let preferredHeight = coordinator.notesLayoutState.preferredHeight
-            baseSize.height = min(max(baseSize.height, preferredHeight), baseSize.height + 40)
-        } else if coordinator.currentView == .terminal || coordinator.currentView == .whatsapp {
-            baseSize.height += 40
-        }
+        // Each tab's height comes from one shared rule table.
+        baseSize = tabOpenNotchSize(for: coordinator.currentView, preset: baseSize,
+                                    screen: vm.screen, closedHeight: vm.effectiveClosedNotchHeight)
         
         let adjustedContentSize = statsAdjustedNotchSize(
             from: baseSize,
@@ -759,6 +774,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.updateWindowSizeForTabSwitch()
             }
         }.store(in: &cancellables)
+
+        // A tab whose content grew or shrank changes the notch height too.
+        coordinator.$reportedContentHeights
+            .removeDuplicates()
+            .sink { [weak self] _ in
+                DispatchQueue.main.async {
+                    self?.updateWindowSizeForTabSwitch()
+                }
+            }
+            .store(in: &cancellables)
 
         coordinator.$notesLayoutState
             .removeDuplicates()

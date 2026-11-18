@@ -370,25 +370,11 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
 
     private func calculateDynamicNotchSize() -> CGSize {
         let baseSize = Defaults[.enableMinimalisticUI] ? minimalisticOpenNotchSize(isDynamicIslandMode: shouldUseDynamicIslandMode(for: screen)) : openNotchSize
-        var adjustedSize = baseSize
+        let adjustedSize = baseSize
 
-        if coordinator.currentView == .timer {
-            return CGSize(width: baseSize.width, height: max(baseSize.height, 224))
-        }
-
-        if coordinator.currentView == .reminders {
-            return baseSize
-        }
-
-        if coordinator.currentView == .notes {
-            let preferred = coordinator.notesLayoutState.preferredHeight
-            adjustedSize.height = min(max(adjustedSize.height, preferred), baseSize.height + 40)
-            return adjustedSize
-        }
-
-        if coordinator.currentView == .terminal || coordinator.currentView == .whatsapp {
-            adjustedSize.height = baseSize.height + 40
-            return adjustedSize
+        if coordinator.currentView.heightRule != .preset {
+            return tabOpenNotchSize(for: coordinator.currentView, preset: baseSize,
+                                    screen: screen, closedHeight: effectiveClosedNotchHeight)
         }
 
         return statsAdjustedNotchSize(

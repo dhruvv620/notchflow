@@ -15,6 +15,10 @@ struct NotchNotificationsView: View {
     @State private var expandedGroups: Set<String> = []
     @State private var token = UUID()
 
+    /// Header row, spacing and padding around the list.
+    private static let chromeHeight: CGFloat = 36
+    private static let emptyStateHeight: CGFloat = 130
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             header
@@ -29,6 +33,9 @@ struct NotchNotificationsView: View {
                 }
             } else if hub.items.isEmpty {
                 emptyInbox
+                    .onAppear {
+                        DynamicIslandViewCoordinator.shared.reportContentHeight(Self.emptyStateHeight, for: .notifications)
+                    }
             } else {
                 list
             }
@@ -41,7 +48,10 @@ struct NotchNotificationsView: View {
         .environment(\.colorScheme, .dark)
         .tint(appearance.accentColor)
         .task { await hub.refresh() }
-        .onAppear { hub.dismissAlert() }
+        .onAppear {
+            hub.dismissAlert()
+            if !enabled { DynamicIslandViewCoordinator.shared.reportContentHeight(nil, for: .notifications) }
+        }
         .onChange(of: hub.replyingID) { _, value in
             vm.setAutoCloseSuppression(value != nil, token: token)
         }
@@ -122,6 +132,16 @@ struct NotchNotificationsView: View {
                     }
                 }
                 .padding(.bottom, hub.undoSnapshot == nil ? 2 : 30)
+                .background {
+                    GeometryReader { geometry in
+                        Color.clear.preference(key: NotificationListHeightKey.self, value: geometry.size.height)
+                    }
+                }
+            }
+            // The panel follows the list: a couple of notifications make a
+            // short notch, a long inbox a taller one, within the tab's limits.
+            .onPreferenceChange(NotificationListHeightKey.self) { height in
+                DynamicIslandViewCoordinator.shared.reportContentHeight(height + Self.chromeHeight, for: .notifications)
             }
             .onHover { vm.setScrollGestureSuppression($0, token: token) }
             .onChange(of: hub.replyingID) { _, id in
@@ -595,5 +615,12 @@ enum NotificationAppIconCache {
         let image = NSWorkspace.shared.icon(forFile: url.path)
         cache.setObject(image, forKey: bundleIdentifier as NSString)
         return image
+    }
+}
+
+private struct NotificationListHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }

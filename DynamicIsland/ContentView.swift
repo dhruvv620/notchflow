@@ -164,23 +164,9 @@ struct ContentView: View {
             }
         }
         
-        if coordinator.currentView == .reminders {
-            return baseSize
-        }
-
-        if coordinator.currentView == .timer {
-            return CGSize(width: baseSize.width, height: max(baseSize.height, 224))
-        }
-        
-        if coordinator.currentView == .notes {
-            let preferredHeight = coordinator.notesLayoutState.preferredHeight
-            let resolvedHeight = min(max(baseSize.height, preferredHeight), baseSize.height + 40)
-            return CGSize(width: baseSize.width, height: resolvedHeight)
-        }
-
-        if coordinator.currentView == .terminal || coordinator.currentView == .whatsapp {
-            let terminalHeight = baseSize.height + 40
-            return CGSize(width: baseSize.width, height: terminalHeight)
+        if coordinator.currentView.heightRule != .preset {
+            return tabOpenNotchSize(for: coordinator.currentView, preset: baseSize,
+                                    screen: vm.screen, closedHeight: vm.effectiveClosedNotchHeight)
         }
 
         if coordinator.currentView == .extensionExperience {

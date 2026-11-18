@@ -95,6 +95,12 @@ printf '\nChecking native hosting and communications...\n'
 /usr/bin/xcrun swiftc -swift-version 5 -parse-as-library "$SOURCE_DIR/DynamicIsland/Communications/CommunicationModels.swift" "$SOURCE_DIR/DynamicIsland/Communications/NotificationCardPolicy.swift" "$SOURCE_DIR/tests/NotificationCardRegression.swift" -o "$BUILD_ROOT/NotificationCardRegression"
 "$BUILD_ROOT/NotificationCardRegression"
 
+printf '\nChecking adaptive tab heights...\n'
+/usr/bin/xcrun swiftc -swift-version 5 -parse-as-library \
+    "$SOURCE_DIR/DynamicIsland/sizing/NotchTabHeightPolicy.swift" \
+    "$SOURCE_DIR/tests/NotchTabHeightRegression.swift" -o "$BUILD_ROOT/NotchTabHeightRegression"
+"$BUILD_ROOT/NotchTabHeightRegression"
+
 printf '\nChecking the notification inbox...\n'
 /usr/bin/xcrun swiftc -swift-version 5 -parse-as-library \
     "$SOURCE_DIR/DynamicIsland/Communications/NotchNotificationModels.swift" \

@@ -175,8 +175,11 @@ struct TabSelectionView: View {
                     ForEach(tabs) { tab in
                         let selected = isSelected(tab)
                         Button {
-                            coordinator.selectedExtensionExperienceID = tab.experienceID
-                            coordinator.currentView = tab.view
+                            // Animate the height change between tabs as well as the content.
+                            withAnimation(.smooth(duration: NotchTabHeightPolicy.animationDuration)) {
+                                coordinator.selectedExtensionExperienceID = tab.experienceID
+                                coordinator.currentView = tab.view
+                            }
                             NotificationCenter.default.post(name: .notchTabExplicitSelection, object: nil)
                         } label: {
                             Image(systemName: tab.icon)
