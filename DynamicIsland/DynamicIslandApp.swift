@@ -888,6 +888,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         TimeTracker.shared.start()
         PromiseKeeper.shared.start()
         WorkspaceManager.shared.start()
+        // The clipboard header button (and its popover) is gone: the Clipboard
+        // tab is where history lives, so start keeping it from launch.
+        if Defaults[.clipboardDisplayMode] == .popover { Defaults[.clipboardDisplayMode] = .separateTab }
+        if Defaults[.enableClipboardManager] && !ClipboardManager.shared.isMonitoring {
+            ClipboardManager.shared.startMonitoring()
+        }
         CopyActionManager.shared.start()
         BuildWatchManager.shared.start()
         AgentHub.shared.start()
@@ -1405,16 +1411,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             switch Defaults[.clipboardDisplayMode] {
             case .panel:
                 ClipboardPanelManager.shared.toggleClipboardPanel()
-            case .popover:
-                if vm.notchState == .closed {
-                    vm.open()
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        NotificationCenter.default.post(name: NSNotification.Name("ToggleClipboardPopover"), object: nil)
-                    }
-                } else {
-                    NotificationCenter.default.post(name: NSNotification.Name("ToggleClipboardPopover"), object: nil)
-                }
-            case .separateTab:
+            case .popover, .separateTab:
                 if vm.notchState == .closed {
                     vm.open()
                     coordinator.currentView = .clipboard

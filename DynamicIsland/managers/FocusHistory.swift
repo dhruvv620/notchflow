@@ -42,7 +42,8 @@ final class FocusHistory: ObservableObject {
     /// turns a Focus on at the start of focus, and the other one on breaks.
     func pomodoroEntered(_ phase: PomodoroPhase?) {
         guard Defaults[.pomodoroControlsFocus] else { return }
-        let wantsFocus = phase == .focus
+        // A focus session from the header keeps macOS Focus on through breaks.
+        let wantsFocus = phase == .focus || FocusQuiet.shared.isManualActive
         guard wantsFocus != focusIsOn else { return }
         focusIsOn = wantsFocus
         let name = wantsFocus ? Defaults[.pomodoroFocusOnShortcut] : Defaults[.pomodoroFocusOffShortcut]

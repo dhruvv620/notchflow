@@ -29,13 +29,11 @@ struct DynamicIslandHeader: View {
     @ObservedObject var shelfState = ShelfStateViewModel.shared
     @ObservedObject var timerManager = TimerManager.shared
     @ObservedObject var doNotDisturbManager = DoNotDisturbManager.shared
-    @State private var showClipboardPopover = false
     @State private var showColorPickerPopover = false
     @State private var showTimerPopover = false
     @State private var cameraPopoverToken = UUID()
     @Default(.enableTimerFeature) var enableTimerFeature
     @Default(.timerDisplayMode) var timerDisplayMode
-    @Default(.showClipboardIcon) var showClipboardIcon
     @Default(.showColorPickerIcon) var showColorPickerIcon
     @Default(.clipboardDisplayMode) var clipboardDisplayMode
     @Default(.showBatteryIndicator) var showBatteryIndicator
@@ -103,50 +101,8 @@ struct DynamicIslandHeader: View {
                         }
                     }
                     
-                    if Defaults[.enableClipboardManager]
-                        && showClipboardIcon
-                        && clipboardDisplayMode != .separateTab {
-                        Button(action: {
-                            // Switch behavior based on display mode
-                            switch clipboardDisplayMode {
-                            case .panel:
-                                ClipboardPanelManager.shared.toggleClipboardPanel()
-                            case .popover:
-                                showClipboardPopover.toggle()
-                            case .separateTab:
-                                coordinator.currentView = .notes
-                            }
-                        }) {
-                            Capsule()
-                                .fill(Color.white.opacity(0.055))
-                                .frame(width: 30, height: 30)
-                                .overlay {
-                                    Image(systemName: "doc.on.clipboard")
-                                        .foregroundColor(.white)
-                                        .padding()
-                                        .imageScale(.medium)
-                                }
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                        .popover(isPresented: $showClipboardPopover, arrowEdge: .bottom) {
-                            ClipboardPopover()
-                        }
-                        .onChange(of: showClipboardPopover) { isActive in
-                            vm.isClipboardPopoverActive = isActive
-                            
-                            // If popover was closed, trigger a hover recheck
-                            if !isActive {
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                                    vm.shouldRecheckHover.toggle()
-                                }
-                            }
-                        }
-                        .onAppear {
-                            if Defaults[.enableClipboardManager] && !clipboardManager.isMonitoring {
-                                clipboardManager.startMonitoring()
-                            }
-                        }
-                    }
+                    // Focus: nothing in the notch disturbs you until you click again.
+                    FocusSessionButton()
                     
                     // ColorPicker button
                     if Defaults[.enableColorPickerFeature] && showColorPickerIcon{
@@ -310,21 +266,13 @@ struct DynamicIslandHeader: View {
                 switch clipboardDisplayMode {
                 case .panel:
                     ClipboardPanelManager.shared.toggleClipboardPanel()
-                case .popover:
-                    showClipboardPopover.toggle()
-                case .separateTab:
+                case .popover, .separateTab:
                     if coordinator.currentView == .notes {
                         coordinator.currentView = .home
                     } else {
                         coordinator.currentView = .notes
                     }
                 }
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ToggleClipboardPopover"))) { _ in
-            // Handle keyboard shortcut for popover mode
-            if Defaults[.enableClipboardManager] && clipboardDisplayMode == .popover {
-                showClipboardPopover.toggle()
             }
         }
         .onChange(of: enableTimerFeature) { _, newValue in
@@ -355,8 +303,6 @@ private extension DynamicIslandHeader {
 
     var shouldSuppressStatusIndicators: Bool {
         Defaults[.settingsIconInNotch]
-            && Defaults[.enableClipboardManager]
-            && Defaults[.showClipboardIcon]
             && Defaults[.showColorPickerIcon]
             && Defaults[.enableTimerFeature]
     }

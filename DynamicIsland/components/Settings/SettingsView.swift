@@ -911,7 +911,6 @@ struct SettingsView: View {
 
             // Clipboard
             SettingsSearchEntry(tab: .clipboard, title: "Enable Clipboard Manager", keywords: ["clipboard", "manager"], highlightID: SettingsTab.clipboard.highlightID(for: "Enable Clipboard Manager")),
-            SettingsSearchEntry(tab: .clipboard, title: "Show Clipboard Icon", keywords: ["icon", "clipboard"], highlightID: SettingsTab.clipboard.highlightID(for: "Show Clipboard Icon")),
             SettingsSearchEntry(tab: .clipboard, title: "Display Mode", keywords: ["list", "grid", "clipboard"], highlightID: SettingsTab.clipboard.highlightID(for: "Display Mode")),
             SettingsSearchEntry(tab: .clipboard, title: "History Size", keywords: ["history", "clipboard"], highlightID: SettingsTab.clipboard.highlightID(for: "History Size")),
 
@@ -6007,7 +6006,7 @@ struct TimerSettings: View {
             Defaults.Toggle(key: .pomodoroHoldsInterruptions) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Don't disturb me during focus")
-                    Text("While a Pomodoro focus block runs, the notch doesn't announce notifications, WhatsApp messages, calls, finished agents or build results. They wait in their tabs, and a line under the notch says what came in when the break starts. Agents that need your approval still show, silently.")
+                    Text("While a Pomodoro focus block runs, the notch doesn't announce notifications, WhatsApp messages, calls, finished agents or build results. They wait in their tabs, and a line under the notch says what came in when the break starts. Agents that need your approval still show, silently. The moon button in the open notch starts the same quiet without a Pomodoro.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }
@@ -6804,7 +6803,6 @@ struct StatsSettings: View {
 struct ClipboardSettings: View {
     @ObservedObject var clipboardManager = ClipboardManager.shared
     @Default(.enableClipboardManager) var enableClipboardManager
-    @Default(.showClipboardIcon) var showClipboardIcon
     @Default(.clipboardDisplayMode) var clipboardDisplayMode
 
     private func highlightID(_ title: String) -> String {
@@ -6833,16 +6831,11 @@ struct ClipboardSettings: View {
 
             if enableClipboardManager {
                 Section {
-                    Defaults.Toggle(key: .showClipboardIcon) {
-                        Text("Show Clipboard Icon")
-                    }
-                    .settingsHighlight(id: highlightID("Show Clipboard Icon"))
-
                     HStack {
                         Text("Display Mode")
                         Spacer()
                         Picker("", selection: $clipboardDisplayMode) {
-                            ForEach(ClipboardDisplayMode.allCases, id: \.self) { mode in
+                            ForEach(ClipboardDisplayMode.allCases.filter { $0 != .popover }, id: \.self) { mode in
                                 Text(mode.displayName).tag(mode)
                             }
                         }
@@ -6882,11 +6875,9 @@ struct ClipboardSettings: View {
                     Text("Settings")
                 } footer: {
                     switch clipboardDisplayMode {
-                    case .popover:
-                        Text("Popover mode shows clipboard as a dropdown attached to the clipboard button.")
                     case .panel:
                         Text("Panel mode shows clipboard in a floating window near the notch.")
-                    case .separateTab:
+                    case .separateTab, .popover:
                         Text("Separate Tab mode integrates Copied Items and Notes into a single view. If both are enabled, Notes appear on the right and Clipboard on the left.")
                     }
                 }

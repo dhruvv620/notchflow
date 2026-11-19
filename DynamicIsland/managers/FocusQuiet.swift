@@ -12,7 +12,8 @@ extension Defaults.Keys {
     static let pomodoroAllowsCalls = Key<Bool>("pomodoroAllowsCalls", default: false)
 }
 
-/// Keeps the notch quiet during a Pomodoro focus block. Pop-ups ask
+/// Keeps the notch quiet during a Pomodoro focus block, or a focus session
+/// started from the moon button in the notch header. Pop-ups ask
 /// `shouldHold(_:)` before they appear; what was held still lands in its tab,
 /// and a one-line summary shows when the block ends.
 @MainActor
@@ -24,6 +25,11 @@ final class FocusQuiet: ObservableObject {
     @Published private(set) var summary: String?
     /// How many things came in during the last block.
     @Published private(set) var lastTotal = 0
+    /// A focus session from the moon button: when it ends (`.distantFuture`
+    /// until it is turned off), or nil when none is running.
+    @Published private(set) var manualEnd: Date?
+    private var pomodoroQuiet = false
+    private var manualWork: DispatchWorkItem?
     private(set) var held = FocusQuietPolicy.Held()
     private var lastHeld = FocusQuietPolicy.Held()
 
@@ -40,11 +46,54 @@ final class FocusQuiet: ObservableObject {
             .combineLatest(Defaults.publisher(.pomodoroHoldsInterruptions).map(\.newValue))
             .receive(on: DispatchQueue.main)
             .sink { [weak self] pomodoro, enabled in
-                self?.update(quiet: FocusQuietPolicy.isQuiet(enabled: enabled, isActive: pomodoro.isActive,
+                guard let self else { return }
+                self.pomodoroQuiet = FocusQuietPolicy.isQuiet(enabled: enabled, isActive: pomodoro.isActive,
                                                              isPaused: pomodoro.isPaused,
-                                                             phaseIsFocus: pomodoro.phase == .focus))
+                                                             phaseIsFocus: pomodoro.phase == .focus)
+                self.update(quiet: self.pomodoroQuiet || self.isManualActive)
             }
             .store(in: &cancellables)
+    }
+
+    // MARK: Focus sessions from the header
+
+    var isManualActive: Bool { manualEnd.map { $0 > Date() } ?? false }
+
+    /// Starts a focus session: `minutes` long, or until turned off (nil).
+    /// With "Also silence macOS (Focus)" set up, macOS Focus turns on too.
+    func startManual(minutes: Int?) {
+        let end = minutes.map { Date().addingTimeInterval(TimeInterval($0) * 60) } ?? .distantFuture
+        let wasActive = isManualActive
+        withAnimation(.smooth(duration: 0.25)) { manualEnd = end }
+        manualWork?.cancel()
+        if let minutes {
+            let work = DispatchWorkItem { [weak self] in self?.stopManual() }
+            manualWork = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + TimeInterval(minutes) * 60, execute: work)
+        }
+        if !wasActive && Defaults[.pomodoroControlsFocus] && !pomodoroQuiet {
+            FocusHistory.runShortcut(named: Defaults[.pomodoroFocusOnShortcut])
+        }
+        update(quiet: true)
+    }
+
+    func stopManual() {
+        guard manualEnd != nil else { return }
+        manualWork?.cancel()
+        withAnimation(.smooth(duration: 0.25)) { manualEnd = nil }
+        // A running Pomodoro focus block keeps macOS Focus on.
+        if Defaults[.pomodoroControlsFocus] && !pomodoroQuiet {
+            FocusHistory.runShortcut(named: Defaults[.pomodoroFocusOffShortcut])
+        }
+        update(quiet: pomodoroQuiet)
+    }
+
+    /// "Until you turn it off", or "24 min left".
+    var manualRemainingText: String? {
+        guard let end = manualEnd, isManualActive else { return nil }
+        guard end != .distantFuture else { return "Until you turn it off" }
+        let minutes = max(1, Int((end.timeIntervalSinceNow / 60).rounded(.up)))
+        return minutes >= 60 ? "\(minutes / 60) h \(minutes % 60) min left" : "\(minutes) min left"
     }
 
     /// Called where a pop-up would appear. True means stay quiet; the pop-up
@@ -127,5 +176,44 @@ struct FocusQuietSummaryActivity: View {
     /// "4 new", short enough for the wing; the full line is in the tooltip.
     private var shortCount: String {
         quiet.lastTotal > 0 ? "\(quiet.lastTotal) new" : ""
+    }
+}
+
+/// The moon button in the notch header: click for a focus session until you
+/// click again, hold for a timed one.
+struct FocusSessionButton: View {
+    @ObservedObject private var quiet = FocusQuiet.shared
+    @ObservedObject private var appearance = NotchAppearanceModel.shared
+
+    var body: some View {
+        let active = quiet.isManualActive
+        Menu {
+            if active {
+                Button("End focus session") { quiet.stopManual() }
+                Divider()
+            }
+            Button("Focus for 30 minutes") { quiet.startManual(minutes: 30) }
+            Button("Focus for 1 hour") { quiet.startManual(minutes: 60) }
+            Button("Focus for 2 hours") { quiet.startManual(minutes: 120) }
+            Button("Focus until I turn it off") { quiet.startManual(minutes: nil) }
+        } label: {
+            Capsule()
+                .fill(active ? appearance.accentColor.opacity(0.35) : Color.white.opacity(0.055))
+                .frame(width: 30, height: 30)
+                .overlay {
+                    Image(systemName: active ? "moon.fill" : "moon")
+                        .foregroundColor(active ? appearance.accentColor : .white)
+                        .imageScale(.medium)
+                }
+        } primaryAction: {
+            if active { quiet.stopManual() } else { quiet.startManual(minutes: nil) }
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help(active
+              ? "Focus is on (\(quiet.manualRemainingText ?? "")): notifications, messages and calls wait. Click to end."
+              : "Focus: click so nothing in the notch disturbs you until you click again. Hold for 30 min, 1 or 2 hours.")
+        .accessibilityLabel(active ? "End focus session" : "Start focus session")
     }
 }

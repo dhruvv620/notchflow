@@ -18,9 +18,11 @@ enum SettingsCleanup {
         "enableExtensionNotchInteractiveWebViews", "extensionAuthorizationEntries", "extensionRateLimitRecords",
         "extensionDiagnosticsLoggingEnabled", "extensionLiveActivityCapacity", "extensionLockScreenWidgetCapacity",
         "extensionNotchExperienceCapacity", "enableExtensionFileSharing",
+        // The clipboard button in the notch header (replaced by the Focus button).
+        "showClipboardIcon",
     ]
 
-    private static let doneKey = "settingsCleanup.v2"
+    private static let doneKey = "settingsCleanup.v3"
 
     static func run(defaults: UserDefaults = .standard) {
         guard !defaults.bool(forKey: doneKey) else { return }
