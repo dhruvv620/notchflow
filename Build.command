@@ -359,6 +359,19 @@ if [ -e "$INSTALL_APP" ]; then
     printf 'Previous app saved as %s\n' "$BACKUP_APP"
 fi
 /usr/bin/ditto "$BUILT_APP" "$INSTALL_APP"
+
+# Backups must not be launchable: macOS opens the copy with the highest build
+# number, so a backed-up release (higher build number than a Debug build)
+# would keep launching instead of this build. Unregister every backup and
+# rename it so it is no longer an app bundle ("….app.backup"; rename it back
+# to restore). Then register the installed copy as the one to launch.
+LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
+while IFS= read -r -d '' backup; do
+    [ -x "$LSREGISTER" ] && "$LSREGISTER" -u "$backup" >/dev/null 2>&1 || true
+    /bin/mv "$backup" "$backup.backup"
+done < <(/usr/bin/find "$BACKUP_ROOT" -maxdepth 1 -type d -name '*.app' -print0)
+[ -x "$LSREGISTER" ] && "$LSREGISTER" -f "$INSTALL_APP" >/dev/null 2>&1 || true
+
 printf '\nInstalled %s\nAny previous running copy was stopped before its bundle was backed up.\n' "$INSTALL_APP"
 if [ "$CONFIGURATION" != Release ]; then
     printf 'This is a development build: it does not check for updates. Run Release.command\n'
@@ -366,4 +379,5 @@ if [ "$CONFIGURATION" != Release ]; then
 fi
 printf 'Reminders is a tab in Standard UI. Liquid Glass is in Settings > Appearance.\n'
 printf 'Cuely is off by default; enable it in Settings > Tabs & Features > Features.\n'
-/usr/bin/open -R "$INSTALL_APP"
+# Launch exactly this copy (not whichever NotchFlow macOS picks by name).
+/usr/bin/open "$INSTALL_APP"

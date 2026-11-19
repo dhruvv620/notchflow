@@ -107,10 +107,21 @@ for OTHER_DIR in "/Applications" "$HOME/Applications"; do
     if [ -d "$OTHER_DIR/${APP_NAME}.app" ] && [ -w "$OTHER_DIR" ]; then
         BACKUPS="$HOME/Library/Application Support/${APP_NAME}/Build Backups"
         mkdir -p "$BACKUPS"
-        mv "$OTHER_DIR/${APP_NAME}.app" "$BACKUPS/${APP_NAME} Other Copy $(date +%Y%m%d-%H%M%S).app"
+        # Not an app bundle any more, so macOS never launches it instead.
+        mv "$OTHER_DIR/${APP_NAME}.app" "$BACKUPS/${APP_NAME} Other Copy $(date +%Y%m%d-%H%M%S).app.backup"
         echo "Moved an older copy from ${OTHER_DIR} to ${BACKUPS}."
     fi
 done
+# Backups left by earlier versions: unregister them and stop them being apps.
+LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
+BACKUPS="$HOME/Library/Application Support/${APP_NAME}/Build Backups"
+if [ -d "$BACKUPS" ]; then
+    find "$BACKUPS" -maxdepth 1 -type d -name '*.app' -print0 | while IFS= read -r -d '' backup; do
+        [ -x "$LSREGISTER" ] && "$LSREGISTER" -u "$backup" >/dev/null 2>&1 || true
+        mv "$backup" "$backup.backup"
+    done
+fi
+[ -x "$LSREGISTER" ] && "$LSREGISTER" -f "$INSTALL_DIR/${APP_NAME}.app" >/dev/null 2>&1 || true
 
 # Clear the quarantine flag (and any other download attributes) from every
 # file in the app, so macOS does not ask Apple to verify it on first launch.
