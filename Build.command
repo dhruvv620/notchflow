@@ -67,6 +67,12 @@ printf '\nChecking Cuely voice following...\n'
     "$SOURCE_DIR/tests/CuelyVoiceFollowRegression.swift" -o "$BUILD_ROOT/CuelyVoiceFollowRegression"
 "$BUILD_ROOT/CuelyVoiceFollowRegression"
 
+printf '\nChecking focus quiet...\n'
+/usr/bin/xcrun swiftc -swift-version 5 -parse-as-library \
+    "$SOURCE_DIR/DynamicIsland/helpers/FocusQuietPolicy.swift" \
+    "$SOURCE_DIR/tests/FocusQuietRegression.swift" -o "$BUILD_ROOT/FocusQuietRegression"
+"$BUILD_ROOT/FocusQuietRegression"
+
 printf '\nChecking the welcome chime...\n'
 /usr/bin/xcrun swiftc -swift-version 5 -parse-as-library \
     "$SOURCE_DIR/DynamicIsland/helpers/WelcomeChimePolicy.swift" \

@@ -148,6 +148,7 @@ final class BuildWatchManager: ObservableObject {
     }
 
     private func announce(_ run: WatchedRun) {
+        if FocusQuiet.shared.shouldHold(.build) { return }
         withAnimation(.smooth(duration: 0.25)) { announcement = run }
         hideWork?.cancel()
         let work = DispatchWorkItem { [weak self] in

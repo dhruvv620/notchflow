@@ -64,6 +64,7 @@ struct ContentView: View {
     @ObservedObject var focusGuard = FocusGuardManager.shared
     @ObservedObject var copyActions = CopyActionManager.shared
     @ObservedObject var buildWatcher = BuildWatchManager.shared
+    @ObservedObject var focusQuiet = FocusQuiet.shared
     @ObservedObject var agentHub = AgentHub.shared
     @Default(.agentShowWorkingInClosedNotch) var agentShowWorkingInClosedNotch
     @ObservedObject var remindersManager = RemindersManager.shared
@@ -343,9 +344,10 @@ struct ContentView: View {
 
     /// An agent needs you, just finished, or (optionally) is working.
     private var isAgentActivityVisible: Bool {
+        // During a Pomodoro focus block only agents waiting on you show.
         let hasSomething = !agentHub.requests.isEmpty || !agentHub.waitingInWindowSessions.isEmpty
             || agentHub.announcement != nil
-            || (agentShowWorkingInClosedNotch && !agentHub.workingSessions.isEmpty)
+            || (!focusQuiet.isQuiet && agentShowWorkingInClosedNotch && !agentHub.workingSessions.isEmpty)
         return hasSomething && canShowClosedActivity
     }
 
@@ -358,7 +360,12 @@ struct ContentView: View {
     }
 
     private var isBuildWatchVisible: Bool {
-        (buildWatcher.announcement != nil || !buildWatcher.running.isEmpty) && canShowClosedActivity
+        (buildWatcher.announcement != nil || (!focusQuiet.isQuiet && !buildWatcher.running.isEmpty)) && canShowClosedActivity
+    }
+
+    /// What came in during a Pomodoro focus block, shown once it ends.
+    private var isFocusSummaryVisible: Bool {
+        focusQuiet.summary != nil && canShowClosedActivity
     }
 
     private var isMeetingActivityVisible: Bool {
@@ -408,7 +415,7 @@ struct ContentView: View {
             width = max(width, vm.closedNotchSize.width + (MeetingLiveActivity.wingWidth + 6) * 2 + closedPadding)
         }
 
-        if isCopyActionVisible || isFocusGuardVisible || isBuildWatchVisible || isAgentActivityVisible {
+        if isCopyActionVisible || isFocusGuardVisible || isBuildWatchVisible || isAgentActivityVisible || isFocusSummaryVisible {
             width = max(width, vm.closedNotchSize.width + 8 + ClosedNotchWingsMetrics.addedWidth + closedPadding)
         }
 
@@ -1127,6 +1134,9 @@ struct ContentView: View {
                       } else if isAgentActivityVisible {
                           AgentLiveActivity(isHovering: isHovering)
                               .transition(.opacity.animation(.smooth(duration: 0.25)))
+                      } else if isFocusSummaryVisible {
+                          FocusQuietSummaryActivity(isHovering: isHovering)
+                              .transition(.opacity.animation(.smooth(duration: 0.25)))
                       } else if isCopyActionVisible {
                           CopyActionLiveActivity(isHovering: isHovering)
                               .id("copy-\(copyActions.suggestion?.id.uuidString ?? "")")
@@ -1289,6 +1299,8 @@ struct ContentView: View {
     private var visibleCommunicationCall: CommunicationCall? {
         guard communications.enabled, communications.accessGranted, interactionsEnabled else { return nil }
         if Defaults[.communicationRespectFocus] && doNotDisturbManager.isDoNotDisturbActive && communications.priorityCall?.phase == .incoming { return nil }
+        // A Pomodoro focus block holds ringing calls unless calls are let through.
+        if focusQuiet.holds(.call) && communications.priorityCall?.phase == .incoming { return nil }
         return communications.priorityCall
     }
     private var visibleCommunicationNotification: NotchNotification? {
@@ -1836,6 +1848,10 @@ struct ContentView: View {
         if announced == nil, visibleCommunicationCall == nil, AgentHub.hasPendingRequest, Defaults[.enableAgentsFeature] {
             // An agent waiting on you comes first.
             coordinator.currentView = .agents
+        } else if announced == nil, visibleCommunicationCall == nil, focusQuiet.summary != nil {
+            // Right after a focus block: where the things that came in are.
+            coordinator.currentView = focusQuiet.summaryDestination
+            focusQuiet.dismissSummary()
         } else if announced == nil, visibleCommunicationCall == nil, CopyActionManager.hasLiveSuggestion {
             coordinator.currentView = .copyAction
         } else if announced == nil, visibleCommunicationCall == nil,

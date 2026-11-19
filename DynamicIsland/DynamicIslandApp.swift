@@ -847,6 +847,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NotificationHub.shared.start()
         MeetingManager.shared.start()
         FocusGuardManager.shared.start()
+        FocusQuiet.shared.start()
         CopyActionManager.shared.start()
         BuildWatchManager.shared.start()
         AgentHub.shared.start()

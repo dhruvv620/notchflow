@@ -421,6 +421,8 @@ final class NotificationHub: ObservableObject {
         guard enabled, Defaults[.notificationAlertInNotch] else { return }
         if Defaults[.communicationRespectFocus] && DoNotDisturbManager.shared.isDoNotDisturbActive { return }
         if LockScreenManager.shared.isLocked { return }
+        // A Pomodoro focus block keeps it in the inbox without announcing it.
+        if FocusQuiet.shared.shouldHold(.notification) { return }
         withAnimation(.snappy) { alert = item }
         alertTask?.cancel()
         alertTask = Task { [weak self] in

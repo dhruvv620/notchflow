@@ -527,7 +527,8 @@ final class AgentHub: ObservableObject {
             waiters[request.id] = continuation
             withAnimation(.smooth(duration: 0.25)) { requests.append(request) }
             Self.hasPendingRequest = true
-            NSSound(named: "Tink")?.play()
+            // Approvals still show during focus (the agent is waiting), but silently.
+            if !FocusQuiet.shared.isQuiet { NSSound(named: "Tink")?.play() }
             Task { @MainActor [weak self] in
                 try? await Task.sleep(nanoseconds: UInt64(seconds) * 1_000_000_000)
                 self?.finish(request.id, with: .inWindow)
@@ -569,6 +570,7 @@ final class AgentHub: ObservableObject {
     }
 
     private func announce(_ session: AgentSession) {
+        if FocusQuiet.shared.shouldHold(.agent) { return }
         withAnimation(.smooth(duration: 0.25)) { announcement = session }
         announcementWork?.cancel()
         let work = DispatchWorkItem { [weak self] in

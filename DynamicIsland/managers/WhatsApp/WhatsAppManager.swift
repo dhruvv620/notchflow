@@ -698,6 +698,8 @@ final class WhatsAppManager: ObservableObject {
         if Defaults[.whatsAppQuietDuringFocus] && DoNotDisturbManager.shared.isDoNotDisturbActive { return }
         if LockScreenManager.shared.isLocked { return }
         if isTabVisible && selectedChatID == chatID { return }
+        // During a Pomodoro focus block the message waits in the WhatsApp tab.
+        if FocusQuiet.shared.shouldHold(.message) { return }
 
         let chatName = chat(id: chatID)?.displayName ?? message.senderName
         let text = Defaults[.whatsAppShowMessagePreviews]

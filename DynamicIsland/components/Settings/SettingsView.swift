@@ -880,6 +880,9 @@ struct SettingsView: View {
             SettingsSearchEntry(tab: .shortcuts, title: "Enable global keyboard shortcuts", keywords: ["keyboard", "shortcut"], highlightID: SettingsTab.shortcuts.highlightID(for: "Enable global keyboard shortcuts")),
 
             // Timer
+            SettingsSearchEntry(tab: .timer, title: "Don't disturb me during focus", keywords: ["pomodoro", "focus", "do not disturb", "notifications", "quiet", "distraction"], highlightID: SettingsTab.timer.highlightID(for: "Don't disturb me during focus")),
+            SettingsSearchEntry(tab: .timer, title: "Let calls through", keywords: ["pomodoro", "focus", "calls"], highlightID: SettingsTab.timer.highlightID(for: "Let calls through")),
+            SettingsSearchEntry(tab: .timer, title: "Also silence macOS (Focus)", keywords: ["pomodoro", "focus", "shortcuts", "do not disturb"], highlightID: SettingsTab.timer.highlightID(for: "Also silence macOS (Focus)")),
             SettingsSearchEntry(tab: .timer, title: "Enable timer feature", keywords: ["timer", "enable"], highlightID: SettingsTab.timer.highlightID(for: "Enable timer feature")),
             SettingsSearchEntry(tab: .timer, title: "Mirror macOS Clock timers", keywords: ["system timer", "clock app"], highlightID: SettingsTab.timer.highlightID(for: "Mirror macOS Clock timers")),
             SettingsSearchEntry(tab: .timer, title: "Timer tint", keywords: ["timer colour", "preset"], highlightID: SettingsTab.timer.highlightID(for: "Timer tint")),
@@ -5962,12 +5965,55 @@ struct TimerSettings: View {
             timerFeatureSection
 
             if enableTimerFeature {
+                pomodoroFocusSection
                 timerConfigurationSections
             }
         }
         .navigationTitle("Timers")
         .onAppear { syncCustomDuration() }
         .onChange(of: customTimerDuration) { _, newValue in syncCustomDuration(newValue) }
+    }
+
+    @Default(.pomodoroHoldsInterruptions) private var pomodoroHoldsInterruptions
+    @Default(.pomodoroControlsFocus) private var pomodoroControlsFocus
+    @Default(.pomodoroFocusOnShortcut) private var pomodoroFocusOnShortcut
+    @Default(.pomodoroFocusOffShortcut) private var pomodoroFocusOffShortcut
+
+    @ViewBuilder
+    private var pomodoroFocusSection: some View {
+        Section {
+            Defaults.Toggle(key: .pomodoroHoldsInterruptions) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Don't disturb me during focus")
+                    Text("While a Pomodoro focus block runs, the notch doesn't announce notifications, WhatsApp messages, calls, finished agents or build results. They wait in their tabs, and a line under the notch says what came in when the break starts. Agents that need your approval still show, silently.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            .settingsHighlight(id: highlightID("Don't disturb me during focus"))
+            if pomodoroHoldsInterruptions {
+                Defaults.Toggle(key: .pomodoroAllowsCalls) { Text("Let calls through") }
+                    .settingsHighlight(id: highlightID("Let calls through"))
+            }
+            Defaults.Toggle(key: .pomodoroControlsFocus) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Also silence macOS (Focus)")
+                    Text("macOS banners from other apps can only be silenced by a Focus. In the Shortcuts app, make two shortcuts with Set Focus (one turning Do Not Disturb on, one turning it off) named as below, and NotchFlow runs them as focus starts and ends.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            .settingsHighlight(id: highlightID("Also silence macOS (Focus)"))
+            if pomodoroControlsFocus {
+                TextField("Shortcut for focus", text: $pomodoroFocusOnShortcut)
+                TextField("Shortcut for breaks", text: $pomodoroFocusOffShortcut)
+                Button("Open Shortcuts") {
+                    if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.shortcuts") {
+                        NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
+                    }
+                }
+            }
+        } header: {
+            Text("Pomodoro")
+        }
     }
 
     @ViewBuilder

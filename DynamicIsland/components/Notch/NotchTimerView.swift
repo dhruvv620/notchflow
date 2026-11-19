@@ -23,6 +23,7 @@ struct NotchTimerView: View {
     @AppStorage("customTimerDuration") private var timerDuration: Double = 600
     @ObservedObject private var focusHistory = FocusHistory.shared
     @Default(.pomodoroControlsFocus) private var pomodoroControlsFocus
+    @Default(.pomodoroHoldsInterruptions) private var holdsInterruptions
     @Default(.pomodoroFocusOnShortcut) private var focusOnShortcut
     @Default(.pomodoroFocusOffShortcut) private var focusOffShortcut
     @AppStorage("notchflowPomodoroFocusMinutes") private var focusMinutes: Double = 25
@@ -245,19 +246,28 @@ struct NotchTimerView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text(section == .pomodoro ? "Pomodoro settings" : "Timer duration").font(.headline)
             if section == .pomodoro {
-                Stepper("Focus: \(Int(focusMinutes)) min", value: $focusMinutes, in: 1...90)
-                Stepper("Short break: \(Int(shortBreakMinutes)) min", value: $shortBreakMinutes, in: 1...60)
-                Stepper("Long break: \(Int(longBreakMinutes)) min", value: $longBreakMinutes, in: 1...120)
-                Stepper("Long break every \(sessionsBeforeLongBreak) sessions", value: $sessionsBeforeLongBreak, in: 1...12)
+                Group {
+                    Stepper("Focus: \(Int(focusMinutes)) min", value: $focusMinutes, in: 1...90)
+                    Stepper("Short break: \(Int(shortBreakMinutes)) min", value: $shortBreakMinutes, in: 1...60)
+                    Stepper("Long break: \(Int(longBreakMinutes)) min", value: $longBreakMinutes, in: 1...120)
+                    Stepper("Long break every \(sessionsBeforeLongBreak) sessions", value: $sessionsBeforeLongBreak, in: 1...12)
+                }
+                .disabled(modes.pomodoro.isActive)
+                if modes.pomodoro.isActive { Text("End the current Pomodoro to change its durations.").font(.caption).foregroundStyle(.secondary) }
                 Divider()
-                Defaults.Toggle(key: .pomodoroControlsFocus) { Text("Turn on a Focus during focus sessions") }
+                Defaults.Toggle(key: .pomodoroHoldsInterruptions) { Text("Don't disturb me during focus") }
+                if holdsInterruptions {
+                    Defaults.Toggle(key: .pomodoroAllowsCalls) { Text("Let calls through") }
+                    Text("Notifications, messages and other pop-ups wait in their tabs until the break.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                Defaults.Toggle(key: .pomodoroControlsFocus) { Text("Also silence macOS (Focus)") }
                 if pomodoroControlsFocus {
                     TextField("Shortcut for focus", text: $focusOnShortcut)
                     TextField("Shortcut for breaks", text: $focusOffShortcut)
                     Text("In the Shortcuts app, make two shortcuts with Set Focus (on, and off) and enter their names here.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
-                if modes.pomodoro.isActive { Text("End the current Pomodoro to change its durations.").font(.caption).foregroundStyle(.secondary) }
             } else {
                 HStack {
                     durationField("Hours", unit: 3600, maximum: 23)
@@ -267,7 +277,6 @@ struct NotchTimerView: View {
             }
         }
         .font(.system(size: 12))
-        .disabled(section == .pomodoro && modes.pomodoro.isActive)
         .padding(16).frame(width: 280)
         .tint(appearance.accentColor)
     }
