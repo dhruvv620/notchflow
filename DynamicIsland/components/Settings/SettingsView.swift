@@ -66,6 +66,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
     case shortcuts
     case notes
     case smartTools
+    case productivity
     case terminal
     case whatsapp
     case agents
@@ -79,7 +80,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .general, .appearance, .tabsAndFeatures, .shortcuts:                return .core
         case .media, .liveActivities, .communications, .whatsapp, .agents,
              .calendar, .timer, .shelf:                                          return .notch
-        case .smartTools, .notes, .clipboard, .screenAssistant,
+        case .smartTools, .productivity, .notes, .clipboard, .screenAssistant,
              .colorPicker, .terminal, .stats:                                    return .tools
         case .hudAndOSD, .battery, .devices, .downloads, .lockScreen:           return .system
         case .about:                                                            return .info
@@ -109,6 +110,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .shortcuts: return String(localized: "Shortcuts")
         case .notes: return String(localized: "Notes")
         case .smartTools: return String(localized: "Smart Tools")
+        case .productivity: return String(localized: "Productivity")
         case .terminal: return String(localized: "Terminal")
         case .whatsapp: return String(localized: "WhatsApp")
         case .agents: return String(localized: "AI Agents")
@@ -139,6 +141,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .shortcuts: return "keyboard"
         case .notes: return "note.text"
         case .smartTools: return "wand.and.stars"
+        case .productivity: return "clock.badge.checkmark"
         case .terminal: return "apple.terminal"
         case .whatsapp: return "message.fill"
         case .agents: return "sparkles"
@@ -169,6 +172,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .shortcuts: return .orange
         case .notes: return Color(red: 0.979, green: 0.716, blue: 0.153, opacity: 1.000)
         case .smartTools: return .orange
+        case .productivity: return .indigo
         case .terminal: return Color(red: 0.2, green: 0.8, blue: 0.4)
         case .whatsapp: return .whatsAppGreen
         case .agents: return .orange
@@ -499,6 +503,7 @@ struct SettingsView: View {
             .shelf,
             // Tools
             .smartTools,
+            .productivity,
             .notes,
             .clipboard,
             .screenAssistant,
@@ -930,6 +935,18 @@ struct SettingsView: View {
             SettingsSearchEntry(tab: .agents, title: "Ask in the agent's window when it is in front", keywords: ["terminal","front","approval"], highlightID: SettingsTab.agents.highlightID(for: "Ask in the agent's window when it is in front")),
             SettingsSearchEntry(tab: .agents, title: "Show working agents under the closed notch", keywords: ["status","working","closed notch"], highlightID: SettingsTab.agents.highlightID(for: "Show working agents under the closed notch")),
             SettingsSearchEntry(tab: .agents, title: "notchflow command", keywords: ["cli","command line","notchflow ask","notify","script"], highlightID: SettingsTab.agents.highlightID(for: "notchflow command")),
+            SettingsSearchEntry(tab: .productivity, title: "Track where my time goes", keywords: ["time tracking", "hours", "apps", "screen time", "rescuetime", "productivity"], highlightID: SettingsTab.productivity.highlightID(for: "Track where my time goes")),
+            SettingsSearchEntry(tab: .productivity, title: "Tell websites apart", keywords: ["browser", "sites", "youtube", "time tracking"], highlightID: SettingsTab.productivity.highlightID(for: "Tell websites apart")),
+            SettingsSearchEntry(tab: .productivity, title: "Daily work goal", keywords: ["goal", "ring", "hours", "work"], highlightID: SettingsTab.productivity.highlightID(for: "Daily work goal")),
+            SettingsSearchEntry(tab: .productivity, title: "Show the work ring under the closed notch", keywords: ["ring", "goal", "closed notch"], highlightID: SettingsTab.productivity.highlightID(for: "Show the work ring under the closed notch")),
+            SettingsSearchEntry(tab: .productivity, title: "Weekly report on Friday afternoon", keywords: ["report", "week", "summary"], highlightID: SettingsTab.productivity.highlightID(for: "Weekly report on Friday afternoon")),
+            SettingsSearchEntry(tab: .productivity, title: "Project names", keywords: ["projects", "clients", "invoice", "csv"], highlightID: SettingsTab.productivity.highlightID(for: "Project names")),
+            SettingsSearchEntry(tab: .productivity, title: "Keep track of promises", keywords: ["promise", "commitment", "follow up", "whatsapp", "remind"], highlightID: SettingsTab.productivity.highlightID(for: "Keep track of promises")),
+            SettingsSearchEntry(tab: .productivity, title: "Also track what others promise me", keywords: ["waiting on", "promise", "follow up"], highlightID: SettingsTab.productivity.highlightID(for: "Also track what others promise me")),
+            SettingsSearchEntry(tab: .productivity, title: "Remind me", keywords: ["promise", "nudge", "reminder"], highlightID: SettingsTab.productivity.highlightID(for: "Remind me")),
+            SettingsSearchEntry(tab: .productivity, title: "Workspaces", keywords: ["workspace", "setup", "launch apps", "layout", "work mode", "study"], highlightID: SettingsTab.productivity.highlightID(for: "Workspaces")),
+            SettingsSearchEntry(tab: .productivity, title: "Suggest workspaces", keywords: ["workspace", "suggestions", "learn"], highlightID: SettingsTab.productivity.highlightID(for: "Suggest workspaces")),
+            SettingsSearchEntry(tab: .productivity, title: "Done for the day quits workspace apps", keywords: ["done for the day", "quit", "workspace"], highlightID: SettingsTab.productivity.highlightID(for: "Done for the day quits workspace apps")),
             SettingsSearchEntry(tab: .smartTools, title: "Distraction meter", keywords: ["pomodoro", "focus", "youtube", "distraction", "off track"], highlightID: SettingsTab.smartTools.highlightID(for: "Distraction meter")),
             SettingsSearchEntry(tab: .smartTools, title: "Copy-to-action", keywords: ["clipboard", "copy", "tracking", "calendar", "directions"], highlightID: SettingsTab.smartTools.highlightID(for: "Copy-to-action")),
             SettingsSearchEntry(tab: .smartTools, title: "Smart replies", keywords: ["minimax", "ai", "reply", "suggestions", "api key"], highlightID: SettingsTab.smartTools.highlightID(for: "Smart replies")),
@@ -1060,6 +1077,10 @@ struct SettingsView: View {
         case .smartTools:
             SettingsForm(tab: .smartTools) {
                 SmartToolsSettings()
+            }
+        case .productivity:
+            SettingsForm(tab: .productivity) {
+                ProductivitySettings()
             }
         case .agents:
             SettingsForm(tab: .agents) {

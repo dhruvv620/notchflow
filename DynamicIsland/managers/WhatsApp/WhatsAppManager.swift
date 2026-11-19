@@ -644,6 +644,8 @@ final class WhatsAppManager: ObservableObject {
         do {
             let sentID = try await client.sendText(to: chatID, text: trimmed)
             replacePending(pendingID, in: chatID, with: sentID)
+            PromiseKeeper.shared.observe(text: trimmed, fromMe: true, person: chat(id: chatID)?.displayName ?? "",
+                                         route: .whatsapp(chatJID: chatID), sourceName: "WhatsApp", at: Date())
             markReadLocally(chatID, at: Date())
             // Replying means the messages before it were read.
             for id in unreadIDs.suffix(20) {
@@ -798,6 +800,13 @@ final class WhatsAppManager: ObservableObject {
             // A group's name is not in the message; fetch it.
             if chat.name.isEmpty { scheduleChatRefresh() }
         }
+
+        // Promises you make or are made, in this chat (only recent messages count).
+        let isGroup = WhatsAppJID.isGroup(chatID)
+        let chatName = chat(id: chatID)?.displayName ?? message.senderName
+        PromiseKeeper.shared.observe(text: message.text, fromMe: message.isFromMe,
+                                     person: (isGroup && !message.isFromMe) ? message.senderName : chatName,
+                                     route: .whatsapp(chatJID: chatID), sourceName: "WhatsApp", at: message.timestamp)
 
         guard !message.isFromMe else { return }
         if !isIgnored(chatID), Date().timeIntervalSince(message.timestamp) < 600 {

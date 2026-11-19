@@ -1,0 +1,355 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 dhruvv620
+
+import AppKit
+import Defaults
+import SwiftUI
+import UniformTypeIdentifiers
+
+/// Settings > Productivity: time tracking, the promise keeper and workspaces.
+struct ProductivitySettings: View {
+    @ObservedObject private var tracker = TimeTracker.shared
+    @ObservedObject private var keeper = PromiseKeeper.shared
+    @ObservedObject private var workspaces = WorkspaceManager.shared
+    @Default(.enableTimeTracking) private var trackingEnabled
+    @Default(.timeTrackingGoalHours) private var goalHours
+    @Default(.timeTrackingWorkCategories) private var workCategories
+    @Default(.timeTrackingProjects) private var extraProjects
+    @Default(.enablePromiseKeeper) private var promisesEnabled
+    @Default(.promiseNudgeMinutes) private var nudgeMinutes
+    @Default(.enableWorkspaces) private var workspacesEnabled
+    @State private var editing: Workspace?
+    @State private var confirmClearTime = false
+
+    // SettingsTab is private to SettingsView.swift; ids follow its "<tab>-<title>" form.
+    private func highlightID(_ title: String) -> String { "productivity-\(title)" }
+
+    var body: some View {
+        Form {
+            timeSection
+            promiseSection
+            workspaceSection
+        }
+        .sheet(item: $editing) { workspace in
+            WorkspaceEditor(workspace: workspace) { saved in
+                if let saved { workspaces.save(saved) }
+                editing = nil
+            }
+        }
+        .alert("Erase all tracked time?", isPresented: $confirmClearTime) {
+            Button("Erase", role: .destructive) { tracker.clearAll() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This deletes every day NotchFlow has tracked. It can't be undone.")
+        }
+    }
+
+    // MARK: Time tracking
+
+    private var timeSection: some View {
+        Section {
+            Defaults.Toggle(key: .enableTimeTracking) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Track where my time goes")
+                    Text("NotchFlow notes the app in front every few seconds (and the website, for browsers) and adds up your day by category and project. Idle time and a locked screen don't count. Everything stays on this Mac.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            .settingsHighlight(id: highlightID("Track where my time goes"))
+            if trackingEnabled {
+                Defaults.Toggle(key: .timeTrackingSites) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Tell websites apart")
+                        Text("Reads the address of the front browser tab (Safari, Chrome, Arc, Brave, Edge). macOS asks once per browser.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                .settingsHighlight(id: highlightID("Tell websites apart"))
+                Stepper(value: $goalHours, in: 0.5...12, step: 0.5) {
+                    Text("Daily work goal: \(goalHours.formatted(.number.precision(.fractionLength(0...1)))) hours")
+                }
+                .settingsHighlight(id: highlightID("Daily work goal"))
+                DisclosureGroup("Counts as work: \(workSummary)") {
+                    ForEach(TimeCategory.allCases, id: \.self) { category in
+                        Toggle(category.title, isOn: Binding(
+                            get: { TimeTrackingPolicy.workCategories(from: workCategories).contains(category) },
+                            set: { on in
+                                var set = TimeTrackingPolicy.workCategories(from: workCategories)
+                                if on { set.insert(category) } else { set.remove(category) }
+                                workCategories = set.map(\.rawValue).sorted()
+                            }))
+                    }
+                }
+                Defaults.Toggle(key: .timeTrackingShowRing) { Text("Show the work ring under the closed notch") }
+                    .settingsHighlight(id: highlightID("Show the work ring under the closed notch"))
+                Defaults.Toggle(key: .timeTrackingWeeklyReport) { Text("Weekly report on Friday afternoon") }
+                    .settingsHighlight(id: highlightID("Weekly report on Friday afternoon"))
+                VStack(alignment: .leading, spacing: 4) {
+                    TextField("Project names", text: $extraProjects, prompt: Text("acme-site, thesis, client-x"))
+                    Text("Projects are found in window titles of editors, terminals and Xcode, and from your AI agent sessions. Add other names here, comma separated, to recognize them anywhere (a Figma file, a Google Doc).")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                .settingsHighlight(id: highlightID("Project names"))
+                HStack {
+                    Button("Export hours (CSV)…") { tracker.exportCSV() }
+                    Spacer()
+                    Button("Erase tracked time…", role: .destructive) { confirmClearTime = true }
+                }
+            }
+        } header: {
+            Text("Time tracking")
+        }
+    }
+
+    private var workSummary: String {
+        TimeTrackingPolicy.workCategories(from: workCategories)
+            .sorted { $0.rawValue < $1.rawValue }.map(\.title).joined(separator: ", ")
+    }
+
+    // MARK: Promises
+
+    private var promiseSection: some View {
+        Section {
+            Defaults.Toggle(key: .enablePromiseKeeper) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Keep track of promises")
+                    Text("When you write \u{201C}I'll send it tonight\u{201D} in WhatsApp or in a reply from the notch, NotchFlow adds it to Promises in the Todos tab and reminds you before it's due. Messages are read on this Mac only.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            .settingsHighlight(id: highlightID("Keep track of promises"))
+            if promisesEnabled {
+                Defaults.Toggle(key: .promiseTrackTheirs) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Also track what others promise me")
+                        Text("\u{201C}I'll send the invoice Monday\u{201D} becomes \u{201C}waiting on\u{201D}, with a polite reminder ready if it doesn't come.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                .settingsHighlight(id: highlightID("Also track what others promise me"))
+                Picker("Remind me", selection: $nudgeMinutes) {
+                    Text("15 minutes before").tag(15)
+                    Text("30 minutes before").tag(30)
+                    Text("1 hour before").tag(60)
+                    Text("2 hours before").tag(120)
+                    Text("When it's due").tag(0)
+                }
+                .settingsHighlight(id: highlightID("Remind me"))
+                HStack {
+                    Text("\(keeper.open.count) open")
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Clear all promises", role: .destructive) { keeper.clearAll() }
+                        .disabled(keeper.promises.isEmpty)
+                }
+            }
+        } header: {
+            Text("Promise keeper")
+        }
+    }
+
+    // MARK: Workspaces
+
+    private var workspaceSection: some View {
+        Section {
+            Defaults.Toggle(key: .enableWorkspaces) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Workspaces")
+                    Text("One tap in the Flow tab opens your apps, pages, folders and a terminal, arranges the windows and can turn on Focus, music and a Pomodoro. Done for the day closes it all again.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            .settingsHighlight(id: highlightID("Workspaces"))
+            if workspacesEnabled {
+                ForEach(workspaces.workspaces) { workspace in
+                    HStack(spacing: 10) {
+                        Image(systemName: workspace.symbol).frame(width: 20).foregroundStyle(.tint)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(workspace.name)
+                            Text(workspace.apps.map(\.name).joined(separator: ", ").ifEmpty("No apps yet"))
+                                .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                        }
+                        Spacer()
+                        Button("Open") { workspaces.open(workspace) }
+                        Button("Edit") { editing = workspace }
+                        Button(role: .destructive) { workspaces.delete(workspace.id) } label: { Image(systemName: "trash") }
+                            .buttonStyle(.borderless)
+                    }
+                }
+                HStack {
+                    Button("New workspace") { editing = Workspace(name: "Work") }
+                    Button("Save what's open now") {
+                        Task { editing = await workspaces.captureCurrentSetup(named: "Setup \(workspaces.workspaces.count + 1)") }
+                    }
+                    Spacer()
+                }
+                Defaults.Toggle(key: .workspaceSuggestions) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Suggest workspaces")
+                        Text("When you open the same apps together on several days, the Flow tab offers to save them.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                .settingsHighlight(id: highlightID("Suggest workspaces"))
+                Defaults.Toggle(key: .workspaceDoneQuitsApps) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Done for the day quits workspace apps")
+                        Text("Only apps a workspace opened today; apps still ask to save your work.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                .settingsHighlight(id: highlightID("Done for the day quits workspace apps"))
+            }
+        } header: {
+            Text("Workspaces")
+        } footer: {
+            Text("Window layouts need Accessibility, and Focus uses the two Shortcuts set up under Settings > Timers > Also silence macOS (Focus).")
+        }
+    }
+}
+
+private extension String {
+    func ifEmpty(_ fallback: String) -> String { isEmpty ? fallback : self }
+}
+
+/// Edits one workspace.
+struct WorkspaceEditor: View {
+    @State var workspace: Workspace
+    let onDone: (Workspace?) -> Void
+    @State private var urlText = ""
+
+    private static let symbols = ["briefcase.fill", "book.fill", "chevron.left.forwardslash.chevron.right", "paintbrush.fill",
+                                  "graduationcap.fill", "music.note", "camera.fill", "chart.bar.fill", "house.fill", "moon.fill"]
+
+    init(workspace: Workspace, onDone: @escaping (Workspace?) -> Void) {
+        _workspace = State(initialValue: workspace)
+        _urlText = State(initialValue: workspace.urls.joined(separator: "\n"))
+        self.onDone = onDone
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Form {
+                Section {
+                    TextField("Name", text: $workspace.name)
+                    Picker("Icon", selection: $workspace.symbol) {
+                        ForEach(Self.symbols, id: \.self) { Image(systemName: $0).tag($0) }
+                    }
+                }
+                Section("Apps") {
+                    ForEach(workspace.apps, id: \.bundleID) { app in
+                        HStack {
+                            Text(app.name)
+                            Spacer()
+                            Button(role: .destructive) { workspace.apps.removeAll { $0.bundleID == app.bundleID } } label: {
+                                Image(systemName: "minus.circle")
+                            }
+                            .buttonStyle(.borderless)
+                        }
+                    }
+                    HStack {
+                        Menu("Add an open app") {
+                            ForEach(runningApps, id: \.bundleID) { app in
+                                Button(app.name) { add(app) }
+                            }
+                        }
+                        Button("Choose an app…") { chooseApp() }
+                    }
+                }
+                Section {
+                    TextEditor(text: $urlText)
+                        .font(.system(size: 12, design: .monospaced))
+                        .frame(minHeight: 60)
+                } header: {
+                    Text("Web pages, one per line")
+                }
+                Section("Folders") {
+                    ForEach(workspace.folders, id: \.self) { folder in
+                        HStack {
+                            Text((folder as NSString).abbreviatingWithTildeInPath).lineLimit(1).truncationMode(.middle)
+                            Spacer()
+                            Button(role: .destructive) { workspace.folders.removeAll { $0 == folder } } label: { Image(systemName: "minus.circle") }
+                                .buttonStyle(.borderless)
+                        }
+                    }
+                    Button("Add a folder…") { if let path = chooseFolder() { workspace.folders.append(path) } }
+                    Text("Folders open in the workspace's code editor if it has one (VS Code, Cursor, Zed, Xcode…), otherwise in Finder.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    HStack {
+                        Text("Terminal in")
+                        Text(workspace.terminalFolder.isEmpty ? "None" : (workspace.terminalFolder as NSString).abbreviatingWithTildeInPath)
+                            .foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                        Spacer()
+                        Button("Choose…") { if let path = chooseFolder() { workspace.terminalFolder = path } }
+                        if !workspace.terminalFolder.isEmpty { Button("Clear") { workspace.terminalFolder = "" } }
+                    }
+                }
+                Section("When it opens") {
+                    Picker("Windows", selection: $workspace.layout) {
+                        ForEach(Workspace.Layout.allCases, id: \.self) { Text($0.title).tag($0) }
+                    }
+                    Toggle("Hide other apps", isOn: $workspace.hideOtherApps)
+                    Toggle("Turn on Focus (Do Not Disturb)", isOn: $workspace.turnOnFocus)
+                    Toggle("Start a Pomodoro", isOn: $workspace.startPomodoro)
+                    Toggle("Play music", isOn: $workspace.playMusic)
+                    if workspace.playMusic {
+                        TextField("Apple Music playlist (optional)", text: $workspace.playlist)
+                    }
+                }
+            }
+            .formStyle(.grouped)
+            Divider()
+            HStack {
+                Button("Cancel") { onDone(nil) }.keyboardShortcut(.cancelAction)
+                Spacer()
+                Button("Save") {
+                    workspace.urls = urlText.split(whereSeparator: \.isNewline)
+                        .map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+                    workspace.name = workspace.name.trimmingCharacters(in: .whitespaces).isEmpty ? "Workspace" : workspace.name
+                    onDone(workspace)
+                }
+                .keyboardShortcut(.defaultAction)
+            }
+            .padding(12)
+        }
+        .frame(width: 480, height: 600)
+    }
+
+    private var runningApps: [WorkspaceApp] {
+        let own = Bundle.main.bundleIdentifier ?? ""
+        let current = Set(workspace.apps.map(\.bundleID))
+        return NSWorkspace.shared.runningApplications
+            .filter { $0.activationPolicy == .regular }
+            .compactMap { app -> WorkspaceApp? in
+                guard let id = app.bundleIdentifier, id != own, !current.contains(id) else { return nil }
+                return WorkspaceApp(bundleID: id, name: app.localizedName ?? id)
+            }
+            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
+    private func add(_ app: WorkspaceApp) {
+        guard !workspace.apps.contains(where: { $0.bundleID == app.bundleID }) else { return }
+        workspace.apps.append(app)
+    }
+
+    private func chooseApp() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.application]
+        panel.directoryURL = URL(fileURLWithPath: "/Applications")
+        panel.allowsMultipleSelection = true
+        guard panel.runModal() == .OK else { return }
+        for url in panel.urls {
+            guard let bundle = Bundle(url: url), let id = bundle.bundleIdentifier else { continue }
+            let name = FileManager.default.displayName(atPath: url.path).replacingOccurrences(of: ".app", with: "")
+            add(WorkspaceApp(bundleID: id, name: name))
+        }
+    }
+
+    private func chooseFolder() -> String? {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.directoryURL = FileManager.default.homeDirectoryForCurrentUser
+        return panel.runModal() == .OK ? panel.url?.path : nil
+    }
+}

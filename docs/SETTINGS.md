@@ -9,7 +9,7 @@ Read this before adding, moving or removing a setting. `tests/test_settings_inte
 |---|---|---|
 | (top, no header) | General, Appearance, Tabs & Features, Shortcuts | The notch as a whole: behavior, look, which tabs exist, keys |
 | In the Notch | Music, Live Activities, Notifications & Calls, WhatsApp, AI Agents, Calendar & Todos, Timers, Shelf | One page per thing that shows up in the notch (a tab or a closed-notch activity) |
-| Tools | Smart Tools, Notes, Clipboard, Screen Assistant, Color Picker, Terminal, Stats | Features you open and use |
+| Tools | Smart Tools, Productivity, Notes, Clipboard, Screen Assistant, Color Picker, Terminal, Stats | Features you open and use |
 | System | Controls, Battery, Devices, Download Alerts, Lock Screen | macOS integrations outside the notch panel |
 | (bottom) | About | Version and updates |
 

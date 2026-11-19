@@ -16,7 +16,7 @@ extension Notification.Name {
 }
 
 enum NotchBuiltinTab: String, CaseIterable, Identifiable {
-    case music, shelf, timers, stats, usage, notes, clipboard, cuely, todos, notifications, whatsapp, calendar, terminal, agents
+    case music, shelf, timers, stats, usage, notes, clipboard, cuely, todos, notifications, whatsapp, calendar, terminal, agents, flow
     var id: String { rawValue }
     var title: String {
         switch self {
@@ -34,6 +34,7 @@ enum NotchBuiltinTab: String, CaseIterable, Identifiable {
         case .calendar: return "Calendar"
         case .terminal: return "Terminal"
         case .agents: return "AI Agents"
+        case .flow: return "Flow"
         }
     }
     var symbol: String {
@@ -52,6 +53,7 @@ enum NotchBuiltinTab: String, CaseIterable, Identifiable {
         case .calendar: return "calendar"
         case .terminal: return "apple.terminal"
         case .agents: return "sparkles"
+        case .flow: return "clock.badge.checkmark"
         }
     }
     var view: NotchViews {
@@ -70,6 +72,7 @@ enum NotchBuiltinTab: String, CaseIterable, Identifiable {
         case .calendar: return .calendar
         case .terminal: return .terminal
         case .agents: return .agents
+        case .flow: return .flow
         }
     }
     static func identifier(for view: NotchViews) -> String {
@@ -91,6 +94,7 @@ enum NotchBuiltinTab: String, CaseIterable, Identifiable {
         case .calendar: return Defaults[.showCalendar]
         case .terminal: return Defaults[.enableTerminalFeature]
         case .agents: return Defaults[.enableAgentsFeature]
+        case .flow: return Defaults[.enableTimeTracking] || Defaults[.enableWorkspaces]
         }
     }
     var settingsDestination: String {
@@ -109,6 +113,7 @@ enum NotchBuiltinTab: String, CaseIterable, Identifiable {
         case .calendar: return "calendar"
         case .terminal: return "terminal"
         case .agents: return "agents"
+        case .flow: return "productivity"
         }
     }
 }
@@ -149,6 +154,8 @@ final class NotchTabPreferences: ObservableObject {
         changes.append(Defaults.publisher(.enableMinimalisticUI, options: []).map { _ in true }.eraseToAnyPublisher())
         changes.append(Defaults.publisher(.communicationsEnabled, options: []).map { _ in true }.eraseToAnyPublisher())
         changes.append(Defaults.publisher(.enableWhatsAppFeature, options: []).map { _ in true }.eraseToAnyPublisher())
+        changes.append(Defaults.publisher(.enableTimeTracking, options: []).map { _ in true }.eraseToAnyPublisher())
+        changes.append(Defaults.publisher(.enableWorkspaces, options: []).map { _ in true }.eraseToAnyPublisher())
         Publishers.MergeMany(changes)
             .receive(on: RunLoop.main).sink { [weak self] _ in
             self?.revision += 1

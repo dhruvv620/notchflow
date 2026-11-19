@@ -4,7 +4,7 @@ NotchFlow runs on your Mac. It has no account, no analytics and no tracking, and
 
 ## What stays on your Mac
 
-Settings, clipboard history, notes, todos, Pomodoro history, Cuely scripts, the notification inbox and agent sessions are stored on your Mac only (in NotchFlow's preferences and in `~/Library/Application Support/NotchFlow`). Keys you enter (MiniMax, GitHub, Gemini) are kept in your login Keychain.
+Settings, clipboard history, notes, todos, Pomodoro history, tracked time, promises, workspaces, Cuely scripts, the notification inbox and agent sessions are stored on your Mac only (in NotchFlow's preferences and in `~/Library/Application Support/NotchFlow`). Keys you enter (MiniMax, GitHub, Gemini) are kept in your login Keychain.
 
 ## Permissions and why they are asked for
 
@@ -12,8 +12,8 @@ macOS asks the first time a feature needs one of these. Every feature works with
 
 | Permission | Used for |
 | --- | --- |
-| Accessibility | Replacing the volume, brightness and keyboard backlight HUDs, trackpad gestures, and reading notification banners so you can reply from the notch. |
-| Automation (Apple Events) | Controlling Spotify and Apple Music, syncing with Notes, sending replies through Messages, reading the browser tab during a Pomodoro (distraction meter), and opening Terminal or iTerm for an AI agent. |
+| Accessibility | Replacing the volume, brightness and keyboard backlight HUDs, trackpad gestures, reading notification banners so you can reply from the notch, reading the front window's title for time tracking's projects, and arranging a workspace's windows. |
+| Automation (Apple Events) | Controlling Spotify and Apple Music, syncing with Notes, sending replies through Messages, reading the front browser tab's address (distraction meter, time tracking, saving a workspace), and opening Terminal or iTerm for an AI agent or a workspace. |
 | Calendar and Reminders | Showing events, meetings and todos in the notch. |
 | Contacts | The caller's photo and number for incoming calls. |
 | Camera | The mirror in the notch. Nothing is recorded. |

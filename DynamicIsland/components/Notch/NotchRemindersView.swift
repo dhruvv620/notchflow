@@ -3,6 +3,7 @@
 
 import AppKit
 import Combine
+import Defaults
 import EventKit
 import SwiftUI
 
@@ -12,6 +13,10 @@ struct NotchRemindersView: View {
     @ObservedObject private var manager = RemindersManager.shared
     @ObservedObject private var appearance = NotchAppearanceModel.shared
     @State private var showingDone = false
+    /// The Promises list (from PromiseKeeper) instead of todos.
+    @State private var showingPromises = false
+    @ObservedObject private var promiseKeeper = PromiseKeeper.shared
+    @Default(.enablePromiseKeeper) private var promisesEnabled
     @State private var page = 0
     @State private var isComposing = false
     @State private var title = ""
@@ -93,6 +98,10 @@ struct NotchRemindersView: View {
             Task { await manager.refresh() }
         }
         .onChange(of: showingDone) { _, done in manager.showCompleted = done; page = 0 }
+        .onAppear { if promiseKeeper.showListRequested { showingPromises = true; promiseKeeper.showListRequested = false } }
+        .onChange(of: promiseKeeper.showListRequested) { _, requested in
+            if requested { showingPromises = true; promiseKeeper.showListRequested = false }
+        }
         .onChange(of: manager.showCompleted) { _, _ in Task { await manager.refresh() } }
         .onChange(of: manager.selectedListID) { _, _ in page = 0 }
         .onChange(of: manager.isRequestingAccess) { _, _ in updateAutoCloseSuppression() }
@@ -116,8 +125,9 @@ struct NotchRemindersView: View {
             HStack(spacing: 6) {
                 statusPill("Open", count: scopedReminders.filter { !$0.isCompleted }.count, done: false)
                 statusPill("Done", count: showingDone ? items.count : nil, done: true)
+                if promisesEnabled { promisesPill }
                 Spacer(minLength: 0)
-                if !showingDone {
+                if !showingDone && !showingPromises {
                     HStack(spacing: 5) {
                         Button { page = max(0, currentPage - 1) } label: { Image(systemName: "chevron.left") }
                             .disabled(currentPage == 0).help("Previous todos page")
@@ -139,7 +149,9 @@ struct NotchRemindersView: View {
                 .disabled(manager.writableLists.isEmpty || manager.isLoading)
                 .help("Add a todo")
             }
-            if manager.isLoading && items.isEmpty {
+            if showingPromises {
+                PromisesList()
+            } else if manager.isLoading && items.isEmpty {
                 ProgressView("Loading todos…").controlSize(.small).frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if items.isEmpty {
                 emptyState
@@ -192,9 +204,28 @@ struct NotchRemindersView: View {
         }
     }
 
+    private var promisesPill: some View {
+        let selected = showingPromises
+        let count = promiseKeeper.open.count
+        return Button { showingPromises = true } label: {
+            HStack(spacing: 4) {
+                Image(systemName: "hand.raised").font(.system(size: 9, weight: .semibold))
+                Text("Promises")
+                if count > 0 { Text("\(count)").opacity(0.65) }
+            }
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(selected ? appearance.accentForegroundColor : Color.white.opacity(0.65))
+            .padding(.horizontal, 11).padding(.vertical, 5)
+            .background(selected ? appearance.accentColor : Color.white.opacity(0.05), in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+        .help("Promises you made and were made in your chats")
+    }
+
     private func statusPill(_ title: String, count: Int?, done: Bool) -> some View {
-        let selected = showingDone == done
-        return Button { showingDone = done } label: {
+        let selected = showingDone == done && !showingPromises
+        return Button { showingDone = done; showingPromises = false } label: {
             HStack(spacing: 4) {
                 Text(title)
                 if let count { Text("\(count)").opacity(0.65) }

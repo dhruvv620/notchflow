@@ -45,6 +45,14 @@ jobs:
         run: |
           swiftc -swift-version 5 -parse-as-library DynamicIsland/helpers/AgentHookPolicy.swift DynamicIsland/helpers/AgentTranscriptPolicy.swift tests/AgentTranscriptRegression.swift -o /tmp/agent-transcript-tests
           /tmp/agent-transcript-tests
+      - name: Check time tracking, promises and workspaces
+        run: |
+          swiftc -swift-version 5 -parse-as-library DynamicIsland/helpers/TimeTrackingPolicy.swift tests/TimeTrackingRegression.swift -o /tmp/time-tracking-tests
+          /tmp/time-tracking-tests
+          swiftc -swift-version 5 -parse-as-library DynamicIsland/helpers/PromisePolicy.swift tests/PromiseRegression.swift -o /tmp/promise-tests
+          /tmp/promise-tests
+          swiftc -swift-version 5 -parse-as-library DynamicIsland/helpers/WorkspacePolicy.swift DynamicIsland/helpers/TimeTrackingPolicy.swift tests/WorkspaceRegression.swift -o /tmp/workspace-tests
+          /tmp/workspace-tests
       - name: Check focus quiet
         run: |
           swiftc -swift-version 5 -parse-as-library DynamicIsland/helpers/FocusQuietPolicy.swift tests/FocusQuietRegression.swift -o /tmp/focus-quiet-tests

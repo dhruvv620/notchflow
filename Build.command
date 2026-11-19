@@ -67,6 +67,21 @@ printf '\nChecking Cuely voice following...\n'
     "$SOURCE_DIR/tests/CuelyVoiceFollowRegression.swift" -o "$BUILD_ROOT/CuelyVoiceFollowRegression"
 "$BUILD_ROOT/CuelyVoiceFollowRegression"
 
+printf '\nChecking time tracking, promises and workspaces...\n'
+/usr/bin/xcrun swiftc -swift-version 5 -parse-as-library \
+    "$SOURCE_DIR/DynamicIsland/helpers/TimeTrackingPolicy.swift" \
+    "$SOURCE_DIR/tests/TimeTrackingRegression.swift" -o "$BUILD_ROOT/TimeTrackingRegression"
+"$BUILD_ROOT/TimeTrackingRegression"
+/usr/bin/xcrun swiftc -swift-version 5 -parse-as-library \
+    "$SOURCE_DIR/DynamicIsland/helpers/PromisePolicy.swift" \
+    "$SOURCE_DIR/tests/PromiseRegression.swift" -o "$BUILD_ROOT/PromiseRegression"
+"$BUILD_ROOT/PromiseRegression"
+/usr/bin/xcrun swiftc -swift-version 5 -parse-as-library \
+    "$SOURCE_DIR/DynamicIsland/helpers/WorkspacePolicy.swift" \
+    "$SOURCE_DIR/DynamicIsland/helpers/TimeTrackingPolicy.swift" \
+    "$SOURCE_DIR/tests/WorkspaceRegression.swift" -o "$BUILD_ROOT/WorkspaceRegression"
+"$BUILD_ROOT/WorkspaceRegression"
+
 printf '\nChecking focus quiet...\n'
 /usr/bin/xcrun swiftc -swift-version 5 -parse-as-library \
     "$SOURCE_DIR/DynamicIsland/helpers/FocusQuietPolicy.swift" \

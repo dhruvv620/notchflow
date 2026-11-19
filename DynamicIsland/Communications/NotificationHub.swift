@@ -279,10 +279,23 @@ final class NotificationHub: ObservableObject {
         let new = incoming.filter { !known.contains($0.id) }
         guard !new.isEmpty else { return }
         replaceItems(new + items)
+        // Promises people make you in chat apps (WhatsApp is watched by its gateway).
+        for item in new where item.source != .whatsapp && Self.promiseChatApps.contains(item.bundleIdentifier ?? "") {
+            let route: TrackedPromise.Route
+            if case .messages(let chat) = item.reply { route = .messages(chatID: chat) } else { route = .none }
+            PromiseKeeper.shared.observe(text: item.body, fromMe: false, person: item.headline, route: route,
+                                         sourceName: item.appName, at: item.date)
+        }
         guard announce, let newest = new.max(by: { $0.date < $1.date }),
               Date().timeIntervalSince(newest.date) < 120 else { return }
         showAlert(newest)
     }
+
+    /// Chat apps whose notifications are checked for promises made to you.
+    private static let promiseChatApps: Set<String> = [
+        NotchNotificationPolicy.messagesBundleIdentifier, "com.tinyspeck.slackmacgap", "ru.keepcoder.Telegram",
+        "com.hnc.Discord", "org.whispersystems.signal-desktop", "com.microsoft.teams2",
+    ]
 
     private func replaceItems(_ next: [NotchNotification]) {
         let normalized = NotchNotificationPolicy.normalized(next, limit: Self.historyLimit)
@@ -389,6 +402,17 @@ final class NotificationHub: ObservableObject {
         }
 
         if sent {
+            // A promise you made in the reply (WhatsApp replies are seen by its gateway hook).
+            switch item.reply {
+            case .messages(let chat):
+                PromiseKeeper.shared.observe(text: trimmed, fromMe: true, person: item.headline,
+                                             route: .messages(chatID: chat), sourceName: item.appName, at: Date())
+            case .banner:
+                PromiseKeeper.shared.observe(text: trimmed, fromMe: true, person: item.headline,
+                                             route: .none, sourceName: item.appName, at: Date())
+            case .whatsapp, .none:
+                break
+            }
             withAnimation(.snappy) {
                 repliedIDs.insert(item.id)
                 if replyingID == item.id { replyingID = nil }

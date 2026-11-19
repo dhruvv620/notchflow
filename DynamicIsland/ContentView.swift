@@ -65,6 +65,10 @@ struct ContentView: View {
     @ObservedObject var copyActions = CopyActionManager.shared
     @ObservedObject var buildWatcher = BuildWatchManager.shared
     @ObservedObject var focusQuiet = FocusQuiet.shared
+    @ObservedObject var timeTracker = TimeTracker.shared
+    @ObservedObject var promiseKeeper = PromiseKeeper.shared
+    @Default(.timeTrackingShowRing) var timeTrackingShowRing
+    @Default(.enableTimeTracking) var enableTimeTracking
     @ObservedObject var agentHub = AgentHub.shared
     @Default(.agentShowWorkingInClosedNotch) var agentShowWorkingInClosedNotch
     @ObservedObject var remindersManager = RemindersManager.shared
@@ -368,6 +372,22 @@ struct ContentView: View {
         focusQuiet.summary != nil && canShowClosedActivity
     }
 
+    /// A promise due soon.
+    private var isPromiseNudgeVisible: Bool {
+        promiseKeeper.nudge != nil && canShowClosedActivity
+    }
+
+    /// Friday's weekly report.
+    private var isWeeklyReportVisible: Bool {
+        timeTracker.weeklyReportReady && canShowClosedActivity
+    }
+
+    /// The work ring fills an otherwise idle closed notch.
+    private var isWorkRingVisible: Bool {
+        enableTimeTracking && timeTrackingShowRing && timeTracker.workToday >= 60
+            && canShowClosedActivity && !musicManager.isPlaying
+    }
+
     private var isMeetingActivityVisible: Bool {
         meetingManager.showsCountdown
             && vm.notchState == .closed
@@ -415,7 +435,8 @@ struct ContentView: View {
             width = max(width, vm.closedNotchSize.width + (MeetingLiveActivity.wingWidth + 6) * 2 + closedPadding)
         }
 
-        if isCopyActionVisible || isFocusGuardVisible || isBuildWatchVisible || isAgentActivityVisible || isFocusSummaryVisible {
+        if isCopyActionVisible || isFocusGuardVisible || isBuildWatchVisible || isAgentActivityVisible || isFocusSummaryVisible
+            || isPromiseNudgeVisible || isWeeklyReportVisible || isWorkRingVisible {
             width = max(width, vm.closedNotchSize.width + 8 + ClosedNotchWingsMetrics.addedWidth + closedPadding)
         }
 
@@ -1137,6 +1158,12 @@ struct ContentView: View {
                       } else if isFocusSummaryVisible {
                           FocusQuietSummaryActivity(isHovering: isHovering)
                               .transition(.opacity.animation(.smooth(duration: 0.25)))
+                      } else if isPromiseNudgeVisible {
+                          PromiseNudgeActivity(isHovering: isHovering)
+                              .transition(.opacity.animation(.smooth(duration: 0.25)))
+                      } else if isWeeklyReportVisible {
+                          WeeklyReportActivity(report: timeTracker.weekReport(), isHovering: isHovering)
+                              .transition(.opacity.animation(.smooth(duration: 0.25)))
                       } else if isCopyActionVisible {
                           CopyActionLiveActivity(isHovering: isHovering)
                               .id("copy-\(copyActions.suggestion?.id.uuidString ?? "")")
@@ -1183,6 +1210,9 @@ struct ContentView: View {
                       } else if !coordinator.expandingView.show && vm.notchState == .closed && (!musicManager.isPlaying && musicManager.isPlayerIdle) && Defaults[.showNotHumanFace] && !vm.hideOnClosed  {
                       } else if isTodayRingVisible {
                           TodayProgressActivity(isHovering: isHovering)
+                              .transition(.opacity.animation(.smooth(duration: 0.25)))
+                      } else if isWorkRingVisible {
+                          WorkGoalActivity(isHovering: isHovering)
                               .transition(.opacity.animation(.smooth(duration: 0.25)))
                       } else if !isCurrentScreenExpansionVisible && vm.notchState == .closed && (!musicManager.isPlaying && musicManager.isPlayerIdle) && Defaults[.showNotHumanFace] && !vm.hideOnClosed  {
                           DynamicIslandFaceAnimation().animation(.interactiveSpring, value: musicManager.isPlayerIdle)
@@ -1338,6 +1368,7 @@ struct ContentView: View {
         case .whatsapp: NotchWhatsAppView()
         case .copyAction: NotchCopyActionView()
         case .agents: NotchAgentsView()
+        case .flow: NotchFlowView()
         }
     }
 
@@ -1848,6 +1879,15 @@ struct ContentView: View {
         if announced == nil, visibleCommunicationCall == nil, AgentHub.hasPendingRequest, Defaults[.enableAgentsFeature] {
             // An agent waiting on you comes first.
             coordinator.currentView = .agents
+        } else if announced == nil, visibleCommunicationCall == nil, promiseKeeper.nudge != nil {
+            // A promise nudge opens the Promises list.
+            promiseKeeper.showListRequested = true
+            coordinator.currentView = .reminders
+            promiseKeeper.dismissNudge()
+        } else if announced == nil, visibleCommunicationCall == nil, timeTracker.weeklyReportReady {
+            timeTracker.showWeekRequested = true
+            coordinator.currentView = .flow
+            timeTracker.dismissWeeklyReport()
         } else if announced == nil, visibleCommunicationCall == nil, focusQuiet.summary != nil {
             // Right after a focus block: where the things that came in are.
             coordinator.currentView = focusQuiet.summaryDestination

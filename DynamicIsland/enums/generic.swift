@@ -87,6 +87,8 @@ public enum NotchViews {
     case calendar
     case whatsapp
     case agents
+    /// Workspaces, today's time and the week's report.
+    case flow
     /// Temporary tab for something just copied (CopyActionManager); not reorderable.
     case copyAction
 }

@@ -21,6 +21,7 @@ NotchFlow stays out of the way until you need it. Hover over the notch (or swipe
 - **Notifications, WhatsApp and calls**: every app's notifications in one inbox with inline replies, WhatsApp chats through a local gateway, and incoming calls with the caller's photo and quick replies.
 - **AI agents**: approve Claude Code, Codex, Cursor and Gemini CLI from the notch, follow what they are doing, read and continue their conversations, and start new tasks without opening a terminal.
 - **Clipboard and Shelf**: clipboard history you can swipe through, and a shelf for files with quick actions (resize, PDF, cut out, zip, AirDrop, WhatsApp).
+- **Flow**: time tracking that tracks itself (apps, sites and projects, a daily work goal, a weekly report, CSV export for invoices), a promise keeper that notices "I'll send it tonight" in your chats and reminds you before it's due, and workspaces that open your whole setup in one tap and close it with Done for the day.
 - **Smart tools**: copy a tracking number, date, address or flight and the notch offers the right action; smart replies with your own MiniMax key; a build watcher for GitHub Actions; people pins.
 - **Cuely**: a teleprompter for your scripts that listens and follows your voice.
 - **System**: replacement HUDs for volume, brightness and keyboard backlight, battery and charging, Bluetooth devices, privacy indicators, downloads, lock screen widgets, and system stats.

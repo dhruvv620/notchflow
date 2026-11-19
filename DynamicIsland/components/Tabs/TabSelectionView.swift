@@ -116,6 +116,9 @@ struct TabSelectionView: View {
         if Defaults[.enableAgentsFeature] {
             tabsArray.append(TabModel(label: "AI Agents", icon: "sparkles", view: .agents))
         }
+        if Defaults[.enableTimeTracking] || Defaults[.enableWorkspaces] {
+            tabsArray.append(TabModel(label: "Flow", icon: "clock.badge.checkmark", view: .flow))
+        }
         return tabsArray
     }
     static var availableTabs: [TabModel] {
