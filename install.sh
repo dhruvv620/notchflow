@@ -88,7 +88,9 @@ else
 fi
 
 echo "Installing to ${INSTALL_DIR}..."
-ditto -x -k "$TMP_DIR/${APP_NAME}.zip" "$TMP_DIR/unzipped"
+# Never let the download flag reach the app (it is what makes Gatekeeper block it).
+xattr -c "$TMP_DIR/${APP_NAME}.zip" 2>/dev/null || true
+ditto -x -k --noqtn "$TMP_DIR/${APP_NAME}.zip" "$TMP_DIR/unzipped"
 
 if [ ! -d "$TMP_DIR/unzipped/${APP_NAME}.app" ]; then
     echo "Install failed: ${APP_NAME}.app was not found in the download."
@@ -110,12 +112,23 @@ for OTHER_DIR in "/Applications" "$HOME/Applications"; do
     fi
 done
 
-# Remove the quarantine flag so the first launch is not blocked.
-xattr -dr com.apple.quarantine "$INSTALL_DIR/${APP_NAME}.app" 2>/dev/null || true
+# Clear the quarantine flag (and any other download attributes) from every
+# file in the app, so macOS does not ask Apple to verify it on first launch.
+xattr -cr "$INSTALL_DIR/${APP_NAME}.app" 2>/dev/null || true
+if xattr -r "$INSTALL_DIR/${APP_NAME}.app" 2>/dev/null | grep -q com.apple.quarantine; then
+    echo ""
+    echo "macOS kept the download flag on ${APP_NAME}. If it says it can't verify the app,"
+    echo "run this once and open it again:"
+    echo "  xattr -cr \"$INSTALL_DIR/${APP_NAME}.app\""
+fi
 
 echo ""
 echo "${APP_NAME} is installed. Launching it now..."
 open "$INSTALL_DIR/${APP_NAME}.app"
 
+echo ""
+echo "If macOS says it could not verify ${APP_NAME}: click Done, then open"
+echo "System Settings > Privacy & Security, scroll down and click Open Anyway."
+echo ""
 echo "Done. macOS will ask for permissions (Reminders, Microphone,"
 echo "Accessibility) the first time a feature needs them - allow the ones you want."
