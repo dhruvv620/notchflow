@@ -34,6 +34,18 @@ struct NotchTabHeightRegression {
         let wide = NotchTabHeightRule.fitsContent(shrinkBy: 200, growBy: 0)
         try require(NotchTabHeightPolicy.height(preset: compact, rule: wide, reportedPanelHeight: 10) == NotchTabHeightPolicy.smallestPanel, "Panel shrank below the smallest usable size")
 
+        // The tallest a tab can get bounds every height it reports, so a window
+        // that tall never has to resize when switching tabs.
+        for rule in [NotchTabHeightRule.preset, .taller(by: 90), .atLeast(224), fits, wide] {
+            let tallest = NotchTabHeightPolicy.tallest(preset: compact, rule: rule)
+            for report: CGFloat? in [nil, 0, 120, 210, 900] {
+                let height = NotchTabHeightPolicy.height(preset: compact, rule: rule, reportedPanelHeight: report)
+                try require(height <= tallest, "Height \(height) above the tallest \(tallest)")
+            }
+        }
+        try require(NotchTabHeightPolicy.tallest(preset: compact, rule: .atLeast(224)) == 224, "Tallest ignores the floor")
+        try require(NotchTabHeightPolicy.tallest(preset: compact, rule: fits) == 260, "Tallest ignores growth")
+
         // Reports are stepped so pixel jitter does not resize the notch.
         try require(NotchTabHeightPolicy.quantized(101) == 104 && NotchTabHeightPolicy.quantized(104) == 104, "Report not quantized up to the step")
         try require(NotchTabHeightPolicy.quantized(.nan) == 0, "NaN report not rejected")

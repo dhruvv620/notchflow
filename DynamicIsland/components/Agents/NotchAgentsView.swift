@@ -13,6 +13,8 @@ struct NotchAgentsView: View {
     @EnvironmentObject private var vm: DynamicIslandViewModel
     @State private var interactionToken = UUID()
     @State private var composing = false
+    @Default(.agentPanelSize) private var panelSizeValue
+    private var panelSize: AgentPanelSize { AgentPanelSize(rawValue: panelSizeValue) ?? .regular }
 
     var body: some View {
         Group {
@@ -27,14 +29,14 @@ struct NotchAgentsView: View {
                 }
             } else {
                 HStack(alignment: .top, spacing: NotchTokens.Spacing.m) {
-                    AgentSessionList(composing: $composing)
-                        .frame(width: 210)
+                    AgentSessionList(composing: $composing, panelSizeValue: $panelSizeValue)
+                        .frame(width: panelSize.listWidth)
                     Rectangle().fill(Color.white.opacity(0.08)).frame(width: 1)
                     Group {
                         if composing {
                             AgentTaskComposer { withAnimation(NotchTokens.Motion.standard) { composing = false } }
                         } else if let selected = conversations.selected {
-                            AgentChatView(summary: selected)
+                            AgentChatView(summary: selected, textScale: panelSize.textScale)
                         } else {
                             NotchEmptyState(symbol: "sparkles",
                                             title: hub.sessions.isEmpty && conversations.recent.isEmpty ? "No sessions yet" : "Pick a session",
@@ -282,6 +284,8 @@ private struct AgentButton: View {
 
 private struct AgentSessionList: View {
     @Binding var composing: Bool
+    @Binding var panelSizeValue: Int
+    private var panelSize: AgentPanelSize { AgentPanelSize(rawValue: panelSizeValue) ?? .regular }
     @ObservedObject private var hub = AgentHub.shared
     @ObservedObject private var conversations = AgentConversations.shared
 
@@ -295,6 +299,7 @@ private struct AgentSessionList: View {
             HStack(spacing: NotchTokens.Spacing.s) {
                 Text("AI Agents").font(NotchTokens.Typography.title)
                 Spacer(minLength: 0)
+                sizeMenu
                 NotchPillButton(title: "New", symbol: "plus", prominent: !composing) {
                     withAnimation(NotchTokens.Motion.standard) { composing.toggle() }
                 }
@@ -341,6 +346,29 @@ private struct AgentSessionList: View {
                 }
             }
         }
+    }
+
+    /// Click to make the tab bigger (Regular, Large, Extra large), hold for the list.
+    private var sizeMenu: some View {
+        Menu {
+            ForEach(AgentPanelSize.allCases, id: \.rawValue) { size in
+                Button {
+                    applyNotchLayoutChange { panelSizeValue = size.rawValue }
+                } label: {
+                    if size == panelSize { Label(size.title, systemImage: "checkmark") } else { Text(size.title) }
+                }
+            }
+        } label: {
+            Image(systemName: panelSize == .extraLarge
+                  ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
+                .font(.system(size: 11, weight: .medium))
+        } primaryAction: {
+            applyNotchLayoutChange { panelSizeValue = panelSize.next.rawValue }
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("Size: \(panelSize.title). Click to make AI Agents bigger; hold for sizes.")
     }
 
     private func liveSubtitle(_ session: AgentSession) -> String {
@@ -405,6 +433,8 @@ private struct AgentListRow: View {
 
 private struct AgentChatView: View {
     let summary: AgentSessionSummary
+    /// Bigger panel sizes read in bigger text.
+    var textScale: CGFloat = 1
     @ObservedObject private var hub = AgentHub.shared
     @ObservedObject private var conversations = AgentConversations.shared
     @ObservedObject private var appearance = NotchAppearanceModel.shared
@@ -519,7 +549,7 @@ private struct AgentChatView: View {
         HStack {
             if mine { Spacer(minLength: 40) }
             Text(LocalizedStringKey(text))
-                .font(.system(size: 12))
+                .font(.system(size: 12 * textScale))
                 .textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, 10)
@@ -542,14 +572,14 @@ private struct AgentChatView: View {
                     Text(items.count == 1 ? items[0].text : "\(items.count) steps · \(items.last?.text ?? "")")
                         .lineLimit(1)
                 }
-                .font(.system(size: 10, design: .monospaced))
+                .font(.system(size: 10 * textScale, design: .monospaced))
                 .foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
             if expanded && items.count > 1 {
                 ForEach(items) { item in
                     Text(item.text)
-                        .font(.system(size: 10, design: .monospaced))
+                        .font(.system(size: 10 * textScale, design: .monospaced))
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
                         .padding(.leading, 13)

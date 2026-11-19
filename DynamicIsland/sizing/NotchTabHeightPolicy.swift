@@ -55,6 +55,14 @@ enum NotchTabHeightPolicy {
         return min(max(wanted, lower), upper).rounded()
     }
 
+    /// The tallest the tab can get, whatever its content reports. The window
+    /// is kept this tall while the notch is open, so switching tabs only
+    /// animates the panel inside it and never resizes the window.
+    static func tallest(preset: CGFloat, rule: NotchTabHeightRule) -> CGFloat {
+        let lower = max(preset + rule.minimumOffset, rule.absoluteMinimum ?? 0, smallestPanel)
+        return max(lower, preset + rule.maximumOffset).rounded()
+    }
+
     /// Reported heights are rounded up to a small step, so a list that moves
     /// by a pixel does not resize the notch on every layout pass.
     static func quantized(_ height: CGFloat, step: CGFloat = 4) -> CGFloat {

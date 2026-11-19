@@ -11,6 +11,7 @@ struct AgentsSettings: View {
     @Default(.enableAgentsFeature) private var enabled
     @Default(.agentApprovalWaitSeconds) private var waitSeconds
     @Default(.agentTerminalApp) private var terminalApp
+    @Default(.agentPanelSize) private var panelSize
     @State private var connected: Set<String> = []
     @State private var commandCurrent = AgentSetup.isCommandCurrent
     @State private var message: String?
@@ -117,6 +118,12 @@ struct AgentsSettings: View {
                 }
             }
             .settingsHighlight(id: highlightID("Ask in the agent's window when it is in front"))
+            Picker("Tab size", selection: Binding(get: { panelSize }, set: { value in applyNotchLayoutChange { panelSize = value } })) {
+                ForEach(AgentPanelSize.allCases, id: \.rawValue) { Text($0.title).tag($0.rawValue) }
+            }
+            .settingsHighlight(id: highlightID("Tab size"))
+            Text("Large and Extra large make the AI Agents tab wider and taller, with bigger text, for reading long conversations. The size button in the tab switches it too.")
+                .font(.caption).foregroundStyle(.secondary)
             Defaults.Toggle(key: .agentShowWorkingInClosedNotch) {
                 Text("Show working agents under the closed notch")
             }

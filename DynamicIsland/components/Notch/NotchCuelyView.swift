@@ -176,7 +176,7 @@ struct NotchCuelyView: View {
             Menu {
                 ForEach(CuelyPanelSize.allCases, id: \.rawValue) { size in
                     Button {
-                        panelSizeValue = size.rawValue
+                        applyNotchLayoutChange { panelSizeValue = size.rawValue }
                     } label: {
                         if size == panelSize { Label(size.title, systemImage: "checkmark") } else { Text(size.title) }
                     }
@@ -186,7 +186,7 @@ struct NotchCuelyView: View {
                       ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
                     .font(.system(size: 11, weight: .medium))
             } primaryAction: {
-                panelSizeValue = panelSize.next.rawValue
+                applyNotchLayoutChange { panelSizeValue = panelSize.next.rawValue }
             }
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)

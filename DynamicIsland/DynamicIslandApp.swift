@@ -492,10 +492,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         resizeWindows(to: requiredSize, animated: animateResize, force: false)
     }
 
+    /// Resize for a layout change right away, in the same frame as the change
+    /// (a size button, for example), instead of on the next run-loop turn.
+    func refreshWindowForLayoutChange() {
+        updateWindowSizeForTabSwitch()
+    }
+
     private func updateWindowSizeForTabSwitch() {
         let requiredSize = calculateRequiredNotchSize()
-        vm.refreshAppearanceSize()
-        for viewModel in viewModels.values { viewModel.refreshAppearanceSize() }
+        // Views that size themselves from the view model follow the panel's
+        // own animation instead of jumping a frame later.
+        withAnimation(.smooth(duration: NotchTabHeightPolicy.animationDuration)) {
+            vm.refreshAppearanceSize()
+            for viewModel in viewModels.values { viewModel.refreshAppearanceSize() }
+        }
 
         pendingWindowShrink?.cancel()
         pendingWindowShrink = nil
@@ -517,6 +527,30 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         DispatchQueue.main.asyncAfter(deadline: .now() + NotchTabHeightPolicy.animationDuration + 0.05, execute: shrink)
     }
     
+    /// The open size one tab needs; with `tallest`, the most it can need.
+    private func requiredOpenSize(for view: NotchViews, tallest: Bool) -> CGSize {
+        let minimalistic = Defaults[.enableMinimalisticUI]
+        var baseSize = minimalistic ? minimalisticOpenNotchSize(isDynamicIslandMode: shouldUseDynamicIslandMode(for: vm.screen)) : openNotchSize
+        baseSize = tabOpenNotchSize(for: view, preset: baseSize, screen: vm.screen,
+                                    closedHeight: vm.effectiveClosedNotchHeight, tallest: tallest)
+        let adjusted = statsAdjustedNotchSize(from: baseSize, isStatsTabActive: view == .stats,
+                                              secondRowProgress: tallest ? 1 : coordinator.statsSecondRowExpansion)
+        return addShadowPadding(to: adjusted, isMinimalistic: minimalistic)
+    }
+
+    /// Room for every tab the notch can show. The window keeps this size, so
+    /// switching tabs only animates the panel inside it: resizing the window
+    /// mid-switch is what made taller tabs (Timer, AI Agents) jump. Clicks
+    /// outside the visible panel pass through (NotchInputRegionBridge).
+    private func openHeadroomSize() -> CGSize {
+        var views = Set(TabSelectionView.availableTabs.map(\.view))
+        views.insert(coordinator.currentView)
+        return views.reduce(CGSize.zero) { size, view in
+            let needed = requiredOpenSize(for: view, tallest: true)
+            return CGSize(width: max(size.width, needed.width), height: max(size.height, needed.height))
+        }
+    }
+
     private func calculateRequiredNotchSize() -> CGSize {
         // Check if inline sneak peek is showing and notch is closed
         let airPodsListeningModeSneakActive = vm.notchState == .closed &&
@@ -615,8 +649,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         resizeWindows(to: size, animated: animated, force: force)
     }
 
-    private func resizeWindows(to size: CGSize, animated: Bool, force: Bool) {
-        guard size.width > 0, size.height > 0 else { return }
+    private func resizeWindows(to requested: CGSize, animated: Bool, force: Bool) {
+        guard requested.width > 0, requested.height > 0 else { return }
+        let headroom = openHeadroomSize()
+        let size = CGSize(width: max(requested.width, headroom.width), height: max(requested.height, headroom.height))
 
         if Defaults[.showOnAllDisplays] {
             for (screen, window) in windows {
@@ -770,6 +806,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         Defaults.publisher(.musicLyricsExpanded, options: []).map { _ in true }
             .merge(with: Defaults.publisher(.enableLyrics, options: []).map { _ in true })
             .merge(with: Defaults.publisher(.cuelyPanelSize, options: []).map { _ in true })
+            .merge(with: Defaults.publisher(.agentPanelSize, options: []).map { _ in true })
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.updateWindowSizeForTabSwitch() }
             .store(in: &cancellables)
