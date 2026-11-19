@@ -22,6 +22,15 @@ struct NotchFlowView: View {
         VStack(alignment: .leading, spacing: NotchTokens.Spacing.s) {
             header
             if workspacesEnabled { workspaceStrip }
+            if let deleted = workspaces.recentlyDeleted {
+                HStack(spacing: 8) {
+                    Image(systemName: "trash").foregroundStyle(.secondary)
+                    Text("Deleted \u{201C}\(deleted.workspace.name)\u{201D}").font(NotchTokens.Typography.caption)
+                    Spacer(minLength: 0)
+                    NotchPillButton(title: "Undo", symbol: "arrow.uturn.backward", prominent: true) { workspaces.undoDelete() }
+                }
+                .transition(.opacity)
+            }
             if let suggestion = workspaces.suggestion, workspacesEnabled { suggestionBanner(suggestion) }
             if workspaces.showDaySummary { daySummary }
             if trackingEnabled {
@@ -80,7 +89,13 @@ struct NotchFlowView: View {
                     chip(workspace.name, symbol: workspace.symbol, selected: workspaces.activeID == workspace.id) {
                         workspaces.open(workspace)
                     }
-                    .help(describe(workspace))
+                    .help(describe(workspace) + "\nRight-click to edit or delete.")
+                    .contextMenu {
+                        Button("Open") { workspaces.open(workspace) }
+                        Button("Edit in Settings…") { SettingsWindowController.shared.showWindow() }
+                        Divider()
+                        Button("Delete \u{201C}\(workspace.name)\u{201D}", role: .destructive) { workspaces.delete(workspace.id) }
+                    }
                 }
                 chip("Done for the day", symbol: "moon.stars.fill", selected: false) { workspaces.doneForTheDay() }
                     .help("Quits what your workspaces opened today, turns Focus off and shows today's summary")

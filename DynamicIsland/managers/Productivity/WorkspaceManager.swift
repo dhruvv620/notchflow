@@ -32,6 +32,9 @@ final class WorkspaceManager: ObservableObject {
     /// Set by Done for the day, to show the day's summary.
     @Published var showDaySummary = false
     @Published private(set) var lastMessage: String?
+    /// The workspace just deleted, for Undo (cleared after a few seconds).
+    @Published private(set) var recentlyDeleted: (workspace: Workspace, index: Int)?
+    private var undoWork: DispatchWorkItem?
 
     private var launches: [AppLaunch] = []
     /// Apps a workspace opened today (not ones that were already running).
@@ -71,9 +74,32 @@ final class WorkspaceManager: ObservableObject {
     }
 
     func delete(_ id: UUID) {
-        workspaces.removeAll { $0.id == id }
+        guard let index = workspaces.firstIndex(where: { $0.id == id }) else { return }
+        let removed = workspaces[index]
+        withAnimation(.smooth(duration: 0.25)) {
+            workspaces.remove(at: index)
+            recentlyDeleted = (removed, index)
+        }
         if activeID == id { activeID = nil }
         persist()
+        refreshSuggestion()
+        undoWork?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            withAnimation(.smooth(duration: 0.25)) { self?.recentlyDeleted = nil }
+        }
+        undoWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 8, execute: work)
+    }
+
+    func undoDelete() {
+        guard let deleted = recentlyDeleted else { return }
+        undoWork?.cancel()
+        withAnimation(.smooth(duration: 0.25)) {
+            workspaces.insert(deleted.workspace, at: min(deleted.index, workspaces.count))
+            recentlyDeleted = nil
+        }
+        persist()
+        refreshSuggestion()
     }
 
     func move(from source: IndexSet, to destination: Int) {
