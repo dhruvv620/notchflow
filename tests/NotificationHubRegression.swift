@@ -86,6 +86,26 @@ struct NotificationHubRegression {
         try require(!NotchNotificationPolicy.isSameWhatsAppMessage(hourLater, gateway), "Messages an hour apart merged")
         try require(!NotchNotificationPolicy.isSameWhatsAppMessage(macApp, stored), "Messages app treated as WhatsApp")
 
+        // The WhatsApp app's two identifiers are one app.
+        let oldID = item("banner-v", app: "desktop.WhatsApp", name: "WhatsApp", title: "Mom", body: "Call me when free", at: 503, source: .banner)
+        try require(NotchNotificationPolicy.isSameNotification(oldID, as: personal), "WhatsApp identifiers not treated as one app")
+        // Replying through the WhatsApp app needs the chat's number.
+        typealias N = NotchNotificationPolicy
+        try require(N.whatsAppPhone(fromThread: "919876543210@s.whatsapp.net") == "919876543210", "JID thread")
+        try require(N.whatsAppPhone(fromThread: "919876543210:12@s.whatsapp.net") == "919876543210", "Device JID thread")
+        try require(N.whatsAppPhone(fromThread: "+91 98765 43210") == "919876543210", "Number thread")
+        try require(N.whatsAppPhone(fromThread: "120363025246125244@g.us") == nil && N.whatsAppPhone(fromThread: "chat-42") == nil
+                    && N.whatsAppPhone(fromThread: nil) == nil, "Group or unknown thread gave a number")
+        try require(N.whatsAppSendURL(phone: "919876543210", text: "ok bhai, 5 baje")?.absoluteString
+                    == "whatsapp://send?phone=919876543210&text=ok%20bhai,%205%20baje", "Send URL: \(N.whatsAppSendURL(phone: "919876543210", text: "ok bhai, 5 baje")?.absoluteString ?? "nil")")
+        try require(N.whatsAppSendURL(phone: "1", text: "2+2 & more")?.absoluteString == "whatsapp://send?phone=1&text=2%2B2%20%26%20more",
+                    "Plus or ampersand not escaped")
+        try require(N.lastingReplyRoute(bundleIdentifier: "net.whatsapp.WhatsApp", threadID: "919876543210@s.whatsapp.net")
+                    == .whatsappApp(phone: "919876543210"), "WhatsApp route")
+        try require(N.lastingReplyRoute(bundleIdentifier: "com.apple.MobileSMS", threadID: "iMessage;-;+15551234567")
+                    == .messages(chatID: "iMessage;-;+15551234567"), "Messages route")
+        try require(N.lastingReplyRoute(bundleIdentifier: "com.tinyspeck.slackmacgap", threadID: "919876543210@s.whatsapp.net") == .none, "Slack route")
+
         // An old notification hovered in the open Notification Center panel, an hour later.
         let browsed = item("banner-w", app: "com.apple.MobileSMS", name: "Messages", title: "Selene", body: "Are you coming?", at: 3_700, source: .banner)
         try require(NotchNotificationPolicy.isSameNotification(browsed, as: stored, window: .infinity), "Panel card not matched to its notification")

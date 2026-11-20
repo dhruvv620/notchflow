@@ -191,9 +191,12 @@ final class NativeNotificationBridge: @unchecked Sendable {
             }
         }
         records = next
-        // Several unknown messages at once means the panel was opened. (One
-        // banner can be read from more than one element, so count messages.)
-        let arrivedTogether = Set(arrivals.map(\.message)).count
+        // Several unknown messages at once, from more than one app, means the
+        // panel was opened. (One banner can be read from more than one
+        // element, so messages are counted; a burst from one chat is not the panel.)
+        let distinctMessages = Set(arrivals.map(\.message)).count
+        let distinctApps = Set(arrivals.map { $0.message.split(separator: "\u{1f}").first.map(String.init) ?? "" }).count
+        let arrivedTogether = distinctApps >= 2 || distinctMessages >= 5 ? distinctMessages : 1
         for arrival in arrivals {
             if arrival.browsed || NotificationCardPolicy.isBrowsedInPanel(shownAge: arrival.age, pointerOnCard: false,
                                                                           newCardsInScan: arrivedTogether) {

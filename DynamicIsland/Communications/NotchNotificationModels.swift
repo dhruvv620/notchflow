@@ -23,6 +23,8 @@ struct NotchNotification: Identifiable, Equatable, Codable, Sendable {
         case messages(chatID: String)
         /// The live banner's own reply field. Only works while it is on screen.
         case banner(id: String)
+        /// The WhatsApp app on this Mac, opened at the chat with this number.
+        case whatsappApp(phone: String)
 
         var isAvailable: Bool { self != .none }
     }
@@ -85,8 +87,6 @@ enum NotchNotificationPolicy {
         return order.compactMap { groups[$0] }
     }
 
-    /// Whether a banner read from the screen is the same notification as one
-    /// already in the inbox (the Notification Center store sees it too).
     /// Whether a banner is a notification already in the inbox: same app,
     /// title and text, within `window` seconds (the store and the banner
     /// reader date the same notification slightly differently). Cards seen
@@ -97,7 +97,8 @@ enum NotchNotificationPolicy {
         guard existing.id != banner.id, existing.source != .banner else { return false }
         let sameApp: Bool
         if let lhs = banner.bundleIdentifier, let rhs = existing.bundleIdentifier {
-            sameApp = lhs == rhs
+            // The WhatsApp app has had two identifiers; the banner reader may name the other one.
+            sameApp = lhs == rhs || (whatsAppBundleIdentifiers.contains(lhs) && whatsAppBundleIdentifiers.contains(rhs))
         } else {
             sameApp = banner.appName.caseInsensitiveCompare(existing.appName) == .orderedSame
         }
@@ -129,6 +130,43 @@ enum NotchNotificationPolicy {
 
     static let messagesBundleIdentifier = "com.apple.MobileSMS"
     static let whatsAppBundleIdentifiers: Set<String> = ["net.whatsapp.WhatsApp", "desktop.WhatsApp"]
+
+    /// The phone number of a WhatsApp chat from a notification's thread
+    /// ("919876543210@s.whatsapp.net", "+91 98765 43210"); nil for groups.
+    static func whatsAppPhone(fromThread thread: String?) -> String? {
+        guard let thread = thread?.trimmingCharacters(in: .whitespacesAndNewlines), !thread.isEmpty,
+              !thread.contains("@g.us"), !thread.contains("@broadcast"), !thread.contains("@newsletter") else { return nil }
+        let local = thread.split(separator: "@").first.map(String.init) ?? thread
+        let candidate = local.split(separator: ":").first.map(String.init) ?? local
+        guard candidate.allSatisfy({ $0.isNumber || "+ -()".contains($0) }) else { return nil }
+        return whatsAppPhone(fromNumber: candidate)
+    }
+
+    /// Digits WhatsApp's click-to-chat link accepts (country code, no +).
+    static func whatsAppPhone(fromNumber number: String) -> String? {
+        let digits = number.filter(\.isNumber)
+        return (8...15).contains(digits.count) ? digits : nil
+    }
+
+    /// How to reply once a live banner is gone: Messages by its chat, the
+    /// WhatsApp app by the chat's number, otherwise not from the notch.
+    static func lastingReplyRoute(bundleIdentifier: String?, threadID: String?) -> NotchNotification.ReplyRoute {
+        if bundleIdentifier == messagesBundleIdentifier, let chat = messagesChatID(fromThread: threadID) { return .messages(chatID: chat) }
+        if let bundleIdentifier, whatsAppBundleIdentifiers.contains(bundleIdentifier),
+           let phone = whatsAppPhone(fromThread: threadID) { return .whatsappApp(phone: phone) }
+        return .none
+    }
+
+    /// Opens the WhatsApp app at the chat with the text typed in.
+    static func whatsAppSendURL(phone: String, text: String) -> URL? {
+        var components = URLComponents()
+        components.scheme = "whatsapp"
+        components.host = "send"
+        components.queryItems = [URLQueryItem(name: "phone", value: phone), URLQueryItem(name: "text", value: text)]
+        // A "+" left as is would arrive as a space.
+        components.percentEncodedQuery = components.percentEncodedQuery?.replacingOccurrences(of: "+", with: "%2B")
+        return components.url
+    }
 
     /// Whether a notification from the WhatsApp app on this Mac and a message
     /// from the linked WhatsApp account are the same message (when both are
@@ -222,13 +260,7 @@ struct NotificationCenterRecord: Equatable, Sendable {
     }
 
     func notification(appName: String) -> NotchNotification {
-        let reply: NotchNotification.ReplyRoute
-        if bundleIdentifier == NotchNotificationPolicy.messagesBundleIdentifier,
-           let chatID = NotchNotificationPolicy.messagesChatID(fromThread: threadID) {
-            reply = .messages(chatID: chatID)
-        } else {
-            reply = .none
-        }
+        let reply = NotchNotificationPolicy.lastingReplyRoute(bundleIdentifier: bundleIdentifier, threadID: threadID)
         return NotchNotification(
             // Notification Center reuses record ids after its newest rows are
             // deleted, so the delivery time keeps ids unique across reuse.

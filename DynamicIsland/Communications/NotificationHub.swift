@@ -206,7 +206,7 @@ final class NotificationHub: ObservableObject {
         for index in next.indices {
             if let banner = next[index].liveBannerID, !liveIDs.contains(banner) {
                 next[index].liveBannerID = nil
-                if case .banner = next[index].reply { next[index].reply = .none }
+                if case .banner = next[index].reply { next[index].reply = Self.lastingRoute(next[index]) }
             }
         }
 
@@ -233,11 +233,12 @@ final class NotificationHub: ObservableObject {
                 // Already collected from Notification Center: lend it the banner's actions.
                 if isLive {
                     next[index].liveBannerID = banner.id
-                    if !next[index].reply.isAvailable, banner.canReply { next[index].reply = .banner(id: banner.id) }
+                    // The banner's own reply field answers in place, without opening the app.
+                    if banner.canReply, Self.bannerReplyIsBetter(than: next[index].reply) { next[index].reply = .banner(id: banner.id) }
                 }
             } else if let index = next.firstIndex(where: { $0.id == candidate.id }) {
                 next[index].liveBannerID = candidate.liveBannerID
-                if case .banner = next[index].reply, !isLive { next[index].reply = .none }
+                if case .banner = next[index].reply, !isLive { next[index].reply = Self.lastingRoute(next[index]) }
                 if isLive, banner.canReply { next[index].reply = .banner(id: banner.id) }
             } else if !banner.seenInPanel {
                 fresh.append(candidate)
@@ -298,7 +299,7 @@ final class NotificationHub: ObservableObject {
                                          sourceName: item.appName, at: item.date)
         }
         guard announce, let newest = new.max(by: { $0.date < $1.date }),
-              Date().timeIntervalSince(newest.date) < 120 else { return }
+              Date().timeIntervalSince(newest.date) < 600 else { return }
         showAlert(newest)
     }
 
@@ -377,7 +378,23 @@ final class NotificationHub: ObservableObject {
 
     // MARK: Actions
 
-    func canReply(_ item: NotchNotification) -> Bool { item.reply.isAvailable }
+    func canReply(_ item: NotchNotification) -> Bool { item.reply.isAvailable || isFromWhatsAppApp(item) }
+
+    /// A notification from the WhatsApp app on this Mac (not the linked account).
+    private func isFromWhatsAppApp(_ item: NotchNotification) -> Bool {
+        item.source != .whatsapp && item.bundleIdentifier.map(NotchNotificationPolicy.whatsAppBundleIdentifiers.contains) == true
+    }
+
+    private static func lastingRoute(_ item: NotchNotification) -> NotchNotification.ReplyRoute {
+        NotchNotificationPolicy.lastingReplyRoute(bundleIdentifier: item.bundleIdentifier, threadID: item.threadID)
+    }
+
+    private static func bannerReplyIsBetter(than route: NotchNotification.ReplyRoute) -> Bool {
+        switch route {
+        case .none, .whatsappApp: return true
+        case .messages, .whatsapp, .banner: return false
+        }
+    }
 
     /// Sends a reply through whichever route the notification supports.
     @discardableResult
@@ -390,8 +407,20 @@ final class NotificationHub: ObservableObject {
 
         var sent = false
         switch item.reply {
+        case .none where isFromWhatsAppApp(item):
+            // No number in the notification: look the sender up in Contacts.
+            let handles = await ContactDirectory.shared.lookup(name: item.title)?.handles ?? []
+            if let phone = handles.lazy.compactMap(NotchNotificationPolicy.whatsAppPhone(fromNumber:)).first {
+                sent = await WhatsAppDesktopSender.send(trimmed, phone: phone)
+                if !sent { lastError = WhatsAppDesktopSender.lastError }
+            } else {
+                lastError = "Couldn't find \(item.title)'s number in Contacts to open the chat in WhatsApp. Open WhatsApp to answer."
+            }
         case .none:
             lastError = "\(item.appName) does not accept replies from the notch. Open it instead."
+        case .whatsappApp(let phone):
+            sent = await WhatsAppDesktopSender.send(trimmed, phone: phone)
+            if !sent { lastError = WhatsAppDesktopSender.lastError }
         case .whatsapp(let chatJID):
             sent = await WhatsAppManager.shared.send(trimmed, to: chatJID)
             if !sent { lastError = WhatsAppManager.shared.lastSendError ?? "WhatsApp could not send the reply." }
@@ -420,6 +449,9 @@ final class NotificationHub: ObservableObject {
                                              route: .messages(chatID: chat), sourceName: item.appName, at: Date(),
                                              replyingTo: item.body)
             case .banner:
+                PromiseKeeper.shared.observe(text: trimmed, fromMe: true, person: item.headline,
+                                             route: .none, sourceName: item.appName, at: Date(), replyingTo: item.body)
+            case .whatsappApp:
                 PromiseKeeper.shared.observe(text: trimmed, fromMe: true, person: item.headline,
                                              route: .none, sourceName: item.appName, at: Date(), replyingTo: item.body)
             case .whatsapp, .none:
@@ -512,7 +544,7 @@ final class NotificationHub: ObservableObject {
         return items.map { item in
             var copy = item
             copy.liveBannerID = nil
-            if case .banner = copy.reply { copy.reply = .none }
+            if case .banner = copy.reply { copy.reply = lastingRoute(copy) }
             return copy
         }
     }
