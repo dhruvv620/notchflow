@@ -6,20 +6,42 @@ import CoreGraphics
 #endif
 import Foundation
 
+/// A window's place on screen, in Accessibility coordinates (origin at the
+/// top left of the main display).
+struct WorkspaceWindow: Codable, Equatable, Hashable, Sendable {
+    var x: Double
+    var y: Double
+    var width: Double
+    var height: Double
+    var title: String?
+
+    init(frame: CGRect, title: String?) {
+        x = Double(frame.minX); y = Double(frame.minY)
+        width = Double(frame.width); height = Double(frame.height)
+        self.title = title
+    }
+
+    var frame: CGRect { CGRect(x: x, y: y, width: width, height: height) }
+}
+
 /// An app in a workspace.
 struct WorkspaceApp: Codable, Equatable, Hashable, Sendable {
     let bundleID: String
     var name: String
+    /// Its windows' positions and sizes, when the workspace was saved from
+    /// what was open (nil in older workspaces).
+    var windows: [WorkspaceWindow]? = nil
 }
 
 /// A saved setup: apps, pages and folders to open, and how to arrange them.
 struct Workspace: Codable, Equatable, Identifiable, Sendable {
     enum Layout: String, Codable, CaseIterable, Sendable {
-        case none, sideBySide, thirds
+        case none, sideBySide, thirds, restore
 
         var title: String {
             switch self {
             case .none: return "Leave as they are"
+            case .restore: return "Exactly as saved"
             case .sideBySide: return "First two side by side"
             case .thirds: return "First three in columns"
             }
@@ -159,7 +181,7 @@ enum WorkspacePolicy {
     static func frames(for layout: Workspace.Layout, visible: CGRect, count: Int) -> [CGRect] {
         let columns: Int
         switch layout {
-        case .none: return []
+        case .none, .restore: return []
         case .sideBySide: columns = 2
         case .thirds: columns = 3
         }
@@ -169,6 +191,42 @@ enum WorkspacePolicy {
         return (0..<used).map { index in
             CGRect(x: visible.minX + CGFloat(index) * width, y: visible.minY, width: width, height: visible.height)
         }
+    }
+
+    // MARK: Restoring saved windows
+
+    /// Pairs saved windows with the app's current windows: same title first,
+    /// then the rest in order.
+    static func matchWindows(saved: [WorkspaceWindow], titles: [String]) -> [(saved: Int, window: Int)] {
+        var pairs: [(saved: Int, window: Int)] = []
+        var usedSaved = Set<Int>(), usedWindows = Set<Int>()
+        for (index, window) in saved.enumerated() {
+            guard let title = window.title, !title.isEmpty,
+                  let match = titles.indices.first(where: { !usedWindows.contains($0) && titles[$0] == title }) else { continue }
+            pairs.append((index, match)); usedSaved.insert(index); usedWindows.insert(match)
+        }
+        let restSaved = saved.indices.filter { !usedSaved.contains($0) }
+        let restWindows = titles.indices.filter { !usedWindows.contains($0) }
+        for (savedIndex, windowIndex) in zip(restSaved, restWindows) { pairs.append((savedIndex, windowIndex)) }
+        return pairs.sorted { $0.saved < $1.saved }
+    }
+
+    /// A saved frame, moved onto a screen if its screen is gone (a monitor
+    /// unplugged) and no bigger than that screen.
+    static func fitted(_ frame: CGRect, screens: [CGRect]) -> CGRect {
+        guard let first = screens.first else { return frame }
+        func overlap(_ screen: CGRect) -> CGFloat {
+            let shared = frame.intersection(screen)
+            return shared.isNull ? 0 : shared.width * shared.height
+        }
+        let target = screens.max { overlap($0) < overlap($1) } ?? first
+        let visibleShare = overlap(target) / max(1, frame.width * frame.height)
+        let size = CGSize(width: min(frame.width, target.width), height: min(frame.height, target.height))
+        if visibleShare >= 0.5 && size == frame.size { return frame }
+        // Keep it where it was as far as possible, inside the screen.
+        let x = min(max(frame.minX, target.minX), target.maxX - size.width)
+        let y = min(max(frame.minY, target.minY), target.maxY - size.height)
+        return CGRect(x: x, y: y, width: size.width, height: size.height)
     }
 
     // MARK: Done for the day

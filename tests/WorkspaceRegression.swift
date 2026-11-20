@@ -68,6 +68,26 @@ struct WorkspaceRegression {
         let data = try JSONEncoder().encode(workspace)
         let decoded = try JSONDecoder().decode(Workspace.self, from: data)
         try require(decoded == workspace, "Workspace does not round-trip")
+        // Restoring saved windows: titles first, then order.
+        let saved = [WorkspaceWindow(frame: CGRect(x: 0, y: 25, width: 700, height: 800), title: "Inbox"),
+                     WorkspaceWindow(frame: CGRect(x: 720, y: 25, width: 700, height: 800), title: "Docs"),
+                     WorkspaceWindow(frame: CGRect(x: 100, y: 100, width: 500, height: 400), title: nil)]
+        let pairs = P.matchWindows(saved: saved, titles: ["Docs", "Untitled", "Inbox"])
+        try require(pairs.map(\.saved) == [0, 1, 2] && pairs.map(\.window) == [2, 0, 1], "Window matching: \(pairs)")
+        try require(P.matchWindows(saved: saved, titles: ["A"]).count == 1, "Fewer windows than saved")
+        // Frames stay where they were, or move onto a screen that exists.
+        let main = CGRect(x: 0, y: 0, width: 1512, height: 982)
+        let onScreen = CGRect(x: 100, y: 50, width: 800, height: 600)
+        try require(P.fitted(onScreen, screens: [main]) == onScreen, "On-screen window moved")
+        let unplugged = CGRect(x: 2000, y: 100, width: 800, height: 600)
+        let moved = P.fitted(unplugged, screens: [main])
+        try require(main.contains(moved) && moved.size == unplugged.size, "Off-screen window not brought back: \(moved)")
+        let huge = P.fitted(CGRect(x: 0, y: 0, width: 3000, height: 2000), screens: [main])
+        try require(huge == main, "Oversized window not fitted: \(huge)")
+        // Older workspaces (no windows) still load.
+        let old = #"{"bundleID":"com.apple.Safari","name":"Safari"}"#
+        let oldApp = try JSONDecoder().decode(WorkspaceApp.self, from: Data(old.utf8))
+        try require(oldApp.windows == nil, "Old workspace app did not load")
         print("Workspaces: OK")
     }
 }

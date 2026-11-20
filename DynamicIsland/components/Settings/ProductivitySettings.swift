@@ -171,6 +171,8 @@ struct ProductivitySettings: View {
                         }
                         Spacer()
                         Button("Open") { workspaces.open(workspace) }
+                        Button("Update") { Task { await workspaces.updateFromCurrent(workspace.id) } }
+                            .help("Replace this setup with the apps, window positions and sizes, and browser tabs open now.")
                         Button("Edit") { editing = workspace }
                         Button(role: .destructive) { workspaces.delete(workspace.id) } label: { Image(systemName: "trash") }
                             .buttonStyle(.borderless)
@@ -203,7 +205,7 @@ struct ProductivitySettings: View {
         } header: {
             Text("Workspaces")
         } footer: {
-            Text("Window layouts need Accessibility, and Focus uses the two Shortcuts set up under Settings > Timers > Also silence macOS (Focus).")
+            Text("Saving and restoring window positions needs Accessibility, and Focus uses the two Shortcuts set up under Settings > Timers > Also silence macOS (Focus).")
         }
     }
 }
@@ -287,6 +289,13 @@ struct WorkspaceEditor: View {
                 Section("When it opens") {
                     Picker("Windows", selection: $workspace.layout) {
                         ForEach(Workspace.Layout.allCases, id: \.self) { Text($0.title).tag($0) }
+                    }
+                    if workspace.layout == .restore {
+                        let saved = workspace.apps.reduce(0) { $0 + ($1.windows?.count ?? 0) }
+                        Text(saved == 0
+                             ? "No window positions saved yet. Arrange your windows, then use Update next to this workspace (or Update to current layout in the Flow tab)."
+                             : "\(saved) window\(saved == 1 ? "" : "s") go back to the exact position and size they had when saved.")
+                            .font(.caption).foregroundStyle(.secondary)
                     }
                     Toggle("Hide other apps", isOn: $workspace.hideOtherApps)
                     Toggle("Turn on Focus (Do Not Disturb)", isOn: $workspace.turnOnFocus)

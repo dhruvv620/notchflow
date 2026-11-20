@@ -17,6 +17,12 @@ struct NotchFlowView: View {
     @Default(.enablePromiseKeeper) private var promisesEnabled
     @Default(.timeTrackingGoalHours) private var goalHours
     @State private var showWeek = false
+    @EnvironmentObject private var vm: DynamicIslandViewModel
+    /// The workspace being renamed inline, and the name typed so far.
+    @State private var renamingID: UUID?
+    @State private var renameText = ""
+    @State private var interactionToken = UUID()
+    @FocusState private var renameFocused: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: NotchTokens.Spacing.s) {
@@ -86,15 +92,21 @@ struct NotchFlowView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 6) {
                 ForEach(workspaces.workspaces) { workspace in
-                    chip(workspace.name, symbol: workspace.symbol, selected: workspaces.activeID == workspace.id) {
-                        workspaces.open(workspace)
-                    }
-                    .help(describe(workspace) + "\nRight-click to edit or delete.")
-                    .contextMenu {
-                        Button("Open") { workspaces.open(workspace) }
-                        Button("Edit in Settings…") { SettingsWindowController.shared.showWindow() }
-                        Divider()
-                        Button("Delete \u{201C}\(workspace.name)\u{201D}", role: .destructive) { workspaces.delete(workspace.id) }
+                    if renamingID == workspace.id {
+                        renameField
+                    } else {
+                        chip(workspace.name, symbol: workspace.symbol, selected: workspaces.activeID == workspace.id) {
+                            workspaces.open(workspace)
+                        }
+                        .help(describe(workspace) + "\nRight-click to rename, update or delete.")
+                        .contextMenu {
+                            Button("Open") { workspaces.open(workspace) }
+                            Button("Rename…") { beginRename(workspace) }
+                            Button("Update to current layout") { Task { await workspaces.updateFromCurrent(workspace.id) } }
+                            Button("Edit in Settings…") { SettingsWindowController.shared.showWindow() }
+                            Divider()
+                            Button("Delete \u{201C}\(workspace.name)\u{201D}", role: .destructive) { workspaces.delete(workspace.id) }
+                        }
                     }
                 }
                 chip("Done for the day", symbol: "moon.stars.fill", selected: false) { workspaces.doneForTheDay() }
@@ -105,9 +117,41 @@ struct NotchFlowView: View {
                         if !draft.isEmpty { workspaces.save(draft) }
                     }
                 }
-                .help("Saves the apps that are open and your browser's tabs as a workspace. Edit it in Settings > Productivity.")
+                .help("Saves the open apps, where each window is and how big it is, and your browser's tabs. Click the setup later to put everything back.")
             }
         }
+    }
+
+    /// Typing a new name in place of the chip: Return saves, Escape cancels.
+    private var renameField: some View {
+        TextField("Name", text: $renameText)
+            .textFieldStyle(.plain)
+            .font(NotchTokens.Typography.captionEmphasis)
+            .frame(width: 130)
+            .padding(.horizontal, 10).padding(.vertical, 5)
+            .background(Capsule().fill(appearance.accentColor.opacity(0.25)))
+            .focused($renameFocused)
+            .onSubmit { commitRename() }
+            .onExitCommand { endRename() }
+            .onChange(of: renameFocused) { _, focused in if !focused && renamingID != nil { commitRename() } }
+    }
+
+    private func beginRename(_ workspace: Workspace) {
+        renameText = workspace.name
+        renamingID = workspace.id
+        vm.setAutoCloseSuppression(true, token: interactionToken)
+        DispatchQueue.main.async { renameFocused = true }
+    }
+
+    private func commitRename() {
+        if let id = renamingID { workspaces.rename(id, to: renameText) }
+        endRename()
+    }
+
+    private func endRename() {
+        renamingID = nil
+        renameFocused = false
+        vm.setAutoCloseSuppression(false, token: interactionToken)
     }
 
     private func chip(_ title: String, symbol: String, selected: Bool, action: @escaping () -> Void) -> some View {
@@ -127,6 +171,8 @@ struct NotchFlowView: View {
         var parts: [String] = []
         if !workspace.apps.isEmpty { parts.append(workspace.apps.map(\.name).joined(separator: ", ")) }
         if !workspace.urls.isEmpty { parts.append("\(workspace.urls.count) page\(workspace.urls.count == 1 ? "" : "s")") }
+        let windows = workspace.apps.reduce(0) { $0 + ($1.windows?.count ?? 0) }
+        if workspace.layout == .restore && windows > 0 { parts.append("\(windows) window\(windows == 1 ? "" : "s") put back in place") }
         if workspace.turnOnFocus { parts.append("Focus on") }
         if workspace.startPomodoro { parts.append("Pomodoro") }
         return parts.joined(separator: " · ")

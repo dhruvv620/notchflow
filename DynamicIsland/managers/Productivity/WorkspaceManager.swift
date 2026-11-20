@@ -111,20 +111,50 @@ final class WorkspaceManager: ObservableObject {
         if let data = try? JSONEncoder().encode(workspaces) { Defaults[.workspacesData] = data }
     }
 
-    /// What's open right now, as a new workspace: running apps and the front
-    /// browser window's tabs.
+    /// What's open right now, as a new workspace: running apps with every
+    /// window's position and size, and the front browser window's tabs.
     func captureCurrentSetup(named name: String = "My setup") async -> Workspace {
+        var workspace = Workspace(name: name)
+        workspace.apps = Self.currentApps()
+        workspace.urls = await frontBrowserTabs()
+        if workspace.apps.contains(where: { !($0.windows ?? []).isEmpty }) { workspace.layout = .restore }
+        return workspace
+    }
+
+    /// Running apps, with their windows' places when Accessibility is allowed.
+    private static func currentApps() -> [WorkspaceApp] {
         let own = Bundle.main.bundleIdentifier ?? ""
         let apps = NSWorkspace.shared.runningApplications
-            .filter { $0.activationPolicy == .regular }
+            .filter { $0.activationPolicy == .regular && !$0.isHidden }
             .compactMap { app -> WorkspaceApp? in
                 guard let id = app.bundleIdentifier, id != own, !WorkspacePolicy.alwaysRunning.contains(id) else { return nil }
-                return WorkspaceApp(bundleID: id, name: app.localizedName ?? id)
+                let windows = standardWindows(of: app).compactMap { window -> WorkspaceWindow? in
+                    guard let frame = frame(of: window) else { return nil }
+                    return WorkspaceWindow(frame: frame, title: title(of: window))
+                }
+                return WorkspaceApp(bundleID: id, name: app.localizedName ?? id, windows: AXIsProcessTrusted() ? windows : nil)
             }
-        var workspace = Workspace(name: name)
-        workspace.apps = Array(apps.prefix(8))
-        workspace.urls = await frontBrowserTabs()
-        return workspace
+        return Array(apps.prefix(16))
+    }
+
+    /// Replaces a workspace's apps, window places and pages with what's open
+    /// now, keeping its name and options.
+    func updateFromCurrent(_ id: UUID) async {
+        guard let index = workspaces.firstIndex(where: { $0.id == id }) else { return }
+        var workspace = workspaces[index]
+        workspace.apps = Self.currentApps()
+        let tabs = await frontBrowserTabs()
+        if !tabs.isEmpty { workspace.urls = tabs }
+        if workspace.apps.contains(where: { !($0.windows ?? []).isEmpty }) { workspace.layout = .restore }
+        save(workspace)
+        lastMessage = "Updated \(workspace.name) to the current layout."
+    }
+
+    func rename(_ id: UUID, to name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty, let index = workspaces.firstIndex(where: { $0.id == id }) else { return }
+        workspaces[index].name = trimmed
+        persist()
     }
 
     private func frontBrowserTabs() async -> [String] {
@@ -202,8 +232,10 @@ final class WorkspaceManager: ObservableObject {
             TimerModesManager.shared.startPomodoro(configuration: Self.pomodoroConfiguration())
         }
         if workspace.layout != .none {
-            // Apps take a moment to open their windows; arrange twice.
-            for delay in [1.5, 4.0] {
+            // Apps take a moment to open their windows; arrange a few times
+            // (more for "exactly as saved", which waits for every window).
+            let delays: [Double] = workspace.layout == .restore ? [0.6, 2.0, 4.5, 9.0] : [1.5, 4.0]
+            for delay in delays {
                 DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in self?.arrange(workspace) }
             }
         }
@@ -242,6 +274,10 @@ final class WorkspaceManager: ObservableObject {
     /// Places the first apps' front windows side by side (needs Accessibility).
     private func arrange(_ workspace: Workspace) {
         guard AXIsProcessTrusted(), let screen = NSScreen.main else { return }
+        if workspace.layout == .restore {
+            restoreWindows(workspace)
+            return
+        }
         // Accessibility uses a top-left origin on the main display.
         let full = NSScreen.screens.first?.frame ?? screen.frame
         let visible = screen.visibleFrame
@@ -262,6 +298,86 @@ final class WorkspaceManager: ObservableObject {
             if let sizeValue = AXValueCreate(.cgSize, &size) {
                 AXUIElementSetAttributeValue(window as! AXUIElement, kAXSizeAttribute as CFString, sizeValue)
             }
+        }
+    }
+
+    /// Puts every saved window back where it was, as far as the app has
+    /// opened them (matched by title, then in order).
+    private func restoreWindows(_ workspace: Workspace) {
+        let screens = Self.screensInAccessibilityCoordinates()
+        for app in workspace.apps {
+            guard let saved = app.windows, !saved.isEmpty,
+                  let running = NSRunningApplication.runningApplications(withBundleIdentifier: app.bundleID).first else { continue }
+            if running.isHidden { running.unhide() }
+            let windows = Self.standardWindows(of: running, includeMinimized: true)
+            let titles = windows.map { Self.title(of: $0) ?? "" }
+            for pair in WorkspacePolicy.matchWindows(saved: saved, titles: titles) {
+                let window = windows[pair.window]
+                AXUIElementSetAttributeValue(window, kAXMinimizedAttribute as CFString, kCFBooleanFalse)
+                Self.move(window, to: WorkspacePolicy.fitted(saved[pair.saved].frame, screens: screens))
+            }
+        }
+    }
+
+    // MARK: Accessibility helpers
+
+    /// The app's ordinary windows (not panels, sheets or tool palettes).
+    private static func standardWindows(of app: NSRunningApplication, includeMinimized: Bool = false) -> [AXUIElement] {
+        guard AXIsProcessTrusted() else { return [] }
+        let element = AXUIElementCreateApplication(app.processIdentifier)
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, kAXWindowsAttribute as CFString, &value) == .success,
+              let windows = value as? [AXUIElement] else { return [] }
+        return windows.filter { window in
+            var subrole: CFTypeRef?
+            AXUIElementCopyAttributeValue(window, kAXSubroleAttribute as CFString, &subrole)
+            guard (subrole as? String) == (kAXStandardWindowSubrole as String) else { return false }
+            if includeMinimized { return true }
+            var minimized: CFTypeRef?
+            AXUIElementCopyAttributeValue(window, kAXMinimizedAttribute as CFString, &minimized)
+            return (minimized as? Bool) != true
+        }
+    }
+
+    private static func frame(of window: AXUIElement) -> CGRect? {
+        var positionValue: CFTypeRef?, sizeValue: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(window, kAXPositionAttribute as CFString, &positionValue) == .success,
+              AXUIElementCopyAttributeValue(window, kAXSizeAttribute as CFString, &sizeValue) == .success,
+              let positionValue, let sizeValue else { return nil }
+        var origin = CGPoint.zero, size = CGSize.zero
+        guard AXValueGetValue(positionValue as! AXValue, .cgPoint, &origin),
+              AXValueGetValue(sizeValue as! AXValue, .cgSize, &size), size.width > 0, size.height > 0 else { return nil }
+        return CGRect(origin: origin, size: size)
+    }
+
+    private static func title(of window: AXUIElement) -> String? {
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(window, kAXTitleAttribute as CFString, &value) == .success else { return nil }
+        return value as? String
+    }
+
+    /// Moves, resizes, then moves again (some apps limit size by position).
+    private static func move(_ window: AXUIElement, to frame: CGRect) {
+        var origin = frame.origin, size = frame.size
+        if let position = AXValueCreate(.cgPoint, &origin) {
+            AXUIElementSetAttributeValue(window, kAXPositionAttribute as CFString, position)
+        }
+        if let sizeValue = AXValueCreate(.cgSize, &size) {
+            AXUIElementSetAttributeValue(window, kAXSizeAttribute as CFString, sizeValue)
+        }
+        if let position = AXValueCreate(.cgPoint, &origin) {
+            AXUIElementSetAttributeValue(window, kAXPositionAttribute as CFString, position)
+        }
+    }
+
+    /// Each screen, in Accessibility coordinates (top left of the main
+    /// display is 0,0; y grows downward). The whole screen, so a window that
+    /// reaches under the Dock keeps its exact size.
+    private static func screensInAccessibilityCoordinates() -> [CGRect] {
+        guard let primary = NSScreen.screens.first else { return [] }
+        return NSScreen.screens.map { screen in
+            let area = screen.frame
+            return CGRect(x: area.minX, y: primary.frame.maxY - area.maxY, width: area.width, height: area.height)
         }
     }
 
