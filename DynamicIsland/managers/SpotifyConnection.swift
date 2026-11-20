@@ -126,7 +126,8 @@ final class SpotifyConnection: ObservableObject {
         do {
             let token = try await requestToken(body: SpotifyAPIPolicy.tokenBody(code: code, verifier: verifier, clientID: clientID))
             store(token)
-            state = .connected
+            state = token.hasRequiredScopes ? .connected
+                : .failed("Spotify didn't grant reading your account's country. Click Connect Spotify and Agree again.")
         } catch {
             state = .failed(error.localizedDescription)
         }
@@ -179,14 +180,20 @@ final class SpotifyConnection: ObservableObject {
     // MARK: Search
 
     func search(_ query: String) async throws -> [SpotifyTrack] {
-        guard let url = SpotifyAPIPolicy.searchURL(query) else { return [] }
+        guard let url = SpotifyAPIPolicy.searchURL(query, market: Locale.current.region?.identifier) else { return [] }
         var request = URLRequest(url: url, timeoutInterval: 15)
         request.setValue("Bearer \(try await validToken())", forHTTPHeaderField: "Authorization")
         let (data, response) = try await URLSession.shared.data(for: request)
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         if status == 401 { accessExpiry = .distantPast }
         guard status == 200 else {
-            throw APIError(errorDescription: "Spotify search: " + (SpotifyAPIPolicy.errorMessage(in: data) ?? "error \(status)"))
+            let reason = SpotifyAPIPolicy.errorMessage(in: data)
+            if status == 403, SpotifyAPIPolicy.isScopeError(reason) {
+                // Connected before NotchFlow asked for the account's country: one more Agree fixes it.
+                state = .failed("Spotify needs one more permission: click Connect Spotify in Settings › Music and Agree.")
+                throw APIError(errorDescription: "Spotify needs one more permission: Settings › Music › Connect Spotify.")
+            }
+            throw APIError(errorDescription: "Spotify search: " + (reason ?? "error \(status)"))
         }
         return SpotifyAPIPolicy.tracks(from: data)
     }

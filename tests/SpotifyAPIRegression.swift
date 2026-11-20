@@ -17,20 +17,27 @@ struct SpotifyAPIRegression {
         let authorize = P.authorizeURL(clientID: "abc123", codeChallenge: "chal", state: "st")?.absoluteString ?? ""
         try require(authorize.hasPrefix("https://accounts.spotify.com/authorize?client_id=abc123&response_type=code")
                     && authorize.contains("redirect_uri=http://127.0.0.1:47863/callback")
-                    && authorize.contains("code_challenge_method=S256&code_challenge=chal&state=st"), "Authorize URL: \(authorize)")
+                    && authorize.contains("code_challenge_method=S256&code_challenge=chal&state=st")
+                    && authorize.hasSuffix("&scope=user-read-private"), "Authorize URL: \(authorize)")
         try require(P.tokenBody(code: "c d", verifier: "v", clientID: "id")
                     == "client_id=id&code=c%20d&code_verifier=v&grant_type=authorization_code&redirect_uri=http%3A%2F%2F127.0.0.1%3A47863%2Fcallback",
                     "Token body: \(P.tokenBody(code: "c d", verifier: "v", clientID: "id"))")
         try require(P.refreshBody(refreshToken: "r", clientID: "id") == "client_id=id&grant_type=refresh_token&refresh_token=r", "Refresh body")
         let token = P.token(from: Data(#"{"access_token":"A","token_type":"Bearer","expires_in":3600,"refresh_token":"R"}"#.utf8))
-        try require(token == P.Token(accessToken: "A", refreshToken: "R", expiresIn: 3600), "Token")
+        try require(token == P.Token(accessToken: "A", refreshToken: "R", expiresIn: 3600) && token?.hasRequiredScopes == true, "Token")
+        let scoped = P.token(from: Data(#"{"access_token":"A","expires_in":3600,"scope":"user-read-private user-read-email"}"#.utf8))
+        let unscoped = P.token(from: Data(#"{"access_token":"A","expires_in":3600,"scope":""}"#.utf8))
+        try require(scoped?.hasRequiredScopes == true && unscoped?.hasRequiredScopes == false, "Granted scopes")
+        try require(P.isScopeError("Insufficient client scope") && !P.isScopeError("Forbidden") && !P.isScopeError(nil), "Scope error")
         try require(P.token(from: Data(#"{"error":"invalid_grant","error_description":"Invalid authorization code"}"#.utf8)) == nil
                     && P.errorMessage(in: Data(#"{"error":"invalid_grant","error_description":"Invalid authorization code"}"#.utf8)) == "Invalid authorization code",
                     "Token error")
         try require(P.errorMessage(in: Data(#"{"error":{"status":403,"message":"Forbidden"}}"#.utf8)) == "Forbidden", "API error")
-        let search = P.searchURL("i wanna love you akon", limit: 50)?.absoluteString ?? ""
-        try require(search == "https://api.spotify.com/v1/search?q=i%20wanna%20love%20you%20akon&type=track&limit=10&market=from_token",
+        let search = P.searchURL("i wanna love you akon", market: "in", limit: 50)?.absoluteString ?? ""
+        try require(search == "https://api.spotify.com/v1/search?q=i%20wanna%20love%20you%20akon&type=track&limit=10&market=IN",
                     "Search URL: \(search)")
+        try require(P.searchURL("i wanna love you", market: nil)?.absoluteString.contains("market") == false
+                    && P.searchURL("i wanna love you", market: "from_token")?.absoluteString.contains("market") == false, "No market")
         let json = #"""
         {"tracks":{"items":[
           {"uri":"spotify:track:0RIAsvP8qBNxaMBkyZpuCX","name":"I Wanna Love You","artists":[{"name":"Akon"},{"name":"Snoop Dogg"}],

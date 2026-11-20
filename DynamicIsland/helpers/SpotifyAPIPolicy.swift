@@ -34,13 +34,19 @@ enum SpotifyAPIPolicy {
             .replacingOccurrences(of: "=", with: "")
     }
 
-    /// The page where you approve NotchFlow. Search needs no scopes.
+    /// What NotchFlow asks for: your account's country, which search uses to
+    /// pick tracks you can play (without it, Spotify answers search with
+    /// "Insufficient client scope").
+    static let scopes = "user-read-private"
+
+    /// The page where you approve NotchFlow.
     static func authorizeURL(clientID: String, codeChallenge: String, state: String) -> URL? {
         var components = URLComponents(string: "https://accounts.spotify.com/authorize")
         components?.queryItems = [
             URLQueryItem(name: "client_id", value: clientID), URLQueryItem(name: "response_type", value: "code"),
             URLQueryItem(name: "redirect_uri", value: redirectURI), URLQueryItem(name: "code_challenge_method", value: "S256"),
             URLQueryItem(name: "code_challenge", value: codeChallenge), URLQueryItem(name: "state", value: state),
+            URLQueryItem(name: "scope", value: scopes),
         ]
         return components?.url
     }
@@ -69,13 +75,27 @@ enum SpotifyAPIPolicy {
         let accessToken: String
         let refreshToken: String?
         let expiresIn: TimeInterval
+        /// The permissions Spotify granted, space-separated (nil when not said).
+        var scope: String? = nil
+
+        /// Whether it carries what NotchFlow asks for now.
+        var hasRequiredScopes: Bool {
+            guard let scope else { return true }
+            let granted = Set(scope.split(separator: " ").map(String.init))
+            return scopes.split(separator: " ").allSatisfy { granted.contains(String($0)) }
+        }
     }
 
     static func token(from data: Data) -> Token? {
         guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let access = object["access_token"] as? String, !access.isEmpty else { return nil }
         return Token(accessToken: access, refreshToken: object["refresh_token"] as? String,
-                     expiresIn: (object["expires_in"] as? Double) ?? 3600)
+                     expiresIn: (object["expires_in"] as? Double) ?? 3600, scope: object["scope"] as? String)
+    }
+
+    /// Spotify's answer when the sign-in lacks a permission.
+    static func isScopeError(_ message: String?) -> Bool {
+        message?.lowercased().contains("scope") == true
     }
 
     static func errorMessage(in data: Data) -> String? {
@@ -85,14 +105,18 @@ enum SpotifyAPIPolicy {
         return object["error"] as? String
     }
 
-    /// Track search (Development Mode apps return at most 10).
-    static func searchURL(_ query: String, limit: Int = 10) -> URL? {
+    /// Track search (Development Mode apps return at most 10), in your
+    /// country's catalog (from the Mac's region, so it doesn't depend on the
+    /// account's country being readable).
+    static func searchURL(_ query: String, market: String? = nil, limit: Int = 10) -> URL? {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.count >= 2 else { return nil }
         var components = URLComponents(string: "https://api.spotify.com/v1/search")
         components?.queryItems = [URLQueryItem(name: "q", value: trimmed), URLQueryItem(name: "type", value: "track"),
-                                  URLQueryItem(name: "limit", value: String(min(10, max(1, limit)))),
-                                  URLQueryItem(name: "market", value: "from_token")]
+                                  URLQueryItem(name: "limit", value: String(min(10, max(1, limit))))]
+        if let market, market.count == 2, market.allSatisfy(\.isLetter) {
+            components?.queryItems?.append(URLQueryItem(name: "market", value: market.uppercased()))
+        }
         return components?.url
     }
 

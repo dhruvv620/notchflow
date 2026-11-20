@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 ### Fixed
+- **Spotify search "Insufficient client scope"**: Spotify now refuses a search that asks for "the account's country" without permission to read it. Searches send your Mac's country instead, and connecting asks for that permission (user-read-private); a connection made without it asks you to click Connect Spotify once more.
 - **No more doubled notifications**: with banners read the instant they appear, a message's banner often reached the inbox before Notification Center's record of it, and the two showed as separate notifications (one with Reply, one without). The record now merges into the banner's entry: one notification, with Reply, announced once.
 - **Notifications arrive instantly**: instead of checking every few seconds (up to ten on battery), NotchFlow now reacts the moment Notification Center's store changes and the moment a banner appears on screen; the timed checks remain as a slow backup.
 - **Cleared notifications stay cleared**: replying to a WhatsApp message (or clearing or dismissing notifications) while its macOS banner was still on screen let the banner bring it straight back into the inbox. What you clear is remembered for a day.
