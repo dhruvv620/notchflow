@@ -131,7 +131,8 @@ final class CommunicationsManager: ObservableObject {
         let now = Date()
         hiddenNotificationIDs.formIntersection(Set(capturedMessages.map(\.id)))
         let messages = capturedMessages.filter { !hiddenNotificationIDs.contains($0.id) }
-        let newMessages = messages.filter { !notificationIDs.contains($0.id) }
+        // Older notifications seen while browsing the Notification Center panel aren't new.
+        let newMessages = messages.filter { !notificationIDs.contains($0.id) && !$0.seenInPanel }
         let inbox = CommunicationsPolicy.mergeNotifications(existing: notifications, observed: messages,
                                                                allowedApps: notificationApps, limit: 20)
         if notifications != inbox { notifications = inbox }

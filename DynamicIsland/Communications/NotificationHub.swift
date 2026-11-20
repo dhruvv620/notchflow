@@ -228,7 +228,8 @@ final class NotificationHub: ObservableObject {
                 reply: (isLive && banner.canReply) ? .banner(id: banner.id) : .none,
                 liveBannerID: isLive ? banner.id : nil
             )
-            if let index = next.firstIndex(where: { NotchNotificationPolicy.isSameNotification(candidate, as: $0) }) {
+            let window: TimeInterval = banner.seenInPanel ? .infinity : 90
+            if let index = next.firstIndex(where: { NotchNotificationPolicy.isSameNotification(candidate, as: $0, window: window) }) {
                 // Already collected from Notification Center: lend it the banner's actions.
                 if isLive {
                     next[index].liveBannerID = banner.id
@@ -238,9 +239,12 @@ final class NotificationHub: ObservableObject {
                 next[index].liveBannerID = candidate.liveBannerID
                 if case .banner = next[index].reply, !isLive { next[index].reply = .none }
                 if isLive, banner.canReply { next[index].reply = .banner(id: banner.id) }
-            } else {
+            } else if !banner.seenInPanel {
                 fresh.append(candidate)
             }
+            // An older card seen while browsing the Notification Center panel
+            // and not in the inbox stays out of it: it isn't new, and its time
+            // on screen would show it as "now".
         }
         if next != items { replaceItems(next) }
         add(fresh, announce: true)

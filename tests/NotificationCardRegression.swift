@@ -84,6 +84,24 @@ struct NotificationCardRegression {
         let waiting = NotificationBridgeDiagnostics(state: .waitingForBanner, processCount: 1, windowCount: 0,
                                                     candidateCount: 0, recognizedCount: 0)
         try require(waiting.message.contains("waiting"), "Empty inbox diagnostics did not explain the rendered-banner requirement")
+        // Old cards in the open Notification Center panel are not new arrivals.
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        let now = calendar.date(from: DateComponents(year: 2026, month: 11, day: 20, hour: 14, minute: 0))!
+        let card = NotificationCardPolicy.Content(app: .messages, sender: "Alex", body: "See you at 10:30")
+        func age(_ texts: [String]) -> TimeInterval? { NotificationCardPolicy.shownAge(texts: texts, excluding: card, now: now, calendar: calendar) }
+        try require(age(["Messages", "now", "Alex", "See you at 10:30"]) == 0, "\"now\" is not new")
+        try require(age(["Messages", "5m ago", "Alex", "See you at 10:30"]) == 300, "5m ago")
+        try require(age(["Messages", "2h", "Alex"]) == 7_200 && age(["1 hour ago"]) == 3_600 && age(["Yesterday"]) == 86_400, "Hours and days")
+        try require(age(["Messages", "13:15", "Alex"]) == 2_700 && age(["1:15 PM"]) == 2_700, "Clock time")
+        try require(age(["Messages", "Alex", "See you at 10:30"]) == nil, "Time in the message read as the card's time")
+        try require(age(["Messages", "18:00"]) == 20 * 3600, "A later clock time is yesterday")
+        typealias C = NotificationCardPolicy
+        try require(!C.isBrowsedInPanel(shownAge: 0, pointerOnCard: false, newCardsInScan: 1), "A new banner treated as old")
+        try require(!C.isBrowsedInPanel(shownAge: nil, pointerOnCard: false, newCardsInScan: 2), "Two banners treated as the panel")
+        try require(C.isBrowsedInPanel(shownAge: nil, pointerOnCard: true, newCardsInScan: 1), "Hovered card announced")
+        try require(C.isBrowsedInPanel(shownAge: 600, pointerOnCard: false, newCardsInScan: 1), "Ten-minute-old card announced")
+        try require(C.isBrowsedInPanel(shownAge: nil, pointerOnCard: false, newCardsInScan: 4), "Opening the panel announced its cards")
         print("Notification card parsing, source filtering and action classification checks passed")
     }
 }

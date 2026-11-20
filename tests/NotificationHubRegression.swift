@@ -71,6 +71,10 @@ struct NotificationHubRegression {
         try require(!NotchNotificationPolicy.isSameNotification(late, as: stored), "Banners minutes apart merged")
         let other = item("banner-z", app: "com.apple.MobileSMS", name: "Messages", title: "Khushii", body: "Are you coming?", at: 101, source: .banner)
         try require(!NotchNotificationPolicy.isSameNotification(other, as: stored), "Different senders merged")
+        // An old notification hovered in the open Notification Center panel, an hour later.
+        let browsed = item("banner-w", app: "com.apple.MobileSMS", name: "Messages", title: "Selene", body: "Are you coming?", at: 3_700, source: .banner)
+        try require(NotchNotificationPolicy.isSameNotification(browsed, as: stored, window: .infinity), "Panel card not matched to its notification")
+        try require(!NotchNotificationPolicy.isSameNotification(other, as: stored, window: .infinity), "Panel card matched another sender")
 
         // The stored inbox survives a relaunch.
         let encoded = try JSONEncoder().encode([converted, stored])

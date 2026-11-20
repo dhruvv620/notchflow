@@ -87,7 +87,13 @@ enum NotchNotificationPolicy {
 
     /// Whether a banner read from the screen is the same notification as one
     /// already in the inbox (the Notification Center store sees it too).
-    static func isSameNotification(_ banner: NotchNotification, as existing: NotchNotification) -> Bool {
+    /// Whether a banner is a notification already in the inbox: same app,
+    /// title and text, within `window` seconds (the store and the banner
+    /// reader date the same notification slightly differently). Cards seen
+    /// in the open Notification Center panel pass `.infinity`, since their
+    /// time on screen says nothing about when they arrived.
+    static func isSameNotification(_ banner: NotchNotification, as existing: NotchNotification,
+                                   window: TimeInterval = 90) -> Bool {
         guard existing.id != banner.id, existing.source != .banner else { return false }
         let sameApp: Bool
         if let lhs = banner.bundleIdentifier, let rhs = existing.bundleIdentifier {
@@ -95,7 +101,7 @@ enum NotchNotificationPolicy {
         } else {
             sameApp = banner.appName.caseInsensitiveCompare(existing.appName) == .orderedSame
         }
-        guard sameApp, abs(banner.date.timeIntervalSince(existing.date)) < 90 else { return false }
+        guard sameApp, abs(banner.date.timeIntervalSince(existing.date)) < window else { return false }
         func clean(_ value: String) -> String {
             value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         }

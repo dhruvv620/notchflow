@@ -27,9 +27,13 @@ final class NativeNotificationBridge: @unchecked Sendable {
         let send: AXUIElement?
         let open: AXUIElement?
         let dismiss: AXUIElement?
+        /// Every text on the card, for its timestamp.
+        let texts: [String]
     }
     private var records: [String: Record] = [:]
     private var firstSeen: [String: Date] = [:]
+    /// Cards first seen while browsing the open Notification Center panel.
+    private var browsed: Set<String> = []
 
     func scan(allowedApps: Set<CommunicationApp>) async -> NotificationBridgeScan {
         guard !allowedApps.isEmpty else {
@@ -48,12 +52,16 @@ final class NativeNotificationBridge: @unchecked Sendable {
                                                            windowCount: 0, candidateCount: 0, recognizedCount: 0)
             )
         }
-        let pids = await MainActor.run {
-            NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.notificationcenterui")
+        let (pids, pointer) = await MainActor.run { () -> ([pid_t], CGPoint?) in
+            let pids = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.notificationcenterui")
                 .filter { !$0.isTerminated }.map(\.processIdentifier)
+            // The pointer in Accessibility coordinates (top left of the main display is 0,0).
+            let mouse = NSEvent.mouseLocation
+            let pointer = NSScreen.screens.first.map { CGPoint(x: mouse.x, y: $0.frame.maxY - mouse.y) }
+            return (pids, pointer)
         }
         return await withCheckedContinuation { continuation in
-            queue.async { continuation.resume(returning: self.scanOnWorker(pids: pids, allowedApps: allowedApps)) }
+            queue.async { continuation.resume(returning: self.scanOnWorker(pids: pids, pointer: pointer, allowedApps: allowedApps)) }
         }
     }
 
@@ -73,14 +81,18 @@ final class NativeNotificationBridge: @unchecked Sendable {
             queue.async {
                 self.records.removeAll()
                 self.firstSeen.removeAll()
+                self.browsed.removeAll()
                 continuation.resume()
             }
         }
     }
 
-    private func scanOnWorker(pids: [pid_t], allowedApps: Set<CommunicationApp>) -> NotificationBridgeScan {
+    private func scanOnWorker(pids: [pid_t], pointer: CGPoint?, allowedApps: Set<CommunicationApp>) -> NotificationBridgeScan {
         var next: [String: Record] = [:]
         var result: [CommunicationNotification] = []
+        /// Cards seen for the first time in this scan, and whether each already looks browsed.
+        var arrivals: [(id: String, browsed: Bool, age: TimeInterval?)] = []
+        let now = Date()
         var windowCount = 0
         var candidateCount = 0
         let deadline = Date().addingTimeInterval(0.8)
@@ -111,8 +123,16 @@ final class NativeNotificationBridge: @unchecked Sendable {
                     let nativeIdentity = identifier.isEmpty ? String(identity) : "\(identifier):\(identity)"
                     let id = NotificationCardPolicy.stableID(app: card.content.app, nativeIdentity: nativeIdentity,
                                                               sender: card.content.sender, body: card.content.body)
-                    let date = firstSeen[id] ?? Date()
-                    firstSeen[id] = date
+                    if firstSeen[id] == nil, !arrivals.contains(where: { $0.id == id }) {
+                        let age = NotificationCardPolicy.shownAge(texts: card.texts, excluding: card.content, now: now)
+                        let pointerOnCard = pointer.map { point in
+                            CommunicationsAX.rect(element)?.insetBy(dx: -6, dy: -6).contains(point) ?? false
+                        } ?? false
+                        let looksBrowsed = NotificationCardPolicy.isBrowsedInPanel(shownAge: age, pointerOnCard: pointerOnCard,
+                                                                                   newCardsInScan: 0)
+                        arrivals.append((id, looksBrowsed, age))
+                    }
+                    let date = firstSeen[id] ?? now
                     next[id] = Record(card: element, pid: pid, content: card.content, observedAt: Date())
                     result.append(CommunicationNotification(id: id, app: card.content.app, sender: card.content.sender,
                                                             body: card.content.body, receivedAt: date,
@@ -170,9 +190,26 @@ final class NativeNotificationBridge: @unchecked Sendable {
             }
         }
         records = next
+        // Several unknown cards at once means the panel was opened.
+        let arrivedTogether = Set(arrivals.map(\.id)).count
+        for arrival in arrivals {
+            if arrival.browsed || NotificationCardPolicy.isBrowsedInPanel(shownAge: arrival.age, pointerOnCard: false,
+                                                                          newCardsInScan: arrivedTogether) {
+                browsed.insert(arrival.id)
+                // Dated by the time it shows, when it shows one.
+                firstSeen[arrival.id] = now.addingTimeInterval(-(arrival.age ?? 0))
+            } else {
+                firstSeen[arrival.id] = now
+            }
+        }
+        for index in result.indices {
+            result[index].receivedAt = firstSeen[result[index].id] ?? result[index].receivedAt
+            result[index].seenInPanel = browsed.contains(result[index].id)
+        }
         if firstSeen.count > 128 {
             let keep = Set(firstSeen.sorted { $0.value > $1.value }.prefix(128).map(\.key))
             firstSeen = firstSeen.filter { keep.contains($0.key) }
+            browsed.formIntersection(keep)
         }
         // Matching AX identities can be reached from several source text nodes.
         var seen = Set<String>()
@@ -302,7 +339,7 @@ final class NativeNotificationBridge: @unchecked Sendable {
         let nativeOpen = row.isEnabled && row.actionNames.contains(kAXPressAction) ? row.element : nil
         return Card(element: row.element, content: content, reply: button(.reply), editor: editor,
                     send: button(.send, enabled: false), open: button(.open) ?? nativeOpen,
-                    dismiss: button(.dismiss))
+                    dismiss: button(.dismiss), texts: texts)
     }
 
     private func subtreeIndices(_ nodes: [CommunicationsAX.Node], root: Int) -> [Int] {

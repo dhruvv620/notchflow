@@ -191,6 +191,49 @@ enum NotificationCardPolicy {
         for byte in value.utf8 { hash = (hash ^ UInt64(byte)) &* 1_099_511_628_211 }
         return "notification-\(String(hash, radix: 16))"
     }
+    /// How old a card says it is, from its header timestamp ("now", "5m",
+    /// "1h ago", "10:41", "yesterday"); nil when it shows none. The sender and
+    /// message are left out, so a message that says "10:30" isn't a timestamp.
+    static func shownAge(texts: [String], excluding content: Content, now: Date, calendar: Calendar = .current) -> TimeInterval? {
+        let message = Set(([content.sender] + content.body.components(separatedBy: "\n")).map(normalized))
+        for raw in texts {
+            let text = normalized(raw)
+            guard !message.contains(text), isHeaderTimestamp(text) else { continue }
+            if ["now", "just now"].contains(text) { return 0 }
+            if text == "yesterday" { return 86_400 }
+            if text == "today" { continue }
+            if let match = text.range(of: #"^\d+"#, options: .regularExpression), let amount = Double(text[match]) {
+                let unit = text[match.upperBound...].trimmingCharacters(in: .whitespaces)
+                if unit.hasPrefix("s") { return amount }
+                if unit.hasPrefix("m") && !unit.hasPrefix("ms") && !text.contains(":") { return amount * 60 }
+                if unit.hasPrefix("h") { return amount * 3600 }
+                if unit.hasPrefix("d") { return amount * 86_400 }
+            }
+            // A clock time: today at that time, or yesterday if that is still ahead.
+            if let clock = text.range(of: #"^(\d{1,2}):(\d{2})"#, options: .regularExpression) {
+                let parts = text[clock].split(separator: ":").compactMap { Int($0) }
+                guard parts.count == 2 else { continue }
+                var hour = parts[0]
+                if text.hasSuffix("pm"), hour < 12 { hour += 12 }
+                if text.hasSuffix("am"), hour == 12 { hour = 0 }
+                guard var date = calendar.date(bySettingHour: hour, minute: parts[1], second: 0, of: now) else { continue }
+                if date > now.addingTimeInterval(60) { date = calendar.date(byAdding: .day, value: -1, to: date) ?? date }
+                return max(0, now.timeIntervalSince(date))
+            }
+        }
+        return nil
+    }
+
+    /// Whether a card NotchFlow sees for the first time is an old one being
+    /// browsed in the open Notification Center panel rather than a new banner:
+    /// the pointer is already on it (a new banner can't be hovered before it
+    /// appears), it shows an older time, or several unknown cards appeared at once.
+    static func isBrowsedInPanel(shownAge: TimeInterval?, pointerOnCard: Bool, newCardsInScan: Int) -> Bool {
+        if pointerOnCard { return true }
+        if let shownAge, shownAge >= 90 { return true }
+        return newCardsInScan >= 3
+    }
+
     private static func isHeaderTimestamp(_ value: String) -> Bool {
         let text = normalized(value)
         if ["now", "just now", "today", "yesterday"].contains(text) { return true }

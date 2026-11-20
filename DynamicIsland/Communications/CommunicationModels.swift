@@ -46,6 +46,9 @@ struct CommunicationNotification: Identifiable, Equatable, Sendable {
     var canReply: Bool
     var canOpen: Bool
     var canDismiss: Bool
+    /// An older notification seen while browsing the Notification Center
+    /// panel, not one that just arrived: never announced again.
+    var seenInPanel = false
 }
 
 enum CommunicationNotificationAction: Sendable { case open, dismiss, beginReply, sendReply(String) }
