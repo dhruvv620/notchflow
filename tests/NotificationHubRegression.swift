@@ -129,6 +129,15 @@ struct NotificationHubRegression {
         try require(!NotchNotificationPolicy.isSameConversation(rahul[0], item("s1", app: "com.tinyspeck.slackmacgap", name: "Slack", title: "Rahul", body: "hi", at: 1)),
                     "Slack and Messages are one conversation")
 
+        // Yesterday's WhatsApp message handed over again this morning is a repeat; a new one isn't.
+        let yesterday = item("nc-10", app: "net.whatsapp.WhatsApp", name: "WhatsApp", title: "Dv", body: "Hey", at: 1_000)
+        let againToday = item("nc-11", app: "net.whatsapp.WhatsApp", name: "WhatsApp", title: "Dv", body: "Hey", at: 1_000 + 15 * 3600)
+        let reply = item("nc-12", app: "net.whatsapp.WhatsApp", name: "WhatsApp", title: "Dv", body: "kal milte hai", at: 1_000 + 15 * 3600)
+        let nextWeek = item("nc-13", app: "net.whatsapp.WhatsApp", name: "WhatsApp", title: "Dv", body: "Hey", at: 1_000 + 7 * 86_400)
+        try require(NotchNotificationPolicy.isRepeat(againToday, of: yesterday), "Yesterday's message handed over again wasn't caught")
+        try require(!NotchNotificationPolicy.isRepeat(reply, of: yesterday) && !NotchNotificationPolicy.isRepeat(nextWeek, of: yesterday)
+                    && !NotchNotificationPolicy.isRepeat(yesterday, of: againToday), "A new message taken for a repeat")
+
         // An old notification hovered in the open Notification Center panel, an hour later.
         let browsed = item("banner-w", app: "com.apple.MobileSMS", name: "Messages", title: "Selene", body: "Are you coming?", at: 3_700, source: .banner)
         try require(NotchNotificationPolicy.isSameNotification(browsed, as: stored, window: .infinity), "Panel card not matched to its notification")

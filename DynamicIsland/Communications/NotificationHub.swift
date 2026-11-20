@@ -285,6 +285,8 @@ final class NotificationHub: ObservableObject {
         let new = incoming.filter { item in
             !known.contains(item.id)
                 && !(item.source != .whatsapp && items.contains { NotchNotificationPolicy.isSameWhatsAppMessage(item, $0) })
+                // Yesterday's message handed over again by an app catching up, dated now.
+                && !items.contains { NotchNotificationPolicy.isRepeat(item, of: $0) }
         }
         guard !new.isEmpty else { return }
         // And the other way round: the linked account's copy replaces the Mac
@@ -303,6 +305,13 @@ final class NotificationHub: ObservableObject {
         }
         guard announce, let newest = new.max(by: { $0.date < $1.date }),
               Date().timeIntervalSince(newest.date) < 600 else { return }
+        // An app that just started catches up on what came in while it was
+        // closed: those go to the inbox quietly instead of being announced.
+        if let bundle = newest.bundleIdentifier,
+           let launched = NSRunningApplication.runningApplications(withBundleIdentifier: bundle).compactMap(\.launchDate).max(),
+           Date().timeIntervalSince(launched) < 60 {
+            return
+        }
         // The same message is announced once, however many ways it arrives.
         let key = NotchNotificationPolicy.announcementKey(newest)
         let now = Date()

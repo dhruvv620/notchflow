@@ -127,6 +127,22 @@ enum NotchNotificationPolicy {
         return !person(lhs).isEmpty && person(lhs) == person(rhs)
     }
 
+    /// Whether a notification repeats one already in the inbox: same app,
+    /// sender and text, from up to `window` earlier. Apps catching up after
+    /// being offline (the WhatsApp app overnight) hand macOS yesterday's
+    /// messages again, dated now.
+    static func isRepeat(_ item: NotchNotification, of earlier: NotchNotification, window: TimeInterval = 30 * 3600) -> Bool {
+        guard item.id != earlier.id, earlier.source != .whatsapp || item.source == .whatsapp else { return false }
+        func app(_ value: NotchNotification) -> String {
+            if let id = value.bundleIdentifier, whatsAppBundleIdentifiers.contains(id) { return "whatsapp" }
+            return value.groupKey
+        }
+        func clean(_ value: String) -> String { value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+        let gap = item.date.timeIntervalSince(earlier.date)
+        return app(item) == app(earlier) && gap > 0 && gap < window
+            && !clean(item.body).isEmpty && clean(item.body) == clean(earlier.body) && clean(item.title) == clean(earlier.title)
+    }
+
     /// A key for "this was just announced", so the same message isn't announced twice.
     static func announcementKey(_ item: NotchNotification) -> String {
         [item.bundleIdentifier ?? item.appName, item.title, item.body]

@@ -52,8 +52,6 @@ struct EnergyRegression {
         try require(P.pulse(switches: on, conditions: battery) == .none && P.pulse(switches: on, conditions: idle) == .none, "Pulse stopped")
 
         // Window and memory.
-        try require(P.keepsWindowHeadroom(switches: on, isOpen: true) && !P.keepsWindowHeadroom(switches: on, isOpen: false), "Window headroom")
-        try require(P.keepsWindowHeadroom(switches: off, isOpen: false), "Window headroom with the switch off")
         try require(P.transcriptTailBytes(switches: on) < P.transcriptTailBytes(switches: off), "Transcript tail")
         try require(P.transcriptItemLimit(switches: on) < P.transcriptItemLimit(switches: off), "Transcript items")
         print("Optimizer: OK")

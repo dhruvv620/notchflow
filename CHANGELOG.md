@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 ### Fixed
+- **The notch opens from the center, at once**: the Optimizer's "Shrink the window when the notch closes" made the window grow again in the middle of every opening, so for a moment the content was drawn at the old spot: the notch opened from its left edge and resized as it went (most visible on Notifications). That option is gone; the window keeps its room, and opening is smooth on every tab.
+- **Yesterday's WhatsApp messages aren't announced as new**: when the WhatsApp app on the Mac starts or reconnects, it hands macOS the messages it missed, dated now. A notification repeating one already in the inbox (same app, sender and text, within about a day) is no longer added or announced again, and what an app posts in its first minute after starting goes to the inbox quietly.
 - **Opening from a notification is smooth**: opening the notch from a notification (by clicking or hovering it) switched to the Notifications tab inside the opening animation, so the tab's sideways slide ran at the same time and the panel lurched; and the list measured its height a frame late, so the notch opened at the old height and then resized. The tab is now set before the notch opens, and its first height uses the opening's own spring.
 
 ## [1.2.2] - 2026-11-20

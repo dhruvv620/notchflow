@@ -22,9 +22,12 @@ enum SettingsCleanup {
         "showClipboardIcon",
         // Time tracking was on by default; it is now off until turned on again.
         "enableTimeTracking",
+        // The Optimizer's "Shrink the window when the notch closes": growing the
+        // window again on every opening made the notch open off-center.
+        "optimizeShrinkWindow",
     ]
 
-    private static let doneKey = "settingsCleanup.v4"
+    private static let doneKey = "settingsCleanup.v5"
 
     static func run(defaults: UserDefaults = .standard) {
         guard !defaults.bool(forKey: doneKey) else { return }

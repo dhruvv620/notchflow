@@ -33,8 +33,6 @@ struct OptimizerSettings: View {
              detail: "On battery or in Low Power Mode: lyrics animate at 10 frames a second instead of 30, the live audio visualizer turns off, and background checks run half as often."),
         Item(id: "optimizer-Calm endless animations", key: .optimizeCalmAnimations, title: "Calm endless animations",
              detail: "Pulses (an agent waiting, the distraction meter, recording and privacy dots) pulse five times and then stay still; on battery saver or when idle they don't pulse. Loading spinners keep turning."),
-        Item(id: "optimizer-Shrink the window when the notch closes", key: .optimizeShrinkWindow, title: "Shrink the window when the notch closes",
-             detail: "While open, the notch keeps room for its biggest tab so switching tabs stays smooth; after it closes, that extra room is given back."),
         Item(id: "optimizer-Keep memory in check", key: .optimizeBoundMemory, title: "Keep memory in check",
              detail: "Reads the last 1 MB of long agent conversations (instead of 4 MB) and keeps 150 messages, and clears cached web responses when the Mac goes idle."),
     ]

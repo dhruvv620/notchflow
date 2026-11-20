@@ -14,7 +14,6 @@ extension Defaults.Keys {
     static let optimizePauseWhenIdle = Key<Bool>("optimizePauseWhenIdle", default: true)
     static let optimizeLowPower = Key<Bool>("optimizeLowPower", default: true)
     static let optimizeCalmAnimations = Key<Bool>("optimizeCalmAnimations", default: true)
-    static let optimizeShrinkWindow = Key<Bool>("optimizeShrinkWindow", default: true)
     static let optimizeBoundMemory = Key<Bool>("optimizeBoundMemory", default: true)
 }
 
@@ -79,7 +78,7 @@ final class EnergySaver: ObservableObject {
         guard !started else { return }
         started = true
         let keys: [Defaults.Key<Bool>] = [.optimizeBatchTimers, .optimizeUseEvents, .optimizePauseWhenIdle, .optimizeLowPower,
-                                          .optimizeCalmAnimations, .optimizeShrinkWindow, .optimizeBoundMemory]
+                                          .optimizeCalmAnimations, .optimizeBoundMemory]
         Publishers.MergeMany(keys.map { Defaults.publisher($0).map { _ in () }.eraseToAnyPublisher() })
             .receive(on: DispatchQueue.main)
             .sink { [weak self] in self?.refresh() }
@@ -123,8 +122,7 @@ final class EnergySaver: ObservableObject {
         let nextSwitches = EnergyPolicy.Switches(
             batchTimers: Defaults[.optimizeBatchTimers], useEvents: Defaults[.optimizeUseEvents],
             pauseWhenIdle: Defaults[.optimizePauseWhenIdle], lowPowerAdapt: Defaults[.optimizeLowPower],
-            calmAnimations: Defaults[.optimizeCalmAnimations], shrinkWindow: Defaults[.optimizeShrinkWindow],
-            boundMemory: Defaults[.optimizeBoundMemory])
+            calmAnimations: Defaults[.optimizeCalmAnimations], boundMemory: Defaults[.optimizeBoundMemory])
         let nextConditions = EnergyPolicy.Conditions(
             idle: LockScreenManager.shared.isLocked || displaysAsleep || sessionInactive,
             lowPowerMode: ProcessInfo.processInfo.isLowPowerModeEnabled,

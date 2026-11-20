@@ -18,13 +18,11 @@ enum EnergyPolicy {
         var lowPowerAdapt = true
         /// Endless pulses run a few times, then rest; none on battery saver or when idle.
         var calmAnimations = true
-        /// Shrink the notch window once the notch closes.
-        var shrinkWindow = true
         /// Keep less in memory and release caches when idle.
         var boundMemory = true
 
         static let allOff = Switches(batchTimers: false, useEvents: false, pauseWhenIdle: false, lowPowerAdapt: false,
-                                     calmAnimations: false, shrinkWindow: false, boundMemory: false)
+                                     calmAnimations: false, boundMemory: false)
     }
 
     /// What the Mac is doing right now.
@@ -116,11 +114,6 @@ enum EnergyPolicy {
         guard switches.calmAnimations else { return .forever }
         if conditions.idle || (switches.lowPowerAdapt && conditions.saving) { return .none }
         return .times(5)
-    }
-
-    /// Whether the notch window keeps room for the biggest tab.
-    static func keepsWindowHeadroom(switches: Switches, isOpen: Bool) -> Bool {
-        !switches.shrinkWindow || isOpen
     }
 
     /// How much of an agent conversation file is read, and how many messages are kept.
