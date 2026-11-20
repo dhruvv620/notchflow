@@ -187,6 +187,7 @@ struct AlbumArtView: View {
         }
         .buttonStyle(.plain)
         .frame(width: 84, height: 84)
+        .artworkGlow(cornerRadius: 12)
         .accessibilityLabel("Open media app")
     }
 }
@@ -602,6 +603,7 @@ struct NotchHomeView: View {
     @Default(.autoHideInactiveNotchMediaPlayer) private var autoHideInactiveNotchMediaPlayer
     @Default(.musicLyricsExpanded) private var lyricsExpanded
     @Default(.enableLyrics) private var lyricsEnabled
+    @ObservedObject private var search = MusicSearchService.shared
     let albumArtNamespace: Namespace.ID
 
     /// Whether the music player should actively display (enabled AND has real content).
@@ -625,7 +627,11 @@ struct NotchHomeView: View {
             } else {
                 VStack(alignment: .leading, spacing: 6) {
                     nowPlayingHeader
-                    if shouldShowMusicPlayer {
+                    if search.isOpen {
+                        MusicSearchPanel()
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                            .transition(.opacity)
+                    } else if shouldShowMusicPlayer {
                         MusicPlayerView(albumArtNamespace: albumArtNamespace)
                             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                         if lyricsExpanded && lyricsEnabled {
@@ -659,9 +665,21 @@ struct NotchHomeView: View {
                     .accessibilityLabel(musicManager.isPlaying ? "Playing" : "Paused")
             }
             Spacer(minLength: 8)
-            if shouldShowMusicPlayer {
+            if shouldShowMusicPlayer && !search.isOpen {
                 MusicLyricsToggle()
             }
+            Button {
+                withAnimation(.smooth(duration: 0.2)) {
+                    if search.isOpen { search.close() } else { search.isOpen = true }
+                }
+            } label: {
+                Image(systemName: search.isOpen ? "xmark" : "magnifyingglass")
+                    .font(.system(size: 11, weight: .semibold))
+                    .frame(width: 18, height: 14)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help(search.isOpen ? "Close search" : "Search songs to play")
             MediaSourcePicker()
         }
         .frame(height: 14)

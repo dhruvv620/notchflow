@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Search songs in the notch**: a search button in the Music tab lists songs as you type, with artwork, from Apple's song catalog. Pick where they play (Apple Music, Spotify or YouTube Music; it starts with the player you use): songs in your Apple Music library play right away (others open in Music), Spotify opens the song in its search, and YouTube Music opens it in the browser. Escape or the X closes it.
+- **Artwork glow**: a soft glow of the album art's colors behind the artwork in the Music tab, brighter while playing (Settings > Music > Artwork glow).
 
 ### Changed
 

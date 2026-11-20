@@ -963,6 +963,7 @@ struct SettingsView: View {
             SettingsSearchEntry(tab: .productivity, title: "Done for the day quits workspace apps", keywords: ["done for the day", "quit", "workspace"], highlightID: SettingsTab.productivity.highlightID(for: "Done for the day quits workspace apps")),
             SettingsSearchEntry(tab: .smartTools, title: "Distraction meter", keywords: ["pomodoro", "focus", "youtube", "distraction", "off track"], highlightID: SettingsTab.smartTools.highlightID(for: "Distraction meter")),
             SettingsSearchEntry(tab: .smartTools, title: "Copy-to-action", keywords: ["clipboard", "copy", "tracking", "calendar", "directions"], highlightID: SettingsTab.smartTools.highlightID(for: "Copy-to-action")),
+            SettingsSearchEntry(tab: .media, title: "Artwork glow", keywords: ["glow", "album art", "artwork", "music"], highlightID: SettingsTab.media.highlightID(for: "Artwork glow")),
             SettingsSearchEntry(tab: .media, title: "Music first", keywords: ["music", "closed notch", "live activity", "priority", "agents", "spotify"], highlightID: SettingsTab.media.highlightID(for: "Music first")),
             SettingsSearchEntry(tab: .smartTools, title: "AI provider", keywords: ["minimax", "openai", "chatgpt", "claude", "anthropic", "gemini", "groq", "openrouter", "deepseek", "mistral", "grok", "ollama", "lm studio", "custom", "model", "api key"], highlightID: SettingsTab.smartTools.highlightID(for: "AI provider")),
             SettingsSearchEntry(tab: .smartTools, title: "Smart replies", keywords: ["minimax", "ai", "reply", "suggestions", "api key", "hinglish"], highlightID: SettingsTab.smartTools.highlightID(for: "Smart replies")),
@@ -3024,6 +3025,14 @@ struct Media: View {
                 }
                 .disabled(!coordinator.musicLiveActivityEnabled)
                 .settingsHighlight(id: highlightID("Music first"))
+                Defaults.Toggle(key: .musicArtworkGlow) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Artwork glow")
+                        Text("A soft glow of the album art's colors behind it in the Music tab, brighter while playing.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                .settingsHighlight(id: highlightID("Artwork glow"))
                 Defaults.Toggle(key: .musicControlWindowEnabled) {
                     Text("Show floating media controls")
                 }

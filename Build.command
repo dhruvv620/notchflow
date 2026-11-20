@@ -103,6 +103,12 @@ printf '\nChecking where the app runs from...\n'
     "$SOURCE_DIR/tests/AppLocationRegression.swift" -o "$BUILD_ROOT/AppLocationRegression"
 "$BUILD_ROOT/AppLocationRegression"
 
+printf '\nChecking music search...\n'
+/usr/bin/xcrun swiftc -swift-version 5 -parse-as-library \
+    "$SOURCE_DIR/DynamicIsland/helpers/MusicSearchPolicy.swift" \
+    "$SOURCE_DIR/tests/MusicSearchRegression.swift" -o "$BUILD_ROOT/MusicSearchRegression"
+"$BUILD_ROOT/MusicSearchRegression"
+
 printf '\nChecking the window stash...\n'
 /usr/bin/xcrun swiftc -swift-version 5 -parse-as-library \
     "$SOURCE_DIR/DynamicIsland/helpers/WindowStashPolicy.swift" \
