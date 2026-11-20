@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
+### Changed
+
+### Fixed
+
+## [1.2.2] - 2026-11-20
+
+### Added
 - **Music first** (Settings > Music, on): while music plays, the closed notch shows its live activity. AI agents working, builds running, a meeting countdown and the distraction meter wait until it stops; approvals, calls and new messages still show for a moment.
 - **Replying clears the conversation**: answer Rahul once and all his notifications leave the inbox (with Undo when you replied from the notch), not just the one you answered. It also happens when you reply somewhere else: in Messages on the Mac or your iPhone (seen through the Messages history, with Full Disk Access) or in WhatsApp on the linked account. Other people's messages stay. Settings > Notifications > Clear a conversation when I reply.
 
