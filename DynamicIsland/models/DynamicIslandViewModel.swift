@@ -73,6 +73,17 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
         }
     }
 
+    /// Areas that scroll sideways themselves (smart reply suggestions): a
+    /// two-finger swipe over them scrolls them instead of changing the tab.
+    @Published private(set) var isHorizontalScrollOwned = false
+    private var horizontalScrollTokens: Set<UUID> = []
+
+    func setHorizontalScrollOwnership(_ active: Bool, token: UUID) {
+        if active { horizontalScrollTokens.insert(token) } else { horizontalScrollTokens.remove(token) }
+        let owned = !horizontalScrollTokens.isEmpty
+        if owned != isHorizontalScrollOwned { isHorizontalScrollOwned = owned }
+    }
+
     private func resetScrollGestureSuppression() {
         scrollGestureSuppressionTokens.removeAll()
         isScrollGestureActive = false

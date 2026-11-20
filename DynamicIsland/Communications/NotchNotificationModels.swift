@@ -179,10 +179,14 @@ enum NotchNotificationPolicy {
     static let whatsAppBundleIdentifiers: Set<String> = ["net.whatsapp.WhatsApp", "desktop.WhatsApp"]
 
     /// The phone number of a WhatsApp chat from a notification's thread
-    /// ("919876543210@s.whatsapp.net", "+91 98765 43210"); nil for groups.
+    /// ("919876543210@s.whatsapp.net", "+91 98765 43210"); nil for groups and
+    /// for private ids ("49752934731960@lid"), which look like numbers but aren't.
     static func whatsAppPhone(fromThread thread: String?) -> String? {
-        guard let thread = thread?.trimmingCharacters(in: .whitespacesAndNewlines), !thread.isEmpty,
-              !thread.contains("@g.us"), !thread.contains("@broadcast"), !thread.contains("@newsletter") else { return nil }
+        guard let thread = thread?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(), !thread.isEmpty else { return nil }
+        if let at = thread.firstIndex(of: "@") {
+            let domain = thread[thread.index(after: at)...]
+            guard domain == "s.whatsapp.net" || domain == "c.us" else { return nil }
+        }
         let local = thread.split(separator: "@").first.map(String.init) ?? thread
         let candidate = local.split(separator: ":").first.map(String.init) ?? local
         guard candidate.allSatisfy({ $0.isNumber || "+ -()".contains($0) }) else { return nil }

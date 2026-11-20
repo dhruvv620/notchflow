@@ -2378,7 +2378,8 @@ struct ContentView: View {
         }
 
         if vm.notchState == .open {
-            guard !lockScreenManager.isLocked, !hasAnyActivePopovers() else { return }
+            // Over something that scrolls sideways (smart reply suggestions), the swipe is its own.
+            guard !lockScreenManager.isLocked, !hasAnyActivePopovers(), !vm.isHorizontalScrollOwned else { return }
             // One discrete horizontal trackpad gesture changes one visible tab.
             // Vertical-scroll suppression belongs to the up/down handlers.
             if skipGestureActiveDirection == nil && translation >= 40 {

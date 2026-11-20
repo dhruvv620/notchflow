@@ -490,7 +490,11 @@ final class NotificationHub: ObservableObject {
                 repliedIDs.insert(item.id)
                 if replyingID == item.id { replyingID = nil }
             }
-            if Defaults[.notificationClearOnReply] { clearConversation(of: item, offeringUndo: true) }
+            if Defaults[.notificationClearOnReply] {
+                // After the reply box has finished closing, so the two animations don't overlap.
+                try? await Task.sleep(for: .milliseconds(350))
+                withAnimation(.smooth(duration: 0.3)) { clearConversation(of: item, offeringUndo: true) }
+            }
         }
         return sent
     }
@@ -575,6 +579,8 @@ final class NotificationHub: ObservableObject {
             var copy = item
             copy.liveBannerID = nil
             if case .banner = copy.reply { copy.reply = lastingRoute(copy) }
+            // Saved before private WhatsApp ids were told apart from numbers: check again.
+            if case .whatsappApp = copy.reply { copy.reply = lastingRoute(copy) }
             return copy
         }
     }

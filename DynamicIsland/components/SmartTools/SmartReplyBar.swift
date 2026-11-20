@@ -17,6 +17,8 @@ struct SmartReplyBar: View {
     @ObservedObject private var service = SmartReplyService.shared
     @ObservedObject private var appearance = NotchAppearanceModel.shared
     @Default(.enableSmartReplies) private var enabled
+    @EnvironmentObject private var vm: DynamicIslandViewModel
+    @State private var swipeToken = UUID()
 
     var body: some View {
         if enabled, !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -47,15 +49,21 @@ struct SmartReplyBar: View {
                         .lineLimit(1)
                         .help(error)
                 } else if let suggestions = service.suggestions[id] {
+                    // Swipe with two fingers to see them all; over here, a swipe doesn't change the tab.
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: NotchTokens.Spacing.xs) {
                             ForEach(suggestions, id: \.self) { suggestion in
                                 NotchChip(isSelected: text == suggestion, action: { text = suggestion }) {
                                     Text(suggestion).lineLimit(1)
                                 }
+                                .help(suggestion)
                             }
                         }
+                        .padding(.horizontal, 2)
+                        .padding(.vertical, 3)
                     }
+                    .onHover { vm.setHorizontalScrollOwnership($0, token: swipeToken) }
+                    .onDisappear { vm.setHorizontalScrollOwnership(false, token: swipeToken) }
                 } else if !service.loading.contains(id) {
                     Text("Suggest replies")
                         .font(NotchTokens.Typography.caption)
@@ -63,7 +71,8 @@ struct SmartReplyBar: View {
                 }
                 Spacer(minLength: 0)
             }
-            .frame(height: 22)
+            .frame(height: 28)
+            .padding(.top, 4)
         }
     }
 }

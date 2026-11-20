@@ -384,6 +384,13 @@ private struct NotificationCard: View {
             NotchPillButton(title: "Open", symbol: "arrow.up.right.square") {
                 hub.open(item)
             }
+            if isSending {
+                HStack(spacing: 4) {
+                    ProgressView().controlSize(.mini)
+                    Text("Sending…").font(NotchTokens.Typography.caption).foregroundStyle(.secondary)
+                }
+                .transition(.opacity)
+            }
             Spacer(minLength: 0)
             if item.bundleIdentifier != nil {
                 Menu {
@@ -420,12 +427,17 @@ private struct NotificationCard: View {
         !isSending && !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
+    /// Closes the reply box right away and sends in the background (Messages
+    /// can take a few seconds); a failed send reopens it with the text.
     private func send() {
         guard canSend else { return }
         let text = draft
+        draft = ""
+        withAnimation(NotchTokens.Motion.standard) { hub.replyingID = nil }
         Task {
-            if await hub.sendReply(text, to: item) {
-                draft = ""
+            if !(await hub.sendReply(text, to: item)) {
+                draft = text
+                withAnimation(NotchTokens.Motion.standard) { hub.replyingID = item.id }
             }
         }
     }

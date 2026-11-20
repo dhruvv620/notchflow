@@ -94,6 +94,7 @@ struct NotificationHubRegression {
         try require(N.whatsAppPhone(fromThread: "919876543210@s.whatsapp.net") == "919876543210", "JID thread")
         try require(N.whatsAppPhone(fromThread: "919876543210:12@s.whatsapp.net") == "919876543210", "Device JID thread")
         try require(N.whatsAppPhone(fromThread: "+91 98765 43210") == "919876543210", "Number thread")
+        try require(N.whatsAppPhone(fromThread: "49752934731960@lid") == nil, "A private WhatsApp id was taken for a phone number")
         try require(N.whatsAppPhone(fromThread: "120363025246125244@g.us") == nil && N.whatsAppPhone(fromThread: "chat-42") == nil
                     && N.whatsAppPhone(fromThread: nil) == nil, "Group or unknown thread gave a number")
         try require(N.whatsAppSendURL(phone: "919876543210", text: "ok bhai, 5 baje")?.absoluteString
