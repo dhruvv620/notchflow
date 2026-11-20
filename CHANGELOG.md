@@ -15,6 +15,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Notifications arrive instantly**: instead of checking every few seconds (up to ten on battery), NotchFlow now reacts the moment Notification Center's store changes and the moment a banner appears on screen; the timed checks remain as a slow backup.
 - **Cleared notifications stay cleared**: replying to a WhatsApp message (or clearing or dismissing notifications) while its macOS banner was still on screen let the banner bring it straight back into the inbox. What you clear is remembered for a day.
 - **Setups respect desktops**: a setup works on the desktop you're on. It saves and moves only that desktop's windows, never touches a window on another desktop, opens a new browser window here when the setup's is elsewhere, and no longer activates an app at the end (which could jump to another desktop where its window was and then move that window). Switching desktops while a setup is being placed stops it.
+
+## [1.2.3] - 2026-11-20
+
+### Added
+
+### Changed
+
+### Fixed
 - **The notch opens from the center, at once**: the Optimizer's "Shrink the window when the notch closes" made the window grow again in the middle of every opening, so for a moment the content was drawn at the old spot: the notch opened from its left edge and resized as it went (most visible on Notifications). That option is gone; the window keeps its room, and opening is smooth on every tab.
 - **Yesterday's WhatsApp messages aren't announced as new**: when the WhatsApp app on the Mac starts or reconnects, it hands macOS the messages it missed, dated now. A notification repeating one already in the inbox (same app, sender and text, within about a day) is no longer added or announced again, and what an app posts in its first minute after starting goes to the inbox quietly.
 - **Opening from a notification is smooth**: opening the notch from a notification (by clicking or hovering it) switched to the Notifications tab inside the opening animation, so the tab's sideways slide ran at the same time and the panel lurched; and the list measured its height a frame late, so the notch opened at the old height and then resized. The tab is now set before the notch opens, and its first height uses the opening's own spring.
