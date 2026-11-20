@@ -67,6 +67,7 @@ struct ContentView: View {
     @ObservedObject var focusQuiet = FocusQuiet.shared
     @ObservedObject var timeTracker = TimeTracker.shared
     @ObservedObject var promiseKeeper = PromiseKeeper.shared
+    @ObservedObject var windowStash = WindowStash.shared
     @Default(.timeTrackingShowRing) var timeTrackingShowRing
     @Default(.timeTrackingEnabled) var enableTimeTracking
     @ObservedObject var agentHub = AgentHub.shared
@@ -372,6 +373,11 @@ struct ContentView: View {
         focusQuiet.summary != nil && canShowClosedActivity
     }
 
+    /// A window being dragged toward the notch: where to let go to stash it.
+    private var isStashDropVisible: Bool {
+        windowStash.dropTarget != .none && vm.notchState == .closed && !lockScreenManager.isLocked
+    }
+
     /// A promise due soon.
     private var isPromiseNudgeVisible: Bool {
         promiseKeeper.nudge != nil && canShowClosedActivity
@@ -436,6 +442,7 @@ struct ContentView: View {
         }
 
         if isCopyActionVisible || isFocusGuardVisible || isBuildWatchVisible || isAgentActivityVisible || isFocusSummaryVisible
+            || isStashDropVisible
             || isPromiseNudgeVisible || isWeeklyReportVisible || isWorkRingVisible {
             width = max(width, vm.closedNotchSize.width + 8 + ClosedNotchWingsMetrics.addedWidth + closedPadding)
         }
@@ -1143,6 +1150,9 @@ struct ContentView: View {
                       } else if vm.notchState == .closed && capsLockManager.isCapsLockActive && Defaults[.enableCapsLockIndicator] && !vm.hideOnClosed && !lockScreenManager.isLocked {
                           InlineHUD(type: .constant(.capsLock), value: .constant(1.0), icon: .constant(""), hoverAnimation: $isHovering, gestureProgress: $gestureProgress)
                               .transition(AnyTransition.move(edge: .trailing).combined(with: .opacity))
+                      } else if isStashDropVisible {
+                          WindowStashDropActivity(isHovering: isHovering)
+                              .transition(.opacity.animation(.smooth(duration: 0.18)))
                       } else if isWhatsAppBannerVisible, let banner = whatsAppManager.banner {
                           WhatsAppMessageLiveActivity(banner: banner, isHovering: isHovering) {
                               coordinator.currentView = .whatsapp

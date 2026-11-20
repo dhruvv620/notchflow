@@ -10,16 +10,21 @@ import Foundation
 /// check it alone). Rectangles are in Accessibility coordinates: the top
 /// left of the main display is 0,0 and y grows downward.
 enum WindowStashPolicy {
-    /// How far below the top of the screen the drop zone reaches.
+    /// How far below the top of the screen the drop zone reaches when the
+    /// menu bar's height isn't known.
     static let zoneDepth: CGFloat = 34
     /// How far beyond the notch's sides it reaches.
-    static let zoneMargin: CGFloat = 50
+    static let zoneMargin: CGFloat = 90
     /// Without a notch, the zone is this wide, centered.
-    static let zoneWidthWithoutNotch: CGFloat = 300
+    static let zoneWidthWithoutNotch: CGFloat = 360
+    /// Within this distance of the top, a dragged window is "near" and the notch shows where to drop it.
+    static let nearDepth: CGFloat = 220
 
-    /// The drop zone at the top of one screen: around the notch, or the
-    /// middle of the top edge on a screen without one.
-    static func zone(screen: CGRect, notchMinX: CGFloat?, notchMaxX: CGFloat?) -> CGRect {
+    /// The drop zone at the top of one screen: the menu bar strip around the
+    /// notch (or the middle of the top edge on a screen without one). A
+    /// window can't be dragged into the menu bar, only the pointer can, so
+    /// it never triggers by just moving a window up.
+    static func zone(screen: CGRect, notchMinX: CGFloat?, notchMaxX: CGFloat?, menuBarHeight: CGFloat? = nil) -> CGRect {
         let minX: CGFloat, maxX: CGFloat
         if let notchMinX, let notchMaxX, notchMaxX > notchMinX {
             minX = notchMinX - zoneMargin
@@ -28,8 +33,21 @@ enum WindowStashPolicy {
             minX = screen.midX - zoneWidthWithoutNotch / 2
             maxX = screen.midX + zoneWidthWithoutNotch / 2
         }
+        let depth = menuBarHeight.map { max(zoneDepth, $0 + 4) } ?? zoneDepth
         return CGRect(x: max(screen.minX, minX), y: screen.minY,
-                      width: min(screen.maxX, maxX) - max(screen.minX, minX), height: zoneDepth)
+                      width: min(screen.maxX, maxX) - max(screen.minX, minX), height: depth)
+    }
+
+    /// The area where a dragged window counts as near the drop zone.
+    static func nearArea(around zone: CGRect) -> CGRect {
+        CGRect(x: zone.minX - 160, y: zone.minY, width: zone.width + 320, height: nearDepth)
+    }
+
+    /// Without a record of the drag: whether the front window was pushed
+    /// against the top (macOS stops it just under the menu bar) as the
+    /// button came up in the zone.
+    static func isPushedAgainstTop(_ frame: CGRect, screen: CGRect, menuBarHeight: CGFloat) -> Bool {
+        abs(frame.minY - (screen.minY + menuBarHeight)) <= 12
     }
 
     /// Whether a mouse drag moved a window into a drop zone: the button went

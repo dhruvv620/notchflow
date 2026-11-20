@@ -44,14 +44,24 @@ final class WindowStash: ObservableObject {
     @Published private(set) var items: [StashedWindow] = []
     @Published private(set) var lastMessage: String?
 
+    /// While a window is being dragged: whether it's near the notch or over
+    /// the drop spot, so the closed notch can show where to let go.
+    enum DropTarget: Equatable { case none, near, over }
+    @Published private(set) var dropTarget: DropTarget = .none
+
     private var monitors: [Any] = []
     private var settings: AnyCancellable?
     private var terminations: AnyCancellable?
+    private var activations: AnyCancellable?
+    /// The last app in front other than NotchFlow, for "stash the front window".
+    private var lastFrontApp: NSRunningApplication?
     /// The drag in progress: where the button went down, and the window
     /// under it once the drag is noticed.
     private var dragDown: CGPoint?
     private var dragWindow: (element: AXUIElement, pid: pid_t, frameBefore: CGRect)?
     private var dragInZone = false
+    private var dragDownAt: Date?
+    private var lookedForWindow = false
     private static let limit = 24
 
     private init() {}
@@ -61,6 +71,13 @@ final class WindowStash: ObservableObject {
         settings = Publishers.CombineLatest(Defaults.publisher(.enableWindowStash), Defaults.publisher(.windowStashByDragging))
             .receive(on: RunLoop.main)
             .sink { [weak self] enabled, dragging in self?.configure(watchDrags: enabled.newValue && dragging.newValue) }
+        activations = NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didActivateApplicationNotification)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] note in
+                guard let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
+                      app.processIdentifier != ProcessInfo.processInfo.processIdentifier else { return }
+                self?.lastFrontApp = app
+            }
         terminations = NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didTerminateApplicationNotification)
             .receive(on: RunLoop.main)
             .sink { [weak self] note in
@@ -89,38 +106,86 @@ final class WindowStash: ObservableObject {
 
     private func mouseDown() {
         dragDown = Self.pointer()
+        dragDownAt = Date()
         dragWindow = nil
         dragInZone = false
+        lookedForWindow = false
     }
 
     private func mouseDragged() {
         guard let down = dragDown, AXIsProcessTrusted() else { return }
         let now = Self.pointer()
-        if dragWindow == nil {
+        if !lookedForWindow {
             // The first drag event: the window being dragged is under the pointer.
-            guard let (window, pid) = Self.window(at: now), let frame = AXWindowTools.frame(of: window) else {
-                dragDown = nil // Not a window: stop looking until the next click.
-                return
+            lookedForWindow = true
+            if let (window, pid) = Self.window(at: now), let frame = AXWindowTools.frame(of: window) {
+                let before = WindowStashPolicy.frameBeforeDrag(noticed: frame, pointerAtDown: down, pointerAtNotice: now)
+                // Only a drag that began on the title bar moves the window.
+                let titleBar = CGRect(x: before.minX, y: before.minY - 6, width: before.width, height: 52)
+                if titleBar.contains(down) { dragWindow = (window, pid, before) }
             }
-            dragWindow = (window, pid, WindowStashPolicy.frameBeforeDrag(noticed: frame, pointerAtDown: down, pointerAtNotice: now))
         }
-        let inZone = Self.zones().contains { $0.contains(now) }
+        guard dragWindow != nil else { return }
+        let screens = Self.screens()
+        let inZone = screens.contains { $0.zone.contains(now) }
+        let near = screens.contains { WindowStashPolicy.nearArea(around: $0.zone).contains(now) }
         if inZone && !dragInZone {
             NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
         }
         dragInZone = inZone
+        setDropTarget(inZone ? .over : near ? .near : .none)
+        // Keep the notch closed under a dragged window, so the drop spot stays put.
+        if near { DynamicIslandViewCoordinator.shared.suppressHoverOpen(for: 1.2) }
     }
 
     private func mouseUp() {
-        defer { dragDown = nil; dragWindow = nil; dragInZone = false }
-        guard let down = dragDown, let drag = dragWindow, Defaults[.enableWindowStash] else { return }
+        let wasOver = dragInZone
+        defer {
+            dragDown = nil; dragWindow = nil; dragInZone = false; lookedForWindow = false
+            setDropTarget(.none)
+        }
+        guard let down = dragDown, Defaults[.enableWindowStash], AXIsProcessTrusted() else { return }
         let up = Self.pointer()
-        guard WindowStashPolicy.isDropIntoNotch(down: down, up: up, frameAtStart: drag.frameBefore,
-                                                frameAtEnd: AXWindowTools.frame(of: drag.element), zones: Self.zones()) else { return }
-        Task { await stash(drag.element, pid: drag.pid, returningTo: drag.frameBefore) }
+        let screens = Self.screens()
+        if let drag = dragWindow {
+            guard wasOver || WindowStashPolicy.isDropIntoNotch(down: down, up: up, frameAtStart: drag.frameBefore,
+                                                               frameAtEnd: AXWindowTools.frame(of: drag.element),
+                                                               zones: screens.map(\.zone)) else { return }
+            Task { await stash(drag.element, pid: drag.pid, returningTo: drag.frameBefore) }
+            return
+        }
+        // macOS didn't report the drag: if the button came up on the drop spot
+        // after a real drag, the front window pushed against the top is the one.
+        guard let screen = screens.first(where: { $0.zone.contains(up) }),
+              let downAt = dragDownAt, Date().timeIntervalSince(downAt) > 0.15,
+              hypot(up.x - down.x, up.y - down.y) > 40,
+              let front = Self.frontApp(), front.processIdentifier != ProcessInfo.processInfo.processIdentifier,
+              let window = AXWindowTools.focusedWindow(of: front.processIdentifier), AXWindowTools.isStandard(window),
+              let frame = AXWindowTools.frame(of: window),
+              WindowStashPolicy.isPushedAgainstTop(frame, screen: screen.frame, menuBarHeight: screen.menuBarHeight) else { return }
+        Task { await stash(window, pid: front.processIdentifier, returningTo: frame) }
+    }
+
+    private func setDropTarget(_ target: DropTarget) {
+        guard dropTarget != target else { return }
+        withAnimation(.smooth(duration: 0.18)) { dropTarget = target }
     }
 
     // MARK: Stashing
+
+    /// Parks the window you're working in (from the shortcut, or the button in Flow).
+    func stashFrontWindow() async {
+        guard AXIsProcessTrusted() else {
+            lastMessage = "Allow NotchFlow in System Settings › Privacy & Security › Accessibility to stash windows."
+            return
+        }
+        guard let app = Self.frontApp(), let window = AXWindowTools.focusedWindow(of: app.processIdentifier),
+              AXWindowTools.isStandard(window), let frame = AXWindowTools.frame(of: window) else {
+            lastMessage = "No window in front to stash."
+            return
+        }
+        await stash(window, pid: app.processIdentifier, returningTo: frame)
+    }
 
     /// Parks every window except the front app's.
     func stashAllOthers() async {
@@ -206,12 +271,13 @@ final class WindowStash: ObservableObject {
         return CGPoint(x: mouse.x, y: top - mouse.y)
     }
 
-    /// Every screen's drop zone, in Accessibility coordinates.
-    private static func zones() -> [CGRect] {
+    /// Every screen with its drop zone, in Accessibility coordinates.
+    private static func screens() -> [(frame: CGRect, zone: CGRect, menuBarHeight: CGFloat)] {
         guard let top = NSScreen.screens.first?.frame.maxY else { return [] }
         return NSScreen.screens.map { screen in
             let frame = screen.frame
             let ax = CGRect(x: frame.minX, y: top - frame.maxY, width: frame.width, height: frame.height)
+            let menuBar = max(0, frame.maxY - screen.visibleFrame.maxY)
             var notchMinX: CGFloat?, notchMaxX: CGFloat?
             if let left = screen.auxiliaryTopLeftArea, let right = screen.auxiliaryTopRightArea {
                 // These may be relative to the screen; make them global.
@@ -219,7 +285,9 @@ final class WindowStash: ObservableObject {
                 notchMinX = left.maxX + offset
                 notchMaxX = right.minX + offset
             }
-            return WindowStashPolicy.zone(screen: ax, notchMinX: notchMinX, notchMaxX: notchMaxX)
+            let zone = WindowStashPolicy.zone(screen: ax, notchMinX: notchMinX, notchMaxX: notchMaxX,
+                                              menuBarHeight: menuBar > 0 ? menuBar : nil)
+            return (ax, zone, menuBar > 0 ? menuBar : 24)
         }
     }
 
@@ -247,8 +315,13 @@ final class WindowStash: ObservableObject {
         return nil
     }
 
+    /// The app you're working in: the front one, or the last one before NotchFlow came forward.
     private static func frontApp() -> NSRunningApplication? {
-        NSWorkspace.shared.frontmostApplication
+        let front = NSWorkspace.shared.frontmostApplication
+        if front?.processIdentifier == ProcessInfo.processInfo.processIdentifier {
+            return shared.lastFrontApp.flatMap { $0.isTerminated ? nil : $0 }
+        }
+        return front
     }
 
     /// A small picture of the window, when Screen Recording is allowed.
@@ -282,6 +355,15 @@ enum AXWindowTools {
     }
 
     static func title(of window: AXUIElement) -> String? { string(window, kAXTitleAttribute) }
+
+    static func focusedWindow(of pid: pid_t) -> AXUIElement? {
+        let app = AXUIElementCreateApplication(pid)
+        AXUIElementSetMessagingTimeout(app, 0.3)
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(app, kAXFocusedWindowAttribute as CFString, &value) == .success,
+              let value, CFGetTypeID(value) == AXUIElementGetTypeID() else { return nil }
+        return (value as! AXUIElement)
+    }
 
     static func standardWindows(of pid: pid_t) -> [AXUIElement] {
         let app = AXUIElementCreateApplication(pid)

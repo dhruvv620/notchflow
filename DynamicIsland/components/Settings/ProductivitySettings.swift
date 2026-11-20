@@ -3,6 +3,7 @@
 
 import AppKit
 import Defaults
+import KeyboardShortcuts
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -191,11 +192,12 @@ struct ProductivitySettings: View {
             Defaults.Toggle(key: .windowStashByDragging) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Drag windows into the notch to stash them")
-                    Text("Drag a window by its title bar up into the notch and let go. The trackpad taps when you're over the drop spot.")
+                    Text("Drag a window by its title bar up past the top of the screen, into the notch. The notch shows \u{201C}Stash \u{00B7} drop here\u{201D} as you get close and \u{201C}Let go to stash\u{201D} when you're on the spot (the trackpad taps too).")
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }
             .settingsHighlight(id: highlightID("Drag windows into the notch to stash them"))
+            KeyboardShortcuts.Recorder("Stash the front window:", name: .stashFrontWindow)
             HStack {
                 Text(previewsAllowed ? "Window previews are on." : "Previews need Screen Recording; until then, app icons stand in.")
                     .font(.caption).foregroundStyle(.secondary)

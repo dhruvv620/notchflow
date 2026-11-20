@@ -15,11 +15,17 @@ struct WindowStashRegression {
         typealias P = WindowStashPolicy
         let laptop = CGRect(x: 0, y: 0, width: 1512, height: 982)
         let notchZone = P.zone(screen: laptop, notchMinX: 660, notchMaxX: 852)
-        try require(notchZone == CGRect(x: 610, y: 0, width: 292, height: 34), "Notch zone: \(notchZone)")
+        try require(notchZone == CGRect(x: 570, y: 0, width: 372, height: 34), "Notch zone: \(notchZone)")
+        let menuBarZone = P.zone(screen: laptop, notchMinX: 660, notchMaxX: 852, menuBarHeight: 37)
+        try require(menuBarZone.height == 41, "The zone covers the menu bar: \(menuBarZone)")
+        try require(P.nearArea(around: notchZone).contains(CGPoint(x: 756, y: 150)), "Near area")
+        try require(P.isPushedAgainstTop(CGRect(x: 100, y: 38, width: 800, height: 600), screen: laptop, menuBarHeight: 37)
+                    && !P.isPushedAgainstTop(CGRect(x: 100, y: 200, width: 800, height: 600), screen: laptop, menuBarHeight: 37),
+                    "Pushed against the top")
         // An external display to the right, without a notch.
         let external = CGRect(x: 1512, y: -200, width: 2560, height: 1440)
         let plainZone = P.zone(screen: external, notchMinX: nil, notchMaxX: nil)
-        try require(plainZone == CGRect(x: 2642, y: -200, width: 300, height: 34), "Zone without a notch: \(plainZone)")
+        try require(plainZone == CGRect(x: 2612, y: -200, width: 360, height: 34), "Zone without a notch: \(plainZone)")
 
         // Dragging Chrome by its title bar up into the notch.
         let start = CGRect(x: 200, y: 300, width: 900, height: 600)

@@ -1071,6 +1071,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             )
         }
 
+        KeyboardShortcuts.onKeyDown(for: .stashFrontWindow) {
+            guard Defaults[.enableShortcuts], Defaults[.enableWindowStash] else { return }
+            Task { @MainActor in await WindowStash.shared.stashFrontWindow() }
+        }
+
         KeyboardShortcuts.onKeyDown(for: .toggleNotchOpen) { [weak self] in
             guard let self = self else { return }
             guard Defaults[.enableShortcuts] else { return }

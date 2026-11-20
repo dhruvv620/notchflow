@@ -102,11 +102,14 @@ struct NotchFlowView: View {
                 if !stash.items.isEmpty {
                     NotchPillButton(title: "Bring all back", symbol: "arrow.uturn.backward") { stash.restoreAll() }
                 }
+                NotchIconButton(symbol: "macwindow.badge.plus", help: "Stash the window you're working in (\u{2303}\u{2325}S)") {
+                    Task { await stash.stashFrontWindow() }
+                }
                 NotchPillButton(title: "Stash all others", symbol: "rectangle.stack") { Task { await stash.stashAllOthers() } }
                     .help("Parks every window except the app in front. Click one here to bring it back where it was.")
             }
             if stash.items.isEmpty {
-                Text("Drag a window by its title bar into the notch to park it here.")
+                Text("Drag a window by its title bar up into the notch, or press \u{2303}\u{2325}S, to park it here.")
                     .font(NotchTokens.Typography.caption).foregroundStyle(.secondary)
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -478,5 +481,34 @@ struct WeeklyReportActivity: View {
                 .foregroundStyle(appearance.accentColor)
         }
         .help("Click for this week's report")
+    }
+}
+
+/// Under the closed notch while a window is dragged toward it: where to let
+/// go to stash it, lit up once the pointer is on the drop spot.
+struct WindowStashDropActivity: View {
+    @ObservedObject private var stash = WindowStash.shared
+    @ObservedObject private var appearance = NotchAppearanceModel.shared
+    let isHovering: Bool
+
+    var body: some View {
+        let over = stash.dropTarget == .over
+        ClosedNotchWings(isHovering: isHovering) {
+            Image(systemName: over ? "tray.and.arrow.down.fill" : "tray.and.arrow.down")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(over ? appearance.accentColor : .white.opacity(0.7))
+                .scaleEffect(over ? 1.15 : 1)
+            Text(over ? "Let go" : "Stash")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.white.opacity(over ? 0.95 : 0.7))
+                .lineLimit(1)
+        } trailing: {
+            Text(over ? "to stash" : "drop here")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(over ? appearance.accentColor : .white.opacity(0.55))
+                .lineLimit(1)
+        }
+        .animation(.smooth(duration: 0.18), value: over)
+        .accessibilityLabel(over ? "Let go to stash the window" : "Drag the window here to stash it")
     }
 }
