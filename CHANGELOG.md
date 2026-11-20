@@ -8,9 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Music first** (Settings > Music, on): while music plays, the closed notch shows its live activity. AI agents working, builds running, a meeting countdown and the distraction meter wait until it stops; approvals, calls and new messages still show for a moment.
 - **Replying clears the conversation**: answer Rahul once and all his notifications leave the inbox (with Undo when you replied from the notch), not just the one you answered. It also happens when you reply somewhere else: in Messages on the Mac or your iPhone (seen through the Messages history, with Full Disk Access) or in WhatsApp on the linked account. Other people's messages stay. Settings > Notifications > Clear a conversation when I reply.
 
 ### Changed
+- **Notifications under the notch**: a new notification shows the app's icon beside the notch and the sender and message on one line under it, like WhatsApp messages, instead of squeezing the text beside the camera where it was cut off.
 - **Setups are your windows, nothing else**: Save current keeps only the windows on screen (each one's app, position, size and screen), not apps without a window, minimized windows or browser tabs, so opening a setup never opens duplicate tabs again. Opening one puts each window back exactly; an app that's closed is opened, and a window that's closed in a running app (Chrome with no window) is opened again before it's placed. Existing setups saved from the screen drop their saved pages and windowless apps once. Flow now shows what a setup did ("Updated Setup 1 to the current layout", "No windows on screen to save").
 
 ### Fixed

@@ -810,6 +810,10 @@ extension Defaults.Keys {
     static let didMigrateMusicControlSlots = Key<Bool>("didMigrateMusicControlSlots", default: false)
     static let musicSkipBehavior = Key<MusicSkipBehavior>("musicSkipBehavior", default: .track)
     static let musicControlWindowEnabled = Key<Bool>("musicControlWindowEnabled", default: false)
+    /// While music plays, the closed notch shows it; ongoing statuses (agents
+    /// working, builds running, a meeting countdown, the distraction meter)
+    /// wait. Things that need you (approvals, calls, messages) still show.
+    static let closedNotchMusicFirst = Key<Bool>("closedNotchMusicFirst", default: true)
     static let showStandardMediaControls = Key<Bool>("showStandardMediaControls", default: true)
     static let autoHideInactiveNotchMediaPlayer = Key<Bool>("autoHideInactiveNotchMediaPlayer", default: true)
     static let cachedMusicLiveActivityPreference = Key<Bool?>("cachedMusicLiveActivityPreference", default: nil)

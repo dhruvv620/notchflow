@@ -348,11 +348,18 @@ struct ContentView: View {
     }
 
     /// An agent needs you, just finished, or (optionally) is working.
+    /// Music is playing and has the closed notch to itself ("Music first").
+    private var isMusicFirst: Bool {
+        Defaults[.closedNotchMusicFirst] && musicManager.isPlaying && coordinator.musicLiveActivityEnabled
+            && closedMusicContentEnabled && canShowClosedActivity
+    }
+
     private var isAgentActivityVisible: Bool {
-        // During a Pomodoro focus block only agents waiting on you show.
+        // During a Pomodoro focus block only agents waiting on you show; while
+        // music plays (Music first), agents just working wait too.
         let hasSomething = !agentHub.requests.isEmpty || !agentHub.waitingInWindowSessions.isEmpty
             || agentHub.announcement != nil
-            || (!focusQuiet.isQuiet && agentShowWorkingInClosedNotch && !agentHub.workingSessions.isEmpty)
+            || (!focusQuiet.isQuiet && !isMusicFirst && agentShowWorkingInClosedNotch && !agentHub.workingSessions.isEmpty)
         return hasSomething && canShowClosedActivity
     }
 
@@ -361,11 +368,11 @@ struct ContentView: View {
     }
 
     private var isFocusGuardVisible: Bool {
-        focusGuard.isOffTrack && canShowClosedActivity
+        focusGuard.isOffTrack && !isMusicFirst && canShowClosedActivity
     }
 
     private var isBuildWatchVisible: Bool {
-        (buildWatcher.announcement != nil || (!focusQuiet.isQuiet && !buildWatcher.running.isEmpty)) && canShowClosedActivity
+        (buildWatcher.announcement != nil || (!focusQuiet.isQuiet && !isMusicFirst && !buildWatcher.running.isEmpty)) && canShowClosedActivity
     }
 
     /// What came in during a Pomodoro focus block, shown once it ends.
@@ -396,6 +403,7 @@ struct ContentView: View {
 
     private var isMeetingActivityVisible: Bool {
         meetingManager.showsCountdown
+            && !isMusicFirst
             && vm.notchState == .closed
             && !vm.hideOnClosed
             && !lockScreenManager.isLocked
@@ -455,7 +463,11 @@ struct ContentView: View {
             height += ClosedNotchLyricsLine.height
         }
 
-        if isWhatsAppBannerVisible {
+        if vm.notchState == .closed, visibleCommunicationCall == nil, visibleCommunicationNotification != nil {
+            // The notification's message is a line under the notch; keep it clickable.
+            width = max(width, vm.closedNotchSize.width + baseHeight * 2 + 20 + closedPadding)
+            height += NotchNotificationCompactActivity.messageLineHeight
+        } else if isWhatsAppBannerVisible {
             // The announcement adds a line of text under the notch; keep it clickable.
             width = max(width, vm.closedNotchSize.width + baseHeight * 2 + 20 + closedPadding)
             height += WhatsAppMessageLiveActivity.messageLineHeight
