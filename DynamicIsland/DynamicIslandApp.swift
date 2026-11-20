@@ -719,6 +719,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard establishSingleNotchFlowInstance() else { return }
+        // Opened from the disk image or a download: offer to move into Applications first.
+        if AppLocationMover.moveIfNeeded() { return }
 
         LockScreenLiveActivityWindowManager.shared.configure(viewModel: vm)
         LockScreenManager.shared.configure(viewModel: vm)

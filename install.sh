@@ -135,6 +135,10 @@ fi
 
 echo ""
 echo "${APP_NAME} is installed. Launching it now..."
+if [ "$INSTALL_DIR" != "/Applications" ]; then
+    echo "(This account can't write to /Applications, so it's in your own Applications folder:"
+    echo " Finder > Go > Home > Applications. Spotlight finds it too: press Cmd-Space and type ${APP_NAME}.)"
+fi
 open "$INSTALL_DIR/${APP_NAME}.app"
 
 echo ""
