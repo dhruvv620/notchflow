@@ -34,8 +34,9 @@ struct SmartToolsRegression {
         try require(CopyActionPolicy.detect(String(repeating: "a", count: 300)).isEmpty, "Long text inspected")
 
         // Smart replies
-        let body = SmartReplyPolicy.requestBody(model: "MiniMax-M2.5", sender: "Selene", message: "Dinner at 8?", context: ["Selene: hey"])
-        try require(body["model"] as? String == "MiniMax-M2.5" && (body["messages"] as? [[String: String]])?.count == 2, "Request body wrong")
+        let prompt = SmartReplyPolicy.prompt(sender: "Selene", message: "Dinner at 8?", context: ["Selene: hey"])
+        try require(prompt.user.contains("Message from Selene: Dinner at 8?") && prompt.user.contains("Selene: hey")
+                    && prompt.system.contains("Hinglish"), "Reply prompt wrong")
         let response = #"{"choices":[{"message":{"content":"<think>She wants dinner.</think>\n```json\n[\"Sounds good!\", \"Can we do 8:30?\", \"Sorry, can't tonight\"]\n```"}}]}"#
         try require(SmartReplyPolicy.suggestions(fromResponse: Data(response.utf8)) == ["Sounds good!", "Can we do 8:30?", "Sorry, can't tonight"], "Suggestions not parsed")
         try require(SmartReplyPolicy.suggestions(fromText: "1. Yes!\n2. Maybe later\n- No thanks\n4. Extra") == ["Yes!", "Maybe later", "No thanks"], "Line fallback wrong")

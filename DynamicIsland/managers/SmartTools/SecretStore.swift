@@ -14,11 +14,19 @@ enum SecretStore {
 
     private static let service = "com.dhruvv620.NotchFlow.secrets"
 
-    static func read(_ secret: Secret) -> String? {
+    static func read(_ secret: Secret) -> String? { read(account: secret.rawValue) }
+
+    static func has(_ secret: Secret) -> Bool { read(secret) != nil }
+
+    @discardableResult
+    static func write(_ value: String, for secret: Secret) -> Bool { write(value, account: secret.rawValue) }
+
+    /// Any named secret (used for one AI key per provider).
+    static func read(account: String) -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: secret.rawValue,
+            kSecAttrAccount as String: account,
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne,
         ]
@@ -30,15 +38,13 @@ enum SecretStore {
         return value
     }
 
-    static func has(_ secret: Secret) -> Bool { read(secret) != nil }
-
     /// Saves the value, or removes the secret when the value is empty.
     @discardableResult
-    static func write(_ value: String, for secret: Secret) -> Bool {
+    static func write(_ value: String, account: String) -> Bool {
         let base: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: secret.rawValue,
+            kSecAttrAccount as String: account,
         ]
         SecItemDelete(base as CFDictionary)
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)

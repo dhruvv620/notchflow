@@ -4,7 +4,7 @@
 import Defaults
 import SwiftUI
 
-/// Three suggested replies above a reply field. Nothing is sent to MiniMax
+/// Three suggested replies above a reply field. Nothing is sent to the AI
 /// until the sparkles button is tapped; tapping a suggestion fills the field
 /// so it can be edited before sending.
 struct SmartReplyBar: View {
@@ -38,7 +38,7 @@ struct SmartReplyBar: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(service.loading.contains(id))
-                .help(service.suggestions[id] == nil ? "Suggest replies with MiniMax" : "Suggest different replies")
+                .help(service.suggestions[id] == nil ? "Suggest replies with AI" : "Suggest different replies")
 
                 if let error = service.errors[id] {
                     Text(error)

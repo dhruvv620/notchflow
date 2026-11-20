@@ -220,21 +220,17 @@ private struct ArithmeticParser {
 // MARK: - Smart replies
 
 enum SmartReplyPolicy {
-    static func requestBody(model: String, sender: String, message: String, context: [String]) -> [String: Any] {
+    static func prompt(sender: String, message: String, context: [String]) -> (system: String, user: String) {
         let history = context.suffix(6).joined(separator: "\n")
         let system = """
         You suggest replies to a chat message. Answer with only a JSON array of exactly three short replies \
-        (each under 10 words) in the same language and tone as the message, from the perspective of the person \
-        replying. No explanations.
+        (each under 10 words) from the perspective of the person replying. Match the message's language, script \
+        and tone: Hinglish or Gujlish written in Latin letters stays in Latin letters, Hindi, Gujarati or Marathi \
+        in their own script stays in that script, English stays English. No explanations.
         """
         var user = "Message from \(sender): \(message)"
         if !history.isEmpty { user = "Recent conversation:\n\(history)\n\n" + user }
-        return [
-            "model": model,
-            "messages": [["role": "system", "content": system], ["role": "user", "content": user]],
-            "temperature": 0.7,
-            "max_tokens": 600,
-        ]
+        return (system, user)
     }
 
     /// Reads three suggestions from an OpenAI-style response, tolerating

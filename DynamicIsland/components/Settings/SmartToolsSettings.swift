@@ -12,18 +12,19 @@ struct SmartToolsSettings: View {
     @Default(.focusGuardSites) private var focusGuardSites
     @Default(.focusGuardApps) private var focusGuardApps
     @Default(.enableSmartReplies) private var enableSmartReplies
-    @Default(.minimaxBaseURL) private var minimaxBaseURL
-    @Default(.minimaxModel) private var minimaxModel
+    @Default(.aiProvider) private var aiProviderRaw
     @Default(.peoplePins) private var peoplePins
     @Default(.enableBuildWatcher) private var enableBuildWatcher
     @Default(.buildWatcherRepositories) private var repositories
     @ObservedObject private var whatsApp = WhatsAppManager.shared
     @ObservedObject private var buildWatcher = BuildWatchManager.shared
 
-    @State private var minimaxKey = ""
-    @State private var hasMinimaxKey = SecretStore.has(.minimaxAPIKey)
-    @State private var minimaxStatus: String?
-    @State private var testingMinimax = false
+    @State private var aiKey = ""
+    @State private var aiBaseURL = AIClient.baseURL(for: AIClient.provider)
+    @State private var aiModel = AIClient.model(for: AIClient.provider)
+    @State private var savedKeys = Set(AIProvider.allCases.filter { AIClient.hasKey($0) })
+    @State private var aiStatus: String?
+    @State private var testingAI = false
     @State private var githubToken = ""
     @State private var hasGitHubToken = SecretStore.has(.githubToken)
     @State private var githubStatus: String?
@@ -36,6 +37,7 @@ struct SmartToolsSettings: View {
         Form {
             focusSection
             copySection
+            aiProviderSection
             smartReplySection
             pinsSection
             buildSection
@@ -105,6 +107,107 @@ struct SmartToolsSettings: View {
         }
     }
 
+    // MARK: AI provider
+
+    private var aiProvider: AIProvider { AIProvider(rawValue: aiProviderRaw) ?? .minimax }
+
+    private var aiProviderSection: some View {
+        Section {
+            Picker("Provider", selection: Binding(get: { aiProvider }, set: { select($0) })) {
+                ForEach(AIProvider.allCases, id: \.self) { provider in
+                    Text(savedKeys.contains(provider) ? "\(provider.title)  \u{2713}" : provider.title).tag(provider)
+                }
+            }
+            .settingsHighlight(id: highlightID("AI provider"))
+            if aiProvider.needsKey || aiProvider == .custom {
+                HStack {
+                    SecureField(savedKeys.contains(aiProvider) ? "Key saved in Keychain"
+                                : aiProvider == .custom ? "API key (if your server needs one)" : "\(aiProvider.title) API key",
+                                text: $aiKey)
+                    Button("Save") {
+                        AIClient.setKey(aiKey, for: aiProvider)
+                        aiKey = ""
+                        refreshKeys()
+                        aiStatus = savedKeys.contains(aiProvider) ? "Key saved." : nil
+                    }
+                    .disabled(aiKey.trimmingCharacters(in: .whitespaces).isEmpty)
+                    if savedKeys.contains(aiProvider) {
+                        Button("Remove", role: .destructive) {
+                            AIClient.setKey("", for: aiProvider)
+                            refreshKeys()
+                            aiStatus = nil
+                        }
+                    }
+                }
+            }
+            TextField("API address", text: $aiBaseURL, prompt: Text(aiProvider == .custom ? "https://your-server/v1" : aiProvider.defaultBaseURL))
+                .onSubmit { AIClient.setBaseURL(aiBaseURL, for: aiProvider) }
+                .onChange(of: aiBaseURL) { _, value in AIClient.setBaseURL(value, for: aiProvider) }
+            TextField("Model", text: $aiModel, prompt: Text(aiProvider.defaultModel.isEmpty ? "model name" : aiProvider.defaultModel))
+                .onChange(of: aiModel) { _, value in AIClient.setModel(value, for: aiProvider) }
+            HStack {
+                Button(testingAI ? "Testing…" : "Test") { testAI() }
+                    .disabled(!AIClient.isReady(aiProvider) || testingAI)
+                if let page = aiProvider.keyPage, let url = URL(string: page) {
+                    Button("Get a key") { NSWorkspace.shared.open(url) }
+                }
+                if aiBaseURL != aiProvider.defaultBaseURL || aiModel != aiProvider.defaultModel, aiProvider != .custom {
+                    Button("Reset address and model") {
+                        aiBaseURL = aiProvider.defaultBaseURL
+                        aiModel = aiProvider.defaultModel
+                    }
+                }
+                if let aiStatus {
+                    Text(aiStatus).font(.caption).foregroundStyle(.secondary).lineLimit(3)
+                }
+            }
+        } header: {
+            Text("AI provider")
+        } footer: {
+            Text(providerFooter)
+        }
+    }
+
+    private var providerFooter: String {
+        var parts = ["Smart replies and the promise keeper's \u{201C}Understand any language\u{201D} use this. Keys stay in your Keychain, one per provider, so you can switch back and forth."]
+        switch aiProvider {
+        case .minimax: parts.append("MiniMax in mainland China: https://api.minimaxi.com/v1.")
+        case .ollama, .lmStudio: parts.append("Runs on this Mac: nothing leaves it. Start \(aiProvider == .ollama ? "Ollama" : "LM Studio's server") and use a model you've downloaded.")
+        case .openRouter: parts.append("One key for models from OpenAI, Anthropic, Google, Meta and more: write the model as provider/model.")
+        case .custom: parts.append("Any server that speaks the OpenAI chat-completions API (vLLM, LiteLLM, Azure OpenAI, a company proxy…).")
+        case .anthropic: parts.append("For lower cost, claude-haiku-5-5 works well for both features.")
+        default: break
+        }
+        return parts.joined(separator: " ")
+    }
+
+    private func select(_ provider: AIProvider) {
+        aiProviderRaw = provider.rawValue
+        aiKey = ""
+        aiStatus = nil
+        aiBaseURL = AIClient.baseURL(for: provider)
+        aiModel = AIClient.model(for: provider)
+    }
+
+    private func refreshKeys() {
+        savedKeys = Set(AIProvider.allCases.filter { AIClient.hasKey($0) })
+    }
+
+    private func testAI() {
+        testingAI = true
+        aiStatus = nil
+        let provider = aiProvider
+        Task { @MainActor in
+            do {
+                let replies = try await SmartReplyService.fetch(sender: "Sam", message: "Kal lunch pe mil rahe hain na?", context: [], provider: provider)
+                aiStatus = "Works: " + replies.joined(separator: " · ")
+            } catch {
+                aiStatus = error.localizedDescription
+            }
+            testingAI = false
+        }
+    }
+
     // MARK: Smart replies
 
     private var smartReplySection: some View {
@@ -112,57 +215,13 @@ struct SmartToolsSettings: View {
             Defaults.Toggle(key: .enableSmartReplies) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Smart replies")
-                    Text("A sparkles button above WhatsApp and notification replies asks MiniMax for three short replies. Only the message you are replying to (and, in WhatsApp, the last few lines) is sent, and only when you tap it.")
+                    Text("A sparkles button above WhatsApp and notification replies asks your AI provider for three short replies, in the same language and style as the message (Hinglish stays Hinglish). Only the message you are replying to (and, in WhatsApp, the last few lines) is sent, and only when you tap it.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }
             .settingsHighlight(id: highlightID("Smart replies"))
-            if enableSmartReplies {
-                HStack {
-                    SecureField(hasMinimaxKey ? "Key saved in Keychain" : "MiniMax API key", text: $minimaxKey)
-                    Button("Save") {
-                        SecretStore.write(minimaxKey, for: .minimaxAPIKey)
-                        minimaxKey = ""
-                        hasMinimaxKey = SecretStore.has(.minimaxAPIKey)
-                        minimaxStatus = hasMinimaxKey ? "Key saved." : nil
-                    }
-                    .disabled(minimaxKey.trimmingCharacters(in: .whitespaces).isEmpty)
-                    if hasMinimaxKey {
-                        Button("Remove", role: .destructive) {
-                            SecretStore.write("", for: .minimaxAPIKey)
-                            hasMinimaxKey = false
-                            minimaxStatus = nil
-                        }
-                    }
-                }
-                TextField("API address", text: $minimaxBaseURL)
-                Text("Global: https://api.minimax.io/v1 · Mainland China: https://api.minimaxi.com/v1")
-                    .font(.caption).foregroundStyle(.secondary)
-                TextField("Model", text: $minimaxModel)
-                HStack {
-                    Button(testingMinimax ? "Testing…" : "Test") { testMinimax() }
-                        .disabled(!hasMinimaxKey || testingMinimax)
-                    if let minimaxStatus {
-                        Text(minimaxStatus).font(.caption).foregroundStyle(.secondary).lineLimit(3)
-                    }
-                }
-            }
         } header: {
             Text("Replies")
-        }
-    }
-
-    private func testMinimax() {
-        testingMinimax = true
-        minimaxStatus = nil
-        Task { @MainActor in
-            do {
-                let replies = try await SmartReplyService.fetch(sender: "Sam", message: "Are we still on for lunch tomorrow?", context: [])
-                minimaxStatus = "Works: " + replies.joined(separator: " · ")
-            } catch {
-                minimaxStatus = error.localizedDescription
-            }
-            testingMinimax = false
         }
     }
 

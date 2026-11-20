@@ -88,6 +88,14 @@ printf '\nChecking time tracking, promises and workspaces...\n'
     "$SOURCE_DIR/tests/WorkspaceRegression.swift" -o "$BUILD_ROOT/WorkspaceRegression"
 "$BUILD_ROOT/WorkspaceRegression"
 
+printf '\nChecking AI providers and promises in any language...\n'
+/usr/bin/xcrun swiftc -swift-version 5 -parse-as-library \
+    "$SOURCE_DIR/DynamicIsland/helpers/AIProviderPolicy.swift" \
+    "$SOURCE_DIR/DynamicIsland/helpers/PromisePolicy.swift" \
+    "$SOURCE_DIR/DynamicIsland/helpers/PromiseAIPolicy.swift" \
+    "$SOURCE_DIR/tests/AIRegression.swift" -o "$BUILD_ROOT/AIRegression"
+"$BUILD_ROOT/AIRegression"
+
 printf '\nChecking focus quiet...\n'
 /usr/bin/xcrun swiftc -swift-version 5 -parse-as-library \
     "$SOURCE_DIR/DynamicIsland/helpers/FocusQuietPolicy.swift" \

@@ -17,6 +17,7 @@ struct ProductivitySettings: View {
     @Default(.timeTrackingProjects) private var extraProjects
     @Default(.enablePromiseKeeper) private var promisesEnabled
     @Default(.promiseNudgeMinutes) private var nudgeMinutes
+    @Default(.promiseUseAI) private var useAI
     @Default(.enableWorkspaces) private var workspacesEnabled
     @State private var editing: Workspace?
     @State private var confirmClearTime = false
@@ -113,7 +114,7 @@ struct ProductivitySettings: View {
             Defaults.Toggle(key: .enablePromiseKeeper) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Keep track of promises")
-                    Text("When you write \u{201C}I'll send it tonight\u{201D} in WhatsApp or in a reply from the notch, NotchFlow adds it to Promises in the Todos tab and reminds you before it's due. Messages are read on this Mac only.")
+                    Text("When you write \u{201C}I'll send it tonight\u{201D} in WhatsApp or in a reply from the notch, NotchFlow adds it to Promises in the Todos tab and reminds you before it's due. English is understood on this Mac; for other languages, see below.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }
@@ -127,6 +128,20 @@ struct ProductivitySettings: View {
                     }
                 }
                 .settingsHighlight(id: highlightID("Also track what others promise me"))
+                Defaults.Toggle(key: .promiseUseAI) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Understand any language")
+                        Text("Also finds promises in Hindi, Gujarati, Marathi and mixes like Hinglish (\u{201C}kal shaam tak bhej dunga\u{201D}, \u{201C}hu kale moklish\u{201D}, \u{201C}मी उद्या पाठवतो\u{201D}), using your AI provider from Settings \u{203A} Smart Tools. Only messages with a word that hints at a promise or a time are sent, a few at a time, at most 300 a day; \u{201C}ok\u{201D}, \u{201C}haha\u{201D} and the like never leave this Mac. Ollama or LM Studio keeps everything on this Mac.")
+                            .font(.caption).foregroundStyle(.secondary)
+                        if useAI && !AIClient.isReady() {
+                            Text("Set up an AI provider in Settings \u{203A} Smart Tools first.")
+                                .font(.caption).foregroundStyle(.orange)
+                        } else if useAI, let status = keeper.aiStatus {
+                            Text(status).font(.caption).foregroundStyle(.orange)
+                        }
+                    }
+                }
+                .settingsHighlight(id: highlightID("Understand any language"))
                 Picker("Remind me", selection: $nudgeMinutes) {
                     Text("15 minutes before").tag(15)
                     Text("30 minutes before").tag(30)

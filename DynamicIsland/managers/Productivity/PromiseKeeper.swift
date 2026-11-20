@@ -14,6 +14,9 @@ extension Defaults.Keys {
     /// How long before a promise is due to nudge, in minutes.
     static let promiseNudgeMinutes = Key<Int>("promiseNudgeMinutes", default: 60)
     static let promisesData = Key<Data>("promisesData", default: Data())
+    /// Also ask the AI provider about messages that might hold a promise, so
+    /// Hindi, Gujarati, Marathi and mixes like Hinglish are understood.
+    static let promiseUseAI = Key<Bool>("promiseUseAI", default: false)
 }
 
 /// A promise being kept track of.
@@ -47,7 +50,8 @@ struct TrackedPromise: Codable, Identifiable, Equatable, Sendable {
 
 /// Watches the messages you send and receive for promises, keeps the list,
 /// and nudges under the closed notch before one is due. Detection runs on
-/// this Mac (PromisePolicy); nothing is sent anywhere.
+/// this Mac (PromisePolicy); with "Understand any language" on, messages that
+/// look like they might hold a promise also go to the user's AI provider.
 @MainActor
 final class PromiseKeeper: ObservableObject {
     static let shared = PromiseKeeper()
@@ -61,6 +65,25 @@ final class PromiseKeeper: ObservableObject {
     private var timer: AnyCancellable?
     private var nudgeWork: DispatchWorkItem?
     private var started = false
+
+    /// Messages waiting to be asked about, sent together a little later.
+    private struct PendingMessage {
+        let message: PromiseAIMessage
+        let route: TrackedPromise.Route
+        let sourceName: String
+        let date: Date
+    }
+    private var pending: [PendingMessage] = []
+    private var nextMessageID = 1
+    private var flushWork: DispatchWorkItem?
+    private var asking = false
+    /// A daily cap, so a busy group chat can't run up the bill.
+    private var askedToday = (day: "", count: 0)
+    private static let dailyLimit = 300
+    private static let batchSize = 8
+    private static let batchDelay: TimeInterval = 20
+    /// The last error from the AI, shown in Settings.
+    @Published private(set) var aiStatus: String?
 
     private init() {
         promises = (try? JSONDecoder().decode([TrackedPromise].self, from: Defaults[.promisesData])) ?? []
@@ -86,16 +109,80 @@ final class PromiseKeeper: ObservableObject {
     func observe(text: String, fromMe: Bool, person: String, route: TrackedPromise.Route, sourceName: String, at date: Date) {
         guard Defaults[.enablePromiseKeeper], fromMe || Defaults[.promiseTrackTheirs] else { return }
         guard Date().timeIntervalSince(date) < 10 * 60 else { return }
-        guard let found = PromisePolicy.detect(text, fromMe: fromMe, now: date) else { return }
-        let title = PromisePolicy.personalized(found.title, kind: found.kind, person: person)
+        if let found = PromisePolicy.detect(text, fromMe: fromMe, now: date) {
+            let title = PromisePolicy.personalized(found.title, kind: found.kind, person: person)
+            add(found, title: title, person: person, route: route, sourceName: sourceName, text: text, date: date)
+        } else if Defaults[.promiseUseAI], AIClient.isReady(), PromiseAIPolicy.mightBePromise(text) {
+            enqueue(PromiseAIMessage(id: nextMessageID, text: text, fromMe: fromMe, person: person),
+                    route: route, sourceName: sourceName, date: date)
+            nextMessageID += 1
+        }
+    }
+
+    private func add(_ found: PromiseCandidate, title: String, person: String, route: TrackedPromise.Route,
+                     sourceName: String, text: String, date: Date) {
         // The same message can arrive twice (sent here, echoed by the phone).
         if promises.contains(where: { $0.status == .open && $0.kind == found.kind && $0.person == person
             && $0.title == title && abs($0.created.timeIntervalSince(date)) < 10 * 60 }) { return }
+        if promises.contains(where: { $0.status == .open && $0.person == person && $0.quote == String(text.prefix(160))
+            && abs($0.created.timeIntervalSince(date)) < 10 * 60 }) { return }
         let promise = TrackedPromise(id: UUID(), kind: found.kind, title: title, person: person, due: found.due,
                                      created: date, hasExplicitTime: found.hasExplicitTime, route: route,
                                      sourceName: sourceName, quote: String(text.prefix(160)))
         withAnimation(.smooth(duration: 0.25)) { promises.append(promise) }
         save()
+    }
+
+    // MARK: Any language, with AI
+
+    private func enqueue(_ message: PromiseAIMessage, route: TrackedPromise.Route, sourceName: String, date: Date) {
+        // The same text from the same person (sent here, echoed by the phone) once.
+        if pending.contains(where: { $0.message.text == message.text && $0.message.person == message.person }) { return }
+        pending.append(PendingMessage(message: message, route: route, sourceName: sourceName, date: date))
+        if pending.count >= Self.batchSize {
+            flush()
+        } else if flushWork == nil {
+            let work = DispatchWorkItem { [weak self] in self?.flush() }
+            flushWork = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + Self.batchDelay, execute: work)
+        }
+    }
+
+    private func flush() {
+        flushWork?.cancel()
+        flushWork = nil
+        guard !asking, !pending.isEmpty else { return }
+        let day = TimeTrackingPolicy.dayKey(Date())
+        if askedToday.day != day { askedToday = (day, 0) }
+        guard askedToday.count < Self.dailyLimit else {
+            pending.removeAll()
+            aiStatus = "Reached today's limit of \(Self.dailyLimit) messages; English promises are still found."
+            return
+        }
+        let batch = Array(pending.prefix(Self.batchSize))
+        pending.removeFirst(batch.count)
+        askedToday.count += batch.count
+        asking = true
+        Task { @MainActor in
+            defer {
+                asking = false
+                if !pending.isEmpty { flush() }
+            }
+            let now = Date()
+            let messages = batch.map(\.message)
+            do {
+                let answer = try await AIClient.complete(system: PromiseAIPolicy.system,
+                                                         user: PromiseAIPolicy.userPrompt(messages, now: now), maxTokens: 800)
+                aiStatus = nil
+                for found in PromiseAIPolicy.promises(fromAnswer: answer, messages: messages, now: now) {
+                    guard let item = batch.first(where: { $0.message.id == found.messageID }) else { continue }
+                    add(found.candidate, title: found.candidate.title, person: item.message.person, route: item.route,
+                        sourceName: item.sourceName, text: item.message.text, date: item.date)
+                }
+            } catch {
+                aiStatus = error.localizedDescription
+            }
+        }
     }
 
     // MARK: Actions

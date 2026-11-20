@@ -4,7 +4,7 @@ NotchFlow runs on your Mac. It has no account, no analytics and no tracking, and
 
 ## What stays on your Mac
 
-Settings, clipboard history, notes, todos, Pomodoro history, tracked time, promises, workspaces, Cuely scripts, the notification inbox and agent sessions are stored on your Mac only (in NotchFlow's preferences and in `~/Library/Application Support/NotchFlow`). Keys you enter (MiniMax, GitHub, Gemini) are kept in your login Keychain.
+Settings, clipboard history, notes, todos, Pomodoro history, tracked time, promises, workspaces, Cuely scripts, the notification inbox and agent sessions are stored on your Mac only (in NotchFlow's preferences and in `~/Library/Application Support/NotchFlow`). Keys you enter (your AI provider keys, GitHub) are kept in your login Keychain.
 
 ## Permissions and why they are asked for
 
@@ -30,7 +30,8 @@ Only for features you turn on, and only to the service that feature needs:
 - **Updates**: once a day it reads `appcast.xml` from NotchFlow's GitHub releases.
 - **Weather**: Open-Meteo, with your approximate location.
 - **Lyrics and artwork**: lyrics and artwork services for the song that is playing.
-- **Smart replies**: MiniMax, with the message you are replying to, only when you tap the sparkles button.
+- **Smart replies**: the AI provider you choose in Settings > Smart Tools (MiniMax, OpenAI, Claude, Gemini, Groq, OpenRouter, DeepSeek, Mistral, xAI, Together, or a custom server), with the message you are replying to, only when you tap the sparkles button. With Ollama or LM Studio nothing leaves your Mac.
+- **Promise keeper, Understand any language** (off by default): the same AI provider, with messages that contain a word hinting at a promise or a time, a few at a time and at most 300 a day. Other messages stay on your Mac.
 - **Screen assistant**: the AI provider you chose, with what you ask and the screenshot you take.
 - **Build watcher**: GitHub, with your token, for the repositories you list.
 - **WhatsApp**: the GOWA gateway runs on your Mac and talks to WhatsApp for your linked account.
