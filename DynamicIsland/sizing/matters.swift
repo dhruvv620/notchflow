@@ -357,14 +357,19 @@ func getClosedNotchSize(screen: String? = nil) -> CGSize {
 
     // Check if the screen is available
     if let screen = selectedScreen {
-        // Calculate and set the exact width of the notch
-        if let topLeftNotchpadding: CGFloat = screen.auxiliaryTopLeftArea?.width,
-           let topRightNotchpadding: CGFloat = screen.auxiliaryTopRightArea?.width
-        {
-            notchWidth = screen.frame.width - topLeftNotchpadding - topRightNotchpadding + 4
-            
+        // The camera notch is the gap between the menu bar areas on either
+        // side of it. Closed, NotchFlow covers it exactly (never smaller, or
+        // the real notch shows around it while closing, like a second notch).
+        var cameraNotchWidth: CGFloat?
+        if let left = screen.auxiliaryTopLeftArea, let right = screen.auxiliaryTopRightArea {
+            let gap = right.minX - left.maxX
+            let fromWidths = screen.frame.width - left.width - right.width
+            cameraNotchWidth = max(gap > 0 ? gap : 0, fromWidths)
+        }
+        if let cameraNotchWidth {
+            notchWidth = cameraNotchWidth + 4
             if Defaults[.customizePhysicalNotchWidth] {
-                notchWidth = Defaults[.closedNotchWidth]
+                notchWidth = max(Defaults[.closedNotchWidth], cameraNotchWidth + 4)
             }
         }
 
@@ -377,6 +382,8 @@ func getClosedNotchSize(screen: String? = nil) -> CGSize {
             } else if Defaults[.notchHeightMode] == .matchMenuBar {
                 notchHeight = screen.frame.maxY - screen.visibleFrame.maxY
             }
+            // Never shorter than the camera notch itself.
+            notchHeight = max(notchHeight, screen.safeAreaInsets.top)
         } else {
             // This is a display WITHOUT a notch - use non-notch height settings
             notchHeight = Defaults[.nonNotchHeight]

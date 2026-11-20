@@ -1644,6 +1644,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             
             vm.screen = selectedScreen.localizedName
             vm.notchSize = getClosedNotchSize(screen: selectedScreen.localizedName)
+            // The closed size too, so the notch closes to this screen's camera notch.
+            vm.closedNotchSize = getClosedNotchSize(screen: selectedScreen.localizedName)
             
             if window == nil {
                 window = createDynamicIslandWindow(for: selectedScreen, with: vm)
