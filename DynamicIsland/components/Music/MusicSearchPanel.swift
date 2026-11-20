@@ -122,7 +122,7 @@ final class MusicSearchService: ObservableObject {
                 if uri == nil { uri = MusicSearchPolicy.spotifyTrackURI(from: await Self.link(for: result, on: "spotify")) }
                 if let uri {
                     do {
-                        try await AppleScriptHelper.executeVoid(MusicSearchPolicy.spotifyPlayScript(trackURI: uri))
+                        try await Self.playInBackground(uri)
                         message = "Playing \(result.title) on Spotify."
                     } catch {
                         // Found, but macOS didn't let NotchFlow tell Spotify to play.
@@ -144,6 +144,37 @@ final class MusicSearchService: ObservableObject {
                     message = "Opened YouTube Music's search, behind this."
                 }
             }
+        }
+    }
+
+    /// Plays a track in Spotify without Spotify coming forward: a Spotify
+    /// that isn't running is started hidden first (an app launched by a
+    /// command otherwise opens its window in front), and if it still jumps
+    /// forward when it starts playing, it's hidden again and you're back
+    /// where you were.
+    private static func playInBackground(_ uri: String) async throws {
+        let spotifyID = "com.spotify.client"
+        let previous = NSWorkspace.shared.frontmostApplication
+        var launchedNow = false
+        if NSRunningApplication.runningApplications(withBundleIdentifier: spotifyID).isEmpty,
+           let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: spotifyID) {
+            let configuration = NSWorkspace.OpenConfiguration()
+            configuration.activates = false
+            configuration.hides = true
+            _ = try? await NSWorkspace.shared.openApplication(at: url, configuration: configuration)
+            launchedNow = true
+            // Ready to take commands a moment after it starts.
+            try? await Task.sleep(for: .seconds(2.5))
+        }
+        try await AppleScriptHelper.executeVoid(MusicSearchPolicy.spotifyPlayScript(trackURI: uri))
+        try? await Task.sleep(for: .milliseconds(400))
+        guard let spotify = NSRunningApplication.runningApplications(withBundleIdentifier: spotifyID).first else { return }
+        let spotifyWasInFront = previous?.bundleIdentifier == spotifyID
+        if spotify.isActive, !spotifyWasInFront {
+            spotify.hide()
+            if let previous, previous.bundleIdentifier != Bundle.main.bundleIdentifier { previous.activate() }
+        } else if launchedNow, !spotify.isHidden {
+            spotify.hide()
         }
     }
 
@@ -243,6 +274,8 @@ struct MusicSearchPanel: View {
             }
             .padding(.horizontal, 6).padding(.vertical, 3)
             .contentShape(Rectangle())
+            // A pointing hand, not the text cursor from the search field above.
+            .background(PointingHandCursorArea())
         }
         .buttonStyle(.plain)
         .help("Play on \(search.target.title)")
