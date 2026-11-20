@@ -18,6 +18,7 @@ struct ProductivitySettings: View {
     @Default(.enablePromiseKeeper) private var promisesEnabled
     @Default(.promiseNudgeMinutes) private var nudgeMinutes
     @Default(.promiseUseAI) private var useAI
+    @State private var previewsAllowed = CGPreflightScreenCaptureAccess()
     @Default(.enableWorkspaces) private var workspacesEnabled
     @State private var editing: Workspace?
     @State private var confirmClearTime = false
@@ -30,6 +31,7 @@ struct ProductivitySettings: View {
             timeSection
             promiseSection
             workspaceSection
+            stashSection
         }
         .sheet(item: $editing) { workspace in
             WorkspaceEditor(workspace: workspace) { saved in
@@ -171,6 +173,44 @@ struct ProductivitySettings: View {
             }
         } header: {
             Text("Promise keeper")
+        }
+    }
+
+    // MARK: Window stash
+
+    private var stashSection: some View {
+        Section {
+            Defaults.Toggle(key: .enableWindowStash) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Window stash")
+                    Text("A parking spot in the Flow tab for windows you need later but not now. Stash all others parks every window except the app in front; click one to bring it back exactly where it was.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            .settingsHighlight(id: highlightID("Window stash"))
+            Defaults.Toggle(key: .windowStashByDragging) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Drag windows into the notch to stash them")
+                    Text("Drag a window by its title bar up into the notch and let go. The trackpad taps when you're over the drop spot.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            .settingsHighlight(id: highlightID("Drag windows into the notch to stash them"))
+            HStack {
+                Text(previewsAllowed ? "Window previews are on." : "Previews need Screen Recording; until then, app icons stand in.")
+                    .font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                if !previewsAllowed {
+                    Button("Show previews") {
+                        _ = CGRequestScreenCaptureAccess()
+                        previewsAllowed = CGPreflightScreenCaptureAccess()
+                    }
+                }
+            }
+        } header: {
+            Text("Window stash")
+        } footer: {
+            Text("Needs Accessibility. Stashed windows are minimized; bringing one back from the Dock removes it from the stash.")
         }
     }
 

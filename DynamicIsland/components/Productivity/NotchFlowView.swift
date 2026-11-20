@@ -12,6 +12,8 @@ struct NotchFlowView: View {
     @ObservedObject private var promises = PromiseKeeper.shared
     @ObservedObject private var appearance = NotchAppearanceModel.shared
     @ObservedObject private var coordinator = DynamicIslandViewCoordinator.shared
+    @ObservedObject private var stash = WindowStash.shared
+    @Default(.enableWindowStash) private var stashEnabled
     @Default(.timeTrackingEnabled) private var trackingEnabled
     @Default(.enableWorkspaces) private var workspacesEnabled
     @Default(.enablePromiseKeeper) private var promisesEnabled
@@ -38,6 +40,7 @@ struct NotchFlowView: View {
                 .transition(.opacity)
             }
             if let suggestion = workspaces.suggestion, workspacesEnabled { suggestionBanner(suggestion) }
+            if stashEnabled { stashRow }
             // Time tracking shows only when turned on in Settings > Productivity.
             if workspaces.showDaySummary && trackingEnabled { daySummary }
             if trackingEnabled {
@@ -47,6 +50,7 @@ struct NotchFlowView: View {
         .notchTabPadding()
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .onAppear {
+            stash.refresh()
             tracker.refreshNow()
             if tracker.showWeekRequested { showWeek = true; tracker.showWeekRequested = false }
         }
@@ -81,6 +85,67 @@ struct NotchFlowView: View {
             NotchIconButton(symbol: "gearshape", help: "Productivity settings") {
                 SettingsWindowController.shared.showWindow()
             }
+        }
+    }
+
+    // MARK: Window stash
+
+    private var stashRow: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                Image(systemName: "tray.and.arrow.down.fill").font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary)
+                Text(stash.items.isEmpty ? "Stash" : "Stash \u{00B7} \(stash.items.count)").font(NotchTokens.Typography.captionEmphasis)
+                if let message = stash.lastMessage {
+                    Text(message).font(NotchTokens.Typography.caption).foregroundStyle(.secondary).lineLimit(1)
+                }
+                Spacer(minLength: 0)
+                if !stash.items.isEmpty {
+                    NotchPillButton(title: "Bring all back", symbol: "arrow.uturn.backward") { stash.restoreAll() }
+                }
+                NotchPillButton(title: "Stash all others", symbol: "rectangle.stack") { Task { await stash.stashAllOthers() } }
+                    .help("Parks every window except the app in front. Click one here to bring it back where it was.")
+            }
+            if stash.items.isEmpty {
+                Text("Drag a window by its title bar into the notch to park it here.")
+                    .font(NotchTokens.Typography.caption).foregroundStyle(.secondary)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(stash.items) { item in stashCard(item) }
+                    }
+                }
+            }
+        }
+    }
+
+    private func stashCard(_ item: StashedWindow) -> some View {
+        Button { stash.restore(item) } label: {
+            VStack(spacing: 2) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 6).fill(Color.white.opacity(0.06))
+                    if let preview = item.preview {
+                        Image(nsImage: preview).resizable().aspectRatio(contentMode: .fit)
+                            .clipShape(RoundedRectangle(cornerRadius: 5))
+                    } else if let icon = item.icon {
+                        Image(nsImage: icon).resizable().frame(width: 26, height: 26)
+                    }
+                    if item.preview != nil, let icon = item.icon {
+                        Image(nsImage: icon).resizable().frame(width: 14, height: 14)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing).padding(2)
+                    }
+                }
+                .frame(width: 64, height: 40)
+                Text(item.title.isEmpty ? item.appName : item.title)
+                    .font(.system(size: 9)).foregroundStyle(.secondary).lineLimit(1).frame(width: 64)
+            }
+        }
+        .buttonStyle(.plain)
+        .help("\(item.appName)\(item.title.isEmpty ? "" : ": \(item.title)")\nClick to bring it back where it was.")
+        .contextMenu {
+            Button("Bring back") { stash.restore(item) }
+            Button("Remove from stash") { stash.forget(item) }
+            Divider()
+            Button("Close window", role: .destructive) { stash.close(item) }
         }
     }
 

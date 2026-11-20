@@ -97,6 +97,12 @@ printf '\nChecking AI providers and promises in any language...\n'
     "$SOURCE_DIR/tests/AIRegression.swift" -o "$BUILD_ROOT/AIRegression"
 "$BUILD_ROOT/AIRegression"
 
+printf '\nChecking the window stash...\n'
+/usr/bin/xcrun swiftc -swift-version 5 -parse-as-library \
+    "$SOURCE_DIR/DynamicIsland/helpers/WindowStashPolicy.swift" \
+    "$SOURCE_DIR/tests/WindowStashRegression.swift" -o "$BUILD_ROOT/WindowStashRegression"
+"$BUILD_ROOT/WindowStashRegression"
+
 printf '\nChecking focus quiet...\n'
 /usr/bin/xcrun swiftc -swift-version 5 -parse-as-library \
     "$SOURCE_DIR/DynamicIsland/helpers/FocusQuietPolicy.swift" \
