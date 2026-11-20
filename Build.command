@@ -93,6 +93,7 @@ printf '\nChecking AI providers and promises in any language...\n'
     "$SOURCE_DIR/DynamicIsland/helpers/AIProviderPolicy.swift" \
     "$SOURCE_DIR/DynamicIsland/helpers/PromisePolicy.swift" \
     "$SOURCE_DIR/DynamicIsland/helpers/PromiseAIPolicy.swift" \
+    "$SOURCE_DIR/DynamicIsland/helpers/MessagesHistoryPolicy.swift" \
     "$SOURCE_DIR/tests/AIRegression.swift" -o "$BUILD_ROOT/AIRegression"
 "$BUILD_ROOT/AIRegression"
 

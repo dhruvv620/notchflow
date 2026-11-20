@@ -417,10 +417,11 @@ final class NotificationHub: ObservableObject {
             switch item.reply {
             case .messages(let chat):
                 PromiseKeeper.shared.observe(text: trimmed, fromMe: true, person: item.headline,
-                                             route: .messages(chatID: chat), sourceName: item.appName, at: Date())
+                                             route: .messages(chatID: chat), sourceName: item.appName, at: Date(),
+                                             replyingTo: item.body)
             case .banner:
                 PromiseKeeper.shared.observe(text: trimmed, fromMe: true, person: item.headline,
-                                             route: .none, sourceName: item.appName, at: Date())
+                                             route: .none, sourceName: item.appName, at: Date(), replyingTo: item.body)
             case .whatsapp, .none:
                 break
             }

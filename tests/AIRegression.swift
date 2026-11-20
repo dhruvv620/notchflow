@@ -58,6 +58,9 @@ struct AIRegression {
                      "मी उद्या पाठवतो", "मैं कल भेज दूंगा", "Done, will send it by 5", "Bas 2 ghante mein aata hu"] {
             try require(A.mightBePromise(text), "Missed: \(text)")
         }
+        for text in ["let's meet for coffee on Friday 5 p.m.", "Kal lunch karte hai 1 baje?", "dinner at 8:30?", "shukravar ne malie?"] {
+            try require(A.mightBePromise(text), "Missed plan: \(text)")
+        }
         for text in ["ok", "haha", "Kya haal hai?", "Thanks bro", "😂😂", "nice pic", "local train is late"] {
             try require(!A.mightBePromise(text), "Would send small talk: \(text)")
         }
@@ -69,6 +72,14 @@ struct AIRegression {
         let messages = [PromiseAIMessage(id: 1, text: "main kal shaam tak bhej dunga", fromMe: true, person: "Sam"),
                         PromiseAIMessage(id: 2, text: "hu kale call karish", fromMe: false, person: "Riya"),
                         PromiseAIMessage(id: 3, text: "kal kya plan hai?", fromMe: false, person: "Riya")]
+        let pair = PromiseAIMessage(id: 4, text: "pakka bhai", fromMe: true, person: "Amit", replyingTo: "Kal lunch karte hai 1 baje?")
+        let pairPrompt = A.userPrompt([pair], now: now, calendar: calendar)
+        try require(pairPrompt.contains("[4] Me to Amit, answering \u{201C}Kal lunch karte hai 1 baje?\u{201D}: pakka bhai"), "Pair prompt: \(pairPrompt)")
+        try require(A.system.contains("short yes"), "System prompt doesn't explain agreed plans")
+        let theirYes = PromiseAIMessage(id: 5, text: "ha chalo", fromMe: false, person: "Amit", replyingTo: "chai at 6?")
+        let pairFound = A.promises(fromAnswer: #"[{"id":5,"task":"Chai with Amit","due":"2026-11-20T18:00"}]"#,
+                                   messages: [theirYes], now: now, calendar: calendar)
+        try require(pairFound.first?.candidate.kind == .mine, "Their yes to my plan isn't my plan")
         let prompt = A.userPrompt(messages, now: now, calendar: calendar)
         try require(prompt.contains("Now: Friday 2026-11-20T14:05") && prompt.contains("[1] Me to Sam: main kal")
                     && prompt.contains("[2] Riya to me:"), "Prompt: \(prompt)")
@@ -94,6 +105,24 @@ struct AIRegression {
         try require(past.first?.candidate.due == now.addingTimeInterval(3600), "Past due time not moved forward")
         try require(A.promises(fromAnswer: "[]", messages: messages, now: now, calendar: calendar).isEmpty
                     && A.promises(fromAnswer: "No promises here.", messages: messages, now: now, calendar: calendar).isEmpty, "Empty answers")
+        // The Messages database
+        let nanoseconds = MessagesHistoryPolicy.date(fromAppleTime: 785_000_000_000_000_000)
+        let seconds = MessagesHistoryPolicy.date(fromAppleTime: 785_000_000)
+        try require(nanoseconds == seconds && seconds == Date(timeIntervalSinceReferenceDate: 785_000_000), "Apple dates")
+        func archived(_ text: String) -> Data {
+            let body = Array(text.utf8)
+            var bytes: [UInt8] = [0x04, 0x0B] + Array("streamtyped".utf8) + [0x81, 0xE8, 0x03, 0x84, 0x01, 0x40, 0x84, 0x84, 0x84, 0x12]
+            bytes += Array("NSAttributedString".utf8) + [0x00, 0x84, 0x84, 0x08] + Array("NSObject".utf8) + [0x00, 0x85, 0x92, 0x84, 0x84, 0x84, 0x08]
+            bytes += Array("NSString".utf8) + [0x01, 0x94, 0x84, 0x01, 0x2B]
+            bytes += body.count < 0x80 ? [UInt8(body.count)] : [0x81, UInt8(body.count & 0xFF), UInt8(body.count >> 8)]
+            bytes += body + [0x86, 0x84, 0x02, 0x69, 0x49, 0x01]
+            return Data(bytes)
+        }
+        try require(MessagesHistoryPolicy.text(fromAttributedBody: archived("okay bhai")) == "okay bhai", "Short archived text")
+        let long = String(repeating: "कल मिलते हैं ", count: 20)
+        try require(MessagesHistoryPolicy.text(fromAttributedBody: archived(long)) == long.trimmingCharacters(in: .whitespaces), "Long archived text")
+        try require(MessagesHistoryPolicy.text(fromAttributedBody: Data("garbage".utf8)) == nil, "Garbage read as text")
+        try require(MessagesHistoryPolicy.cleaned("\u{FFFC} see you ") == "see you", "Attachment marker kept")
         print("AI providers and any-language promises: OK")
     }
 }

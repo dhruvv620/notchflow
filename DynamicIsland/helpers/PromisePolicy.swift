@@ -274,3 +274,83 @@ enum PromisePolicy {
         }
     }
 }
+
+// MARK: - Agreed plans
+
+/// "Let's meet for coffee on Friday 5 pm" answered with "okay bhai": a plan
+/// both agreed to, kept like a promise ("Coffee with Rahul · Fri 5:00 PM").
+extension PromisePolicy {
+    /// Words a short yes is made of, in English, Hindi, Gujarati and Marathi
+    /// (Latin letters), and the address words that often follow it.
+    private static let agreementWords: Set<String> = [
+        "ok", "okay", "okk", "okkk", "okie", "okey", "oki", "k", "kk", "sure", "done", "deal", "yes", "yeah", "yea",
+        "yep", "yup", "ya", "yaa", "haan", "han", "haa", "hanji", "haanji", "hmm", "hmmm", "pakka", "pakki", "chalo",
+        "chal", "chalega", "chalegi", "theek", "thik", "thick", "sahi", "perfect", "great", "cool", "fine", "alright",
+        "absolutely", "bilkul", "zaroor", "jarur", "saru", "chalse", "barabar", "ho", "hoy", "chalel", "nakki",
+        "sounds", "good", "works", "see", "cya", "im", "i'm", "count", "course", "definitely", "confirmed", "booked",
+    ]
+    /// Allowed in a yes but not enough on their own.
+    private static let agreementFillers: Set<String> = [
+        "hai", "he", "che", "chhe", "for", "me", "you", "then", "in", "of", "ji", "it", "the", "to", "there", "that",
+        "bhai", "bro", "bhaiya", "yaar", "yar", "dude", "man", "re", "ben", "bhau", "da", "buddy", "sir", "mam", "di",
+        "didi", "boss", "dear", "na", "so", "very", "much", "thanks", "thank", "thx",
+    ]
+    private static let agreementEmoji: Set<Character> = ["👍", "👌", "🤝", "✅", "💯", "🙌", "👏"]
+
+    /// Whether a reply is a short yes ("ok", "okay bhai", "pakka", "haan chalo",
+    /// "sounds good", "👍"). Anything with "but", "not" or "can't" isn't.
+    static func isAgreement(_ text: String) -> Bool {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, trimmed.count <= 40 else { return false }
+        let lower = trimmed.lowercased().replacingOccurrences(of: "’", with: "'")
+        let words = lower.split(whereSeparator: { !($0.isLetter || $0 == "'") }).map(String.init)
+        if words.isEmpty { return trimmed.contains(where: { agreementEmoji.contains($0) }) }
+        guard words.count <= 6, words.allSatisfy({ agreementWords.contains($0) || agreementFillers.contains($0) }) else { return false }
+        return words.contains { agreementWords.contains($0) }
+    }
+
+    /// Words that make a message a proposal rather than news.
+    private static let proposalWords = [
+        "let's", "lets", "let us", "shall we", "should we", "wanna", "want to", "how about", "what about", "can we",
+        "could we", "are you free", "you free", "free on", "free at", "meet", "milte", "milna", "milo", "malie",
+        "maliye", "bhetu", "bhetuya", "coffee", "lunch", "dinner", "breakfast", "drinks", "chai", "call", "catch up",
+        "movie", "gym", "party", "game", "match", "chalo", "chal ", "join", "come", "aaja", "aa jana", "aavje",
+    ]
+    private static let activities: [(words: [String], title: String)] = [
+        (["coffee", "cafe"], "Coffee"), (["chai", "tea"], "Chai"), (["breakfast", "nashta"], "Breakfast"),
+        (["lunch"], "Lunch"), (["dinner", "khana"], "Dinner"), (["drinks", "beer", "beers"], "Drinks"),
+        (["movie", "film", "picture"], "Movie"), (["gym", "workout", "run"], "Gym"),
+        (["cricket", "football", "badminton", "game", "match"], "Game"), (["party"], "Party"),
+        (["call", "phone"], "Call"), (["meeting"], "Meeting"),
+        (["meet", "milte", "milna", "milo", "malie", "maliye", "bhetu", "bhetuya", "catch up"], "Meet"),
+    ]
+
+    /// The plan in an invitation answered with a yes, if it names a time.
+    static func agreedPlan(invitation: String, reply: String, person: String, now: Date,
+                           calendar: Calendar = .current) -> PromiseCandidate? {
+        guard isAgreement(reply) else { return nil }
+        let lower = " " + invitation.lowercased().replacingOccurrences(of: "’", with: "'") + " "
+        let words = Set(lower.split(whereSeparator: { !($0.isLetter || $0 == "'") }).map(String.init))
+        let isProposal = invitation.contains("?") || proposalWords.contains { word in
+            word.contains(" ") ? lower.contains(word) : words.contains(word)
+        }
+        guard isProposal else { return nil }
+        let (due, explicit) = dueDate(in: lower, now: now, calendar: calendar)
+        guard explicit, due > now else { return nil }
+        return PromiseCandidate(kind: .mine, title: planTitle(lower, words: words, person: person), due: due, hasExplicitTime: true)
+    }
+
+    /// "Coffee with Rahul", "Call Rahul", "Meet Rahul", or "Plan with Rahul".
+    static func planTitle(_ lower: String, words: Set<String>, person: String) -> String {
+        let name = firstName(person)
+        let activity = activities.first { activity in
+            activity.words.contains { $0.contains(" ") ? lower.contains($0) : words.contains($0) }
+        }?.title
+        switch activity {
+        case "Meet"?: return name.isEmpty ? "Meet up" : "Meet \(name)"
+        case "Call"?: return name.isEmpty ? "Call" : "Call \(name)"
+        case let activity?: return name.isEmpty ? activity : "\(activity) with \(name)"
+        case nil: return name.isEmpty ? "Plan" : "Plan with \(name)"
+        }
+    }
+}

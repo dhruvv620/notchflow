@@ -114,7 +114,7 @@ struct ProductivitySettings: View {
             Defaults.Toggle(key: .enablePromiseKeeper) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Keep track of promises")
-                    Text("When you write \u{201C}I'll send it tonight\u{201D} in WhatsApp or in a reply from the notch, NotchFlow adds it to Promises in the Todos tab and reminds you before it's due. English is understood on this Mac; for other languages, see below.")
+                    Text("When you write \u{201C}I'll send it tonight\u{201D} in WhatsApp or in a reply from the notch, NotchFlow adds it to Promises in the Todos tab and reminds you before it's due. A plan you say yes to (\u{201C}lunch tomorrow at 1?\u{201D} \u{2192} \u{201C}pakka\u{201D}) is kept too. English is understood on this Mac; for other languages, see below.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }
@@ -128,6 +128,17 @@ struct ProductivitySettings: View {
                     }
                 }
                 .settingsHighlight(id: highlightID("Also track what others promise me"))
+                Defaults.Toggle(key: .promiseReadMessagesHistory) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("See what I send in Messages")
+                        Text("Reads new iMessages and texts you send (from the Messages app or your iPhone) with the message you answered, so a plan you said yes to (\u{201C}coffee Friday 5 pm?\u{201D} \u{2192} \u{201C}okay bhai\u{201D}) is kept as \u{201C}Coffee with Rahul \u{00B7} Fri 5:00 PM\u{201D}. Needs Full Disk Access; only messages from now on, read on this Mac.")
+                            .font(.caption).foregroundStyle(.secondary)
+                        if let status = keeper.messagesHistoryStatus {
+                            Text(status).font(.caption).foregroundStyle(.orange)
+                        }
+                    }
+                }
+                .settingsHighlight(id: highlightID("See what I send in Messages"))
                 Defaults.Toggle(key: .promiseUseAI) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Understand any language")

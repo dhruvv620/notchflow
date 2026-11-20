@@ -645,7 +645,8 @@ final class WhatsAppManager: ObservableObject {
             let sentID = try await client.sendText(to: chatID, text: trimmed)
             replacePending(pendingID, in: chatID, with: sentID)
             PromiseKeeper.shared.observe(text: trimmed, fromMe: true, person: chat(id: chatID)?.displayName ?? "",
-                                         route: .whatsapp(chatJID: chatID), sourceName: "WhatsApp", at: Date())
+                                         route: .whatsapp(chatJID: chatID), sourceName: "WhatsApp", at: Date(),
+                                         replyingTo: lastText(in: chatID, before: pending.timestamp, fromMe: false))
             markReadLocally(chatID, at: Date())
             // Replying means the messages before it were read.
             for id in unreadIDs.suffix(20) {
@@ -806,7 +807,9 @@ final class WhatsAppManager: ObservableObject {
         let chatName = chat(id: chatID)?.displayName ?? message.senderName
         PromiseKeeper.shared.observe(text: message.text, fromMe: message.isFromMe,
                                      person: (isGroup && !message.isFromMe) ? message.senderName : chatName,
-                                     route: .whatsapp(chatJID: chatID), sourceName: "WhatsApp", at: message.timestamp)
+                                     route: .whatsapp(chatJID: chatID), sourceName: "WhatsApp", at: message.timestamp,
+                                     replyingTo: lastText(in: chatID, before: message.timestamp, fromMe: !message.isFromMe,
+                                                          excluding: message.id))
 
         guard !message.isFromMe else { return }
         if !isIgnored(chatID), Date().timeIntervalSince(message.timestamp) < 600 {
@@ -933,6 +936,15 @@ final class WhatsAppManager: ObservableObject {
         lastRead[chatID] = value
         Defaults[.whatsAppLastRead] = lastRead
         resummarize(chatID)
+    }
+
+    /// The latest message from one side of a chat before a moment, from the
+    /// last day: what a reply like "ok bhai" answers.
+    private func lastText(in chatID: String, before date: Date, fromMe: Bool, excluding id: String? = nil) -> String? {
+        messages[chatID]?
+            .filter { $0.isFromMe == fromMe && $0.id != id && !$0.isRevoked && $0.timestamp <= date
+                && date.timeIntervalSince($0.timestamp) < 86_400 && !$0.text.isEmpty }
+            .max { $0.timestamp < $1.timestamp }?.text
     }
 
     private func resummarize(_ chatID: String) {

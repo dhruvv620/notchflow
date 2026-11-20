@@ -85,6 +85,11 @@ final class PromiseKeeper: ObservableObject {
     /// The last error from the AI, shown in Settings.
     @Published private(set) var aiStatus: String?
 
+    private let messagesHistory = MessagesHistoryReader()
+    private var historyLoop: Task<Void, Never>?
+    /// Why messages sent in Messages can't be read, shown in Settings.
+    @Published private(set) var messagesHistoryStatus: String?
+
     private init() {
         promises = (try? JSONDecoder().decode([TrackedPromise].self, from: Defaults[.promisesData])) ?? []
     }
@@ -95,6 +100,49 @@ final class PromiseKeeper: ObservableObject {
         prune()
         timer = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
             .sink { [weak self] now in self?.checkNudges(now: now) }
+        historyLoop = Task { [weak self] in
+            while !Task.isCancelled {
+                guard let self else { return }
+                if !EnergyState.isPaused(.notificationDatabase) { await self.readMessagesHistory() }
+                try? await Task.sleep(for: .seconds(max(15, EnergyState.interval(.notificationDatabase) * 3)))
+            }
+        }
+    }
+
+    // MARK: Messages you send in Messages
+
+    /// New messages in the Messages app: what you send is checked for
+    /// promises (with the message you answered), and a yes from them to a
+    /// plan you proposed becomes a plan too. Their other messages already
+    /// come through their notifications.
+    private func readMessagesHistory() async {
+        guard Defaults[.enablePromiseKeeper], Defaults[.promiseReadMessagesHistory] else {
+            messagesHistoryStatus = nil
+            return
+        }
+        do {
+            guard let batch = try await messagesHistory.read(afterRowID: Int64(Defaults[.messagesHistoryLastRowID])) else { return }
+            messagesHistoryStatus = nil
+            if Int(batch.latestRowID) != Defaults[.messagesHistoryLastRowID] { Defaults[.messagesHistoryLastRowID] = Int(batch.latestRowID) }
+            for message in batch.messages {
+                let person = message.groupName.isEmpty ? personName(forChat: message.chatGUID, handle: message.handle) : message.groupName
+                let route: TrackedPromise.Route = message.chatGUID.isEmpty ? .none : .messages(chatID: message.chatGUID)
+                observe(text: message.text, fromMe: message.fromMe, person: person, route: route, sourceName: "Messages",
+                        at: message.date, replyingTo: message.replyingTo, plansOnly: !message.fromMe)
+            }
+        } catch MessagesHistoryReader.ReadError.permissionDenied {
+            messagesHistoryStatus = "Needs Full Disk Access (System Settings \u{203A} Privacy & Security) to see messages you send."
+        } catch MessagesHistoryReader.ReadError.notFound {
+            messagesHistoryStatus = "Messages isn't set up on this Mac."
+        } catch {
+            messagesHistoryStatus = "Couldn't read Messages: \(error.localizedDescription)"
+        }
+    }
+
+    /// The contact's name as their notifications show it, or the number.
+    private func personName(forChat chatID: String, handle: String) -> String {
+        if let item = NotificationHub.shared.items.first(where: { $0.reply == .messages(chatID: chatID) }) { return item.headline }
+        return handle
     }
 
     /// Open promises, soonest first.
@@ -106,9 +154,25 @@ final class PromiseKeeper: ObservableObject {
 
     /// Called for each message sent or received. Only recent messages count,
     /// so syncing old chats does not fill the list.
-    func observe(text: String, fromMe: Bool, person: String, route: TrackedPromise.Route, sourceName: String, at date: Date) {
-        guard Defaults[.enablePromiseKeeper], fromMe || Defaults[.promiseTrackTheirs] else { return }
-        guard Date().timeIntervalSince(date) < 10 * 60 else { return }
+    ///
+    /// `replyingTo` is the other side's message this one answers: a yes
+    /// ("ok", "pakka", "haan chalo") to a plan with a time keeps the plan.
+    /// With `plansOnly`, only that is looked for.
+    func observe(text: String, fromMe: Bool, person: String, route: TrackedPromise.Route, sourceName: String, at date: Date,
+                 replyingTo: String? = nil, plansOnly: Bool = false) {
+        guard Defaults[.enablePromiseKeeper], Date().timeIntervalSince(date) < 10 * 60 else { return }
+        if let invitation = replyingTo, PromisePolicy.isAgreement(text) {
+            if let plan = PromisePolicy.agreedPlan(invitation: invitation, reply: text, person: person, now: date) {
+                add(plan, title: plan.title, person: person, route: route, sourceName: sourceName,
+                    text: invitation + " \u{2192} " + text, date: date)
+            } else if Defaults[.promiseUseAI], AIClient.isReady(), PromiseAIPolicy.mightBePromise(invitation) {
+                enqueue(PromiseAIMessage(id: nextMessageID, text: text, fromMe: fromMe, person: person, replyingTo: invitation),
+                        route: route, sourceName: sourceName, date: date)
+                nextMessageID += 1
+            }
+            return
+        }
+        guard !plansOnly, fromMe || Defaults[.promiseTrackTheirs] else { return }
         if let found = PromisePolicy.detect(text, fromMe: fromMe, now: date) {
             let title = PromisePolicy.personalized(found.title, kind: found.kind, person: person)
             add(found, title: title, person: person, route: route, sourceName: sourceName, text: text, date: date)
@@ -124,7 +188,10 @@ final class PromiseKeeper: ObservableObject {
         // The same message can arrive twice (sent here, echoed by the phone).
         if promises.contains(where: { $0.status == .open && $0.kind == found.kind && $0.person == person
             && $0.title == title && abs($0.created.timeIntervalSince(date)) < 10 * 60 }) { return }
-        if promises.contains(where: { $0.status == .open && $0.person == person && $0.quote == String(text.prefix(160))
+        // Or seen twice under different names (a notch reply and the Messages history).
+        if promises.contains(where: { $0.status == .open && $0.quote == String(text.prefix(160))
+            && abs($0.created.timeIntervalSince(date)) < 10 * 60 }) { return }
+        if promises.contains(where: { $0.status == .open && $0.title == title && abs($0.due.timeIntervalSince(found.due)) < 60
             && abs($0.created.timeIntervalSince(date)) < 10 * 60 }) { return }
         let promise = TrackedPromise(id: UUID(), kind: found.kind, title: title, person: person, due: found.due,
                                      created: date, hasExplicitTime: found.hasExplicitTime, route: route,
@@ -137,7 +204,8 @@ final class PromiseKeeper: ObservableObject {
 
     private func enqueue(_ message: PromiseAIMessage, route: TrackedPromise.Route, sourceName: String, date: Date) {
         // The same text from the same person (sent here, echoed by the phone) once.
-        if pending.contains(where: { $0.message.text == message.text && $0.message.person == message.person }) { return }
+        if pending.contains(where: { $0.message.text == message.text && $0.message.replyingTo == message.replyingTo
+            && ($0.message.person == message.person || message.fromMe) }) { return }
         pending.append(PendingMessage(message: message, route: route, sourceName: sourceName, date: date))
         if pending.count >= Self.batchSize {
             flush()
@@ -176,8 +244,9 @@ final class PromiseKeeper: ObservableObject {
                 aiStatus = nil
                 for found in PromiseAIPolicy.promises(fromAnswer: answer, messages: messages, now: now) {
                     guard let item = batch.first(where: { $0.message.id == found.messageID }) else { continue }
+                    let quote = item.message.replyingTo.map { $0 + " \u{2192} " + item.message.text } ?? item.message.text
                     add(found.candidate, title: found.candidate.title, person: item.message.person, route: item.route,
-                        sourceName: item.sourceName, text: item.message.text, date: item.date)
+                        sourceName: item.sourceName, text: quote, date: item.date)
                 }
             } catch {
                 aiStatus = error.localizedDescription

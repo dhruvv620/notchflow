@@ -4,6 +4,8 @@ NotchFlow runs on your Mac. It has no account, no analytics and no tracking, and
 
 ## What stays on your Mac
 
+With Full Disk Access, the promise keeper also reads new messages from the Messages app's history (`~/Library/Messages/chat.db`, from a private copy, never changed) to see what you send and the message you answered; only messages from the moment it's turned on, and nothing leaves your Mac unless "Understand any language" is on (see below). Turn it off with Settings > Productivity > See what I send in Messages.
+
 Settings, clipboard history, notes, todos, Pomodoro history, tracked time, promises, workspaces, Cuely scripts, the notification inbox and agent sessions are stored on your Mac only (in NotchFlow's preferences and in `~/Library/Application Support/NotchFlow`). Keys you enter (your AI provider keys, GitHub) are kept in your login Keychain.
 
 ## Permissions and why they are asked for

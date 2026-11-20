@@ -9,6 +9,8 @@ struct PromiseAIMessage: Equatable, Sendable {
     let text: String
     let fromMe: Bool
     let person: String
+    /// The other side's message this one answers ("let's meet Friday 5 pm" for "ok bhai").
+    var replyingTo: String? = nil
 }
 
 /// Promise detection in any language (English, Hindi, Gujarati, Marathi, and
@@ -40,6 +42,10 @@ enum PromiseAIPolicy {
         "karen", "karto", "karte", "karin", "pathavto", "pathavte", "pathaven", "pathvin", "deto", "dete", "deyin",
         "yeto", "yete", "sangto", "sangte", "sangen", "baghto", "baghte", "udya", "udyaa", "ratri", "sandhyakali",
         "sakali", "nantar", "thodyavelat", "tasat", "paryant", "nakki",
+        // Days and plans
+        "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday", "weekend", "let's",
+        "lets", "shall we", "how about", "chalo", "milte", "meet", "somvar", "mangalvar", "budhvar", "guruvar",
+        "shukravar", "shanivar", "ravivar",
     ]
 
     /// The same, in Devanagari (Hindi, Marathi) and Gujarati script.
@@ -57,7 +63,7 @@ enum PromiseAIPolicy {
     ]
 
     /// Whether a message is worth asking the AI about: long enough, and with
-    /// a word that suggests a commitment or a time.
+    /// a word that suggests a commitment, a plan or a time.
     static func mightBePromise(_ text: String) -> Bool {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard (4...600).contains(trimmed.count), trimmed.contains(where: \.isLetter) else { return false }
@@ -66,7 +72,9 @@ enum PromiseAIPolicy {
         let words = lower.split(whereSeparator: { !($0.isLetter || $0.isNumber || $0 == "'") })
         guard !words.isEmpty else { return false }
         let padded = " " + words.joined(separator: " ") + " "
-        return latinMarkers.contains { padded.contains(" \($0) ") }
+        if latinMarkers.contains(where: { padded.contains(" \($0) ") }) { return true }
+        // A clock time: "5pm", "5 pm", "17:30".
+        return lower.range(of: #"\b\d{1,2}(:\d{2})?\s?(am|pm)\b|\b\d{1,2}:\d{2}\b"#, options: .regularExpression) != nil
     }
 
     // MARK: Asking
@@ -80,6 +88,8 @@ enum PromiseAIPolicy {
     Answer with only a JSON array, one object per promise (an empty array if there are none):
     {"id": <message id>, "task": "<what will be done, in short English, starting with a verb>", \
     "due": "<YYYY-MM-DDTHH:MM in the local time given, or null if no time was said>"}
+    A short yes ("ok", "okay bhai", "pakka", "haan chalo", "thik che", "ho nakki", "done") to a plan in the \
+    message it answers is a promise too: the task is the plan ("Coffee with Rahul", "Call Riya"), due when the plan is.
     For a message from me, write the task as what I will do, naming the other person instead of "you" \
     ("Send Sam the deck"). For a message to me, write what they will do for me ("Send me the invoice").
     Vague times: morning 09:00, afternoon 15:00, evening or shaam/saanje/sandhyakali 19:00, \
@@ -98,7 +108,11 @@ enum PromiseAIPolicy {
         for message in messages {
             let text = message.text.replacingOccurrences(of: "\n", with: " ").prefix(600)
             let who = message.fromMe ? "Me to \(name(message.person))" : "\(name(message.person)) to me"
-            lines.append("[\(message.id)] \(who): \(text)")
+            if let answered = message.replyingTo?.replacingOccurrences(of: "\n", with: " ").prefix(300) {
+                lines.append("[\(message.id)] \(who), answering \u{201C}\(answered)\u{201D}: \(text)")
+            } else {
+                lines.append("[\(message.id)] \(who): \(text)")
+            }
         }
         return lines.joined(separator: "\n")
     }
@@ -136,7 +150,9 @@ enum PromiseAIPolicy {
             }
             seen.insert(id)
             let title = task.prefix(1).uppercased() + task.dropFirst()
-            found.append((id, PromiseCandidate(kind: message.fromMe ? .mine : .theirs, title: title, due: due, hasExplicitTime: explicit)))
+            // An agreed plan is on my calendar whoever proposed it.
+            let kind: PromiseCandidate.Kind = message.fromMe || message.replyingTo != nil ? .mine : .theirs
+            found.append((id, PromiseCandidate(kind: kind, title: title, due: due, hasExplicitTime: explicit)))
         }
         return found
     }

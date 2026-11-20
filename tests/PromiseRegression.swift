@@ -70,6 +70,30 @@ struct PromiseRegression {
                     == "Hi Alex, just checking in on this (send me the invoice). Thanks!", "Their draft")
         try require(P.followUpDraft(kind: .mine, title: "Send Sam the deck", person: "Sam")
                     == "Sorry, running a bit behind on this (send Sam the deck). Is tomorrow morning okay?", "My draft")
+        // Plans you said yes to. Today is Wednesday 18 November, 14:00.
+        for yes in ["ok", "Okay bhai", "okk", "pakka", "haan chalo", "Sure!", "sounds good", "done bro", "👍", "thik che",
+                    "ho nakki", "theek hai", "see you then"] {
+            try require(P.isAgreement(yes), "Not a yes: \(yes)")
+        }
+        for notYes in ["ok but not friday", "can't, sorry", "no", "okay I'll check and tell you", "haha", "not sure",
+                       "ok so what time does the movie start tomorrow evening"] {
+            try require(!P.isAgreement(notYes), "Taken as a yes: \(notYes)")
+        }
+        let coffee = P.agreedPlan(invitation: "let's meet for coffee on Friday 5 p.m.", reply: "okay bhai", person: "Rahul Shah",
+                                  now: now, calendar: calendar)
+        try require(coffee?.title == "Coffee with Rahul" && coffee?.kind == .mine && coffee?.hasExplicitTime == true,
+                    "Coffee plan: \(String(describing: coffee))")
+        try require(coffee?.due == at(20, 17, 0), "Coffee due: \(String(describing: coffee?.due))")
+        let call = P.agreedPlan(invitation: "Can we do a call tomorrow at 11am?", reply: "sure", person: "Priya", now: now, calendar: calendar)
+        try require(call?.title == "Call Priya" && call?.due == at(19, 11, 0), "Call plan: \(String(describing: call))")
+        let meet = P.agreedPlan(invitation: "milte hai saturday 7pm", reply: "haan", person: "+919800000000", now: now, calendar: calendar)
+        try require(meet?.title == "Meet up" && meet?.due == at(21, 19, 0), "Meet plan: \(String(describing: meet))")
+        try require(P.agreedPlan(invitation: "let's catch up sometime", reply: "ok", person: "Sam", now: now, calendar: calendar) == nil,
+                    "A plan without a time kept")
+        try require(P.agreedPlan(invitation: "I reached home at 5pm", reply: "ok", person: "Sam", now: now, calendar: calendar) == nil,
+                    "News taken as a plan")
+        try require(P.agreedPlan(invitation: "coffee Friday 5pm?", reply: "can't, sorry", person: "Sam", now: now, calendar: calendar) == nil,
+                    "A no taken as a yes")
         print("Promises: OK")
     }
 }
