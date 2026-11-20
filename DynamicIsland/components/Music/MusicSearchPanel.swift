@@ -12,8 +12,8 @@ extension Defaults.Keys {
     static let musicArtworkGlow = Key<Bool>("musicArtworkGlow", default: true)
 }
 
-/// Searches songs (Apple's public catalog) and hands one to Apple Music,
-/// Spotify or YouTube Music.
+/// Searches songs (Apple's public catalog) and plays one on Apple Music,
+/// Spotify or YouTube Music without leaving the notch.
 @MainActor
 final class MusicSearchService: ObservableObject {
     static let shared = MusicSearchService()
@@ -68,30 +68,62 @@ final class MusicSearchService: ObservableObject {
         }
     }
 
+    @Published private(set) var startingID: Int?
+
+    /// Plays the song without leaving the notch: from the Apple Music
+    /// library, or in Spotify by its track (found through song.link), in the
+    /// background. Only when that can't be done does a player open, and then
+    /// behind what you're doing.
     func play(_ result: MusicSearchResult) {
-        switch target {
-        case .appleMusic:
-            Task {
+        startingID = result.id
+        message = nil
+        let target = self.target
+        Task { @MainActor in
+            defer { startingID = nil }
+            switch target {
+            case .appleMusic:
                 let answer = try? await AppleScriptHelper.execute(
                     MusicSearchPolicy.appleMusicLibraryScript(title: result.title, artist: result.artist))
                 if answer?.stringValue == "played" {
-                    message = "Playing \(result.title) in Apple Music."
+                    message = "Playing \(result.title)."
                 } else if let url = MusicSearchPolicy.appleMusicAppURL(result.storeURL) {
-                    NSWorkspace.shared.open(url)
-                    message = "Opened in Apple Music: it isn't in your library."
+                    Self.openInBackground(url)
+                    message = "Not in your library: opened in Music, behind this. Press play there."
+                }
+            case .spotify:
+                if let uri = MusicSearchPolicy.spotifyTrackURI(from: await Self.link(for: result, on: "spotify")),
+                   (try? await AppleScriptHelper.executeVoid(MusicSearchPolicy.spotifyPlayScript(trackURI: uri))) != nil {
+                    message = "Playing \(result.title) on Spotify."
+                } else if let url = MusicSearchPolicy.spotifySearchURL(title: result.title, artist: result.artist) {
+                    Self.openInBackground(url)
+                    message = "Couldn't find the exact track: opened Spotify's search, behind this."
+                }
+            case .youtubeMusic:
+                // A website plays in a browser tab: the exact song, opened behind what you're doing.
+                if let url = await Self.link(for: result, on: "youtubeMusic") {
+                    Self.openInBackground(url)
+                    message = "Playing \(result.title) on YouTube Music, in a browser tab behind this."
+                } else if let url = MusicSearchPolicy.youtubeMusicURL(title: result.title, artist: result.artist) {
+                    Self.openInBackground(url)
+                    message = "Opened YouTube Music's search, behind this."
                 }
             }
-        case .spotify:
-            if let url = MusicSearchPolicy.spotifySearchURL(title: result.title, artist: result.artist) {
-                NSWorkspace.shared.open(url)
-                message = "Opened in Spotify's search: press play there."
-            }
-        case .youtubeMusic:
-            if let url = MusicSearchPolicy.youtubeMusicURL(title: result.title, artist: result.artist) {
-                NSWorkspace.shared.open(url)
-                message = "Opened on YouTube Music."
-            }
         }
+    }
+
+    /// The song's link on another service, from song.link.
+    private static func link(for result: MusicSearchResult, on platform: String) async -> URL? {
+        guard let url = MusicSearchPolicy.songLinkURL(for: result.storeURL, country: Locale.current.region?.identifier ?? "US"),
+              let (data, response) = try? await URLSession.shared.data(from: url),
+              (response as? HTTPURLResponse)?.statusCode == 200 else { return nil }
+        return MusicSearchPolicy.platformURL(platform, in: data)
+    }
+
+    /// Opens a link without bringing its app to the front.
+    private static func openInBackground(_ url: URL) {
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.activates = false
+        NSWorkspace.shared.open(url, configuration: configuration)
     }
 }
 
@@ -161,15 +193,19 @@ struct MusicSearchPanel: View {
                         .font(.system(size: 10)).foregroundStyle(.secondary).lineLimit(1)
                 }
                 Spacer(minLength: 0)
-                Image(systemName: search.target == .appleMusic ? "play.fill" : "arrow.up.right")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(appearance.accentColor)
+                if search.startingID == result.id {
+                    ProgressView().controlSize(.mini)
+                } else {
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(appearance.accentColor)
+                }
             }
             .padding(.horizontal, 6).padding(.vertical, 3)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .help(search.target == .appleMusic ? "Play in Apple Music" : "Open in \(search.target.title)")
+        .help("Play on \(search.target.title)")
     }
 }
 

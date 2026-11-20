@@ -32,7 +32,7 @@ Only for features you turn on, and only to the service that feature needs:
 - **Updates**: once a day it reads `appcast.xml` from NotchFlow's GitHub releases.
 - **Weather**: Open-Meteo, with your approximate location.
 - **Lyrics and artwork**: lyrics and artwork services for the song that is playing.
-- **Music search**: what you type in the Music tab's search goes to Apple's public song catalog (the iTunes Search API, no account) to list songs; a song you pick is played in the Music app or opened in Spotify or on YouTube Music.
+- **Music search**: what you type in the Music tab's search goes to Apple's public song catalog (the iTunes Search API, no account) to list songs; a song you pick is played in the Music app; for Spotify and YouTube Music, its Apple Music link goes to song.link (Odesli, no account) to find the same song there.
 - **Smart replies**: the AI provider you choose in Settings > Smart Tools (MiniMax, OpenAI, Claude, Gemini, Groq, OpenRouter, DeepSeek, Mistral, xAI, Together, or a custom server), with the message you are replying to, only when you tap the sparkles button. With Ollama or LM Studio nothing leaves your Mac.
 - **Promise keeper, Understand any language** (off by default): the same AI provider, with messages that contain a word hinting at a promise or a time, a few at a time and at most 300 a day. Other messages stay on your Mac.
 - **Screen assistant**: the AI provider you chose, with what you ask and the screenshot you take.

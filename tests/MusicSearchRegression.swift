@@ -38,6 +38,21 @@ struct MusicSearchRegression {
                     && MusicSearchTarget.preferred(forPlayer: "com.spotify.client") == .spotify
                     && MusicSearchTarget.preferred(forPlayer: "com.google.Chrome.app.cinhimbnkkaeohfgghhklpknlkffjgod.youtube") == .youtubeMusic,
                     "Preferred target")
+        // Spotify and YouTube Music through song.link.
+        let link = P.songLinkURL(for: results[0].storeURL, country: "IN")?.absoluteString ?? ""
+        try require(link.hasPrefix("https://api.song.link/v1-alpha.1/links?url=https://music.apple.com/us/album/x/123?i%3D1")
+                    && link.hasSuffix("userCountry=IN"), "song.link URL: \(link)")
+        let answer = #"{"entityUniqueId":"ITUNES_SONG::1","linksByPlatform":{"spotify":{"url":"https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC"},"youtubeMusic":{"url":"https://music.youtube.com/watch?v=abc123"}}}"#
+        let spotify = P.platformURL("spotify", in: Data(answer.utf8))
+        try require(P.spotifyTrackURI(from: spotify) == "spotify:track:4uLU6hMCjMI75M1A2tKUQC", "Spotify URI")
+        try require(P.spotifyTrackURI(from: URL(string: "https://open.spotify.com/intl-de/track/4uLU6hMCjMI75M1A2tKUQC?si=x")) == "spotify:track:4uLU6hMCjMI75M1A2tKUQC",
+                    "Spotify URI with a locale and share id")
+        try require(P.spotifyTrackURI(from: URL(string: "https://open.spotify.com/album/1")) == nil
+                    && P.spotifyTrackURI(from: URL(string: "https://example.com/track/1")) == nil, "Not a Spotify track")
+        try require(P.platformURL("youtubeMusic", in: Data(answer.utf8))?.absoluteString == "https://music.youtube.com/watch?v=abc123", "YouTube Music link")
+        try require(P.platformURL("spotify", in: Data("{}".utf8)) == nil, "Empty answer")
+        try require(P.spotifyPlayScript(trackURI: "spotify:track:4uLU6hMCjMI75M1A2tKUQC")
+                    == #"tell application "Spotify" to play track "spotify:track:4uLU6hMCjMI75M1A2tKUQC""#, "Spotify script")
         print("Music search: OK")
     }
 }
