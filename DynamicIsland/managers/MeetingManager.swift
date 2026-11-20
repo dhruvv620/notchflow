@@ -30,7 +30,7 @@ final class MeetingManager: ObservableObject {
     @Published private(set) var meeting: Meeting?
     @Published private(set) var phase: MeetingPolicy.Phase = .hidden
 
-    private var timer: AnyCancellable?
+    private var timer: EnergyTimer?
     private var pausedMusicForMeetingID: String?
     private var started = false
 
@@ -39,9 +39,12 @@ final class MeetingManager: ObservableObject {
     func start() {
         guard !started else { return }
         started = true
-        timer = Timer.publish(every: 1, on: .main, in: .common)
-            .autoconnect()
-            .sink { [weak self] now in self?.tick(now: now) }
+        // Every second while a meeting is near; otherwise as the Optimizer allows.
+        let timer = EnergyTimer(.meetings, soon: { [weak self] in self?.meeting != nil }) { [weak self] in
+            self?.tick(now: Date())
+        }
+        timer.start()
+        self.timer = timer
         tick(now: Date())
     }
 

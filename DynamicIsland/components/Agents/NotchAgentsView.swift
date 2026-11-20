@@ -614,7 +614,7 @@ struct AgentLiveActivity: View {
                     .foregroundStyle(Color.orange)
                     .lineLimit(1)
             }
-            .onAppear { withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) { pulse = true } }
+            .onAppear { withAnimation(EnergyState.repeating(.easeInOut(duration: 0.9))) { pulse = true } }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("\(request.agent.displayName) in \(request.project) needs you")
         } else if let waiting = hub.waitingInWindowSessions.first {
@@ -632,7 +632,7 @@ struct AgentLiveActivity: View {
                     .font(.system(size: 10, weight: .bold))
                     .foregroundStyle(Color.orange)
             }
-            .onAppear { withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) { pulse = true } }
+            .onAppear { withAnimation(EnergyState.repeating(.easeInOut(duration: 0.9))) { pulse = true } }
             .onTapGesture { hub.openWindow(bundleID: waiting.appBundleID) }
             .help("\(waiting.agent.displayName) is asking in its window")
         } else if let done = hub.announcement {

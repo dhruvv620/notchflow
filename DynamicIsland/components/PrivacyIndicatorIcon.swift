@@ -114,10 +114,7 @@ struct PrivacyIndicatorIcon: View {
     
     // MARK: - Animation
     private func startPulseAnimation() {
-        withAnimation(
-            .easeInOut(duration: 1.5)
-            .repeatForever(autoreverses: true)
-        ) {
+        withAnimation(EnergyState.repeating(.easeInOut(duration: 1.5))) {
             isAnimating = true
         }
     }

@@ -142,8 +142,9 @@ final class NotificationHub: ObservableObject {
         loop = Task { [weak self] in
             while !Task.isCancelled {
                 guard let self else { return }
-                await self.pollNotificationCenter()
-                try? await Task.sleep(for: .seconds(2))
+                // Paced by the Optimizer; skipped while the Mac is idle.
+                if !EnergyState.isPaused(.notificationDatabase) { await self.pollNotificationCenter() }
+                try? await Task.sleep(for: .seconds(EnergyState.isPaused(.notificationDatabase) ? 5 : EnergyState.interval(.notificationDatabase)))
             }
         }
     }

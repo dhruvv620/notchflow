@@ -14,13 +14,14 @@ extension Defaults.Keys {
 struct ClosedNotchLyricsLine: View {
     let width: CGFloat
     @ObservedObject private var music = MusicManager.shared
+    @ObservedObject private var energy = EnergySaver.shared
     @ObservedObject private var appearance = NotchAppearanceModel.shared
 
     static let height: CGFloat = 26
 
     var body: some View {
-        // 30 fps is plenty for a sweep and keeps the closed notch cheap.
-        TimelineView(.animation(minimumInterval: 1.0 / 30, paused: !music.isPlaying)) { context in
+        // 30 fps is plenty for a sweep; 10 on battery saver (Optimizer).
+        TimelineView(.animation(minimumInterval: 1.0 / EnergyPolicy.lyricsFrameRate(switches: energy.switches, conditions: energy.conditions), paused: !music.isPlaying)) { context in
             let lines = music.syncedLyrics
             let position = LyricsKaraokePolicy.position(
                 timestamps: lines.map(\.timestamp),

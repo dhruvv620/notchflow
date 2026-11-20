@@ -34,7 +34,10 @@ final class AgentConversations: ObservableObject {
     @Published private(set) var lastError: String?
 
     private var processes: [String: Process] = [:]
-    private var refreshTimer: AnyCancellable?
+    private var refreshTimer: EnergyTimer?
+    /// With the Optimizer's "react to events", a file watch replaces polling.
+    private var fileWatch: DispatchSourceFileSystemObject?
+    private var policyObserver: NSObjectProtocol?
     private var selectedModified: Date?
     private var listRefreshedAt = Date.distantPast
 
@@ -105,12 +108,54 @@ final class AgentConversations: ObservableObject {
         pendingMessages = []
         selectedModified = nil
         lastError = nil
-        refreshTimer = nil
+        stopFollowing()
         guard summary != nil else { return }
         reloadSelected()
-        // The agent appends to its file as it works; follow it while the chat is open.
-        refreshTimer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
-            .sink { [weak self] _ in self?.reloadSelectedIfChanged() }
+        startFollowing()
+    }
+
+    /// The agent appends to its file as it works; follow it while the chat is
+    /// open: by watching the file (Optimizer: react to events) or by checking it.
+    private func startFollowing() {
+        stopFollowing()
+        guard let url = selected?.fileURL else { return }
+        if policyObserver == nil {
+            policyObserver = NotificationCenter.default.addObserver(forName: .energyPolicyChanged, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    guard let self, self.isFollowing else { return }
+                    self.startFollowing()
+                }
+            }
+        }
+        if EnergyState.switches.useEvents, let watch = Self.watch(url, onChange: { [weak self] replaced in
+            guard let self else { return }
+            self.reloadSelectedIfChanged()
+            if replaced { self.startFollowing() }  // the file was swapped: watch the new one
+        }) {
+            fileWatch = watch
+        } else {
+            let timer = EnergyTimer(.agentFollow) { [weak self] in self?.reloadSelectedIfChanged() }
+            timer.start()
+            refreshTimer = timer
+        }
+    }
+
+    private var isFollowing: Bool { fileWatch != nil || refreshTimer != nil }
+
+    /// Calls `onChange` on the main thread when the file grows or changes;
+    /// `true` when it was deleted or renamed.
+    private static func watch(_ url: URL, onChange: @escaping @MainActor (Bool) -> Void) -> DispatchSourceFileSystemObject? {
+        let descriptor = open(url.path, O_EVTONLY)
+        guard descriptor >= 0 else { return nil }
+        let source = DispatchSource.makeFileSystemObjectSource(fileDescriptor: descriptor,
+                                                               eventMask: [.write, .extend, .delete, .rename], queue: .main)
+        source.setEventHandler { [weak source] in
+            let events = source?.data ?? []
+            MainActor.assumeIsolated { onChange(events.contains(.delete) || events.contains(.rename)) }
+        }
+        source.setCancelHandler { close(descriptor) }
+        source.resume()
+        return source
     }
 
     /// Opens the conversation of a live session, by its id.
@@ -130,7 +175,10 @@ final class AgentConversations: ObservableObject {
     }
 
     func stopFollowing() {
+        refreshTimer?.stop()
         refreshTimer = nil
+        fileWatch?.cancel()
+        fileWatch = nil
     }
 
     private func reloadSelectedIfChanged() {
@@ -144,15 +192,18 @@ final class AgentConversations: ObservableObject {
         guard let summary = selected else { return }
         let url = summary.fileURL
         selectedModified = (try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate)
+        // The Optimizer's "keep memory bounded" reads less of long conversations.
+        let tailBytes = EnergyPolicy.transcriptTailBytes(switches: EnergyState.switches)
+        let itemLimit = EnergyPolicy.transcriptItemLimit(switches: EnergyState.switches)
         Task.detached(priority: .userInitiated) {
-            guard let data = Self.readTail(of: url, bytes: 4 * 1024 * 1024) else { return }
+            guard let data = Self.readTail(of: url, bytes: tailBytes) else { return }
             let parsed = summary.agent == .claude
                 ? AgentTranscriptPolicy.claudeItems(from: data)
                 : AgentTranscriptPolicy.codexItems(from: data)
             await MainActor.run {
                 let conversations = AgentConversations.shared
                 guard conversations.selected?.id == summary.id else { return }
-                conversations.items = Array(parsed.suffix(300))
+                conversations.items = Array(parsed.suffix(itemLimit))
                 // A sent message is no longer pending once the transcript has it.
                 let userTexts = Set(parsed.filter { $0.role == .user }.map { $0.text.trimmingCharacters(in: .whitespacesAndNewlines) })
                 conversations.pendingMessages.removeAll { userTexts.contains($0) }

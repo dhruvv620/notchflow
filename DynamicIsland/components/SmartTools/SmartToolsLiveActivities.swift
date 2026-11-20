@@ -62,7 +62,7 @@ struct FocusGuardLiveActivity: View {
                 .contentTransition(.numericText())
         }
         .onAppear {
-            withAnimation(.easeInOut(duration: 1.1).repeatForever(autoreverses: true)) { pulse = true }
+            withAnimation(EnergyState.repeating(.easeInOut(duration: 1.1))) { pulse = true }
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Off track: \(guardian.source), \(FocusGuardPolicy.offTrackLabel(seconds: guardian.offTrackSeconds))")

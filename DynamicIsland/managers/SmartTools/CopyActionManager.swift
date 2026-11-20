@@ -62,7 +62,7 @@ final class CopyActionManager: ObservableObject {
     static let tabLifetime: TimeInterval = 30
     private var closedWork: DispatchWorkItem?
     private var isTabVisible = false
-    private var timer: AnyCancellable?
+    private var timer: EnergyTimer?
     private var lastChangeCount = NSPasteboard.general.changeCount
     private var ownChangeCount: Int?
     private var hideWork: DispatchWorkItem?
@@ -73,9 +73,9 @@ final class CopyActionManager: ObservableObject {
     func start() {
         guard !started else { return }
         started = true
-        timer = Timer.publish(every: 0.7, on: .main, in: .common)
-            .autoconnect()
-            .sink { [weak self] _ in self?.poll() }
+        let timer = EnergyTimer(.copyAction) { [weak self] in self?.poll() }
+        timer.start()
+        self.timer = timer
     }
 
     private func poll() {

@@ -63,7 +63,7 @@ struct RecordingIndicator: View {
     
     private func startPulsingAnimation() {
         isPulsing = false
-        withAnimation(.easeInOut(duration: animationDuration).repeatForever(autoreverses: true)) {
+        withAnimation(EnergyState.repeating(.easeInOut(duration: animationDuration))) {
             isPulsing = true
         }
     }
@@ -143,7 +143,7 @@ struct RecordingIndicatorLarge: View {
                         .opacity(isPulsing ? 1.0 : 0.7)
                 }
                 .onAppear {
-                    withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
+                    withAnimation(EnergyState.repeating(.easeInOut(duration: 0.8))) {
                         isPulsing = true
                     }
                 }
@@ -171,7 +171,7 @@ struct RecordingIndicatorSubtle: View {
                     .frame(width: 4, height: 4)
                     .opacity(opacity)
                     .onAppear {
-                        withAnimation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true)) {
+                        withAnimation(EnergyState.repeating(.easeInOut(duration: 1.0))) {
                             opacity = 1.0
                         }
                     }

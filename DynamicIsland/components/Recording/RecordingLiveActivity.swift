@@ -88,7 +88,7 @@ struct PulsingModifier: ViewModifier {
             .scaleEffect(isPulsing ? 1.2 : 1.0)
             .opacity(isPulsing ? 0.7 : 1.0)
             .onAppear {
-                withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
+                withAnimation(EnergyState.repeating(.easeInOut(duration: 0.8))) {
                     isPulsing = true
                 }
             }

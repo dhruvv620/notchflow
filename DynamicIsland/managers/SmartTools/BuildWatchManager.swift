@@ -35,7 +35,7 @@ final class BuildWatchManager: ObservableObject {
     private var jobRuns: [WatchedRun] = []
     private var announcedJobIDs = Set<String>()
     private let startedAt = Date()
-    private var jobTimer: AnyCancellable?
+    private var jobTimer: EnergyTimer?
     private var githubTask: Task<Void, Never>?
     private var hideWork: DispatchWorkItem?
     private var started = false
@@ -45,9 +45,9 @@ final class BuildWatchManager: ObservableObject {
     func start() {
         guard !started else { return }
         started = true
-        jobTimer = Timer.publish(every: 2, on: .main, in: .common)
-            .autoconnect()
-            .sink { [weak self] _ in self?.pollJobs() }
+        let jobTimer = EnergyTimer(.buildJobs) { [weak self] in self?.pollJobs() }
+        jobTimer.start()
+        self.jobTimer = jobTimer
         githubTask = Task { @MainActor [weak self] in
             while !Task.isCancelled {
                 guard let self else { return }

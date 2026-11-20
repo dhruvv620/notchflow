@@ -358,6 +358,9 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
         notchSize = targetSize
         lastOpenedAt = Date()
         notchState = .open
+        // Now that it counts as open, make room for every tab (the window may
+        // have shrunk while closed), so the first tab switch is smooth too.
+        if EnergyState.switches.shrinkWindow { AppDelegate.shared?.refreshWindowForLayoutChange() }
 
         // Force music information update when notch is opened
         MusicManager.shared.forceUpdate()

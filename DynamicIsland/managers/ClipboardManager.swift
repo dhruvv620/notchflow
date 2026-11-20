@@ -174,7 +174,7 @@ class ClipboardManager: ObservableObject {
     @Published var isMonitoring: Bool = false
     @Published private(set) var lastCopiedItemDate: Date?
     
-    private var timer: Timer?
+    private var timer: EnergyTimer?
     private var lastChangeCount: Int = 0
     
     /// Recent history is deliberately bounded; legacy favorites remain separate.
@@ -221,14 +221,15 @@ class ClipboardManager: ObservableObject {
         guard !isMonitoring else { return }
         
         isMonitoring = true
-        timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
-            self?.checkClipboard()
-        }
+        // Paced by the Optimizer (every 0.5 s, or 1 s batched; paused while idle).
+        let timer = EnergyTimer(.clipboard) { [weak self] in self?.checkClipboard() }
+        timer.start()
+        self.timer = timer
     }
     
     func stopMonitoring() {
         isMonitoring = false
-        timer?.invalidate()
+        timer?.stop()
         timer = nil
     }
     

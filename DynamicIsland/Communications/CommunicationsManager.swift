@@ -106,8 +106,9 @@ final class CommunicationsManager: ObservableObject {
         loop = Task { [weak self] in
             while !Task.isCancelled {
                 guard let self else { return }
-                await self.refresh()
-                try? await Task.sleep(for: .seconds(1.5))
+                // Paced by the Optimizer; skipped while the Mac is idle.
+                if !EnergyState.isPaused(.bannerScan) { await self.refresh() }
+                try? await Task.sleep(for: .seconds(EnergyState.isPaused(.bannerScan) ? 5 : EnergyState.interval(.bannerScan)))
             }
         }
     }

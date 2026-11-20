@@ -801,12 +801,12 @@ struct BatteryTemporaryActivityView: View {
             break
         case .lowBattery:
             if !isLowPowerMode {
-                withAnimation(.easeInOut(duration: 1).repeatForever(autoreverses: true)) {
+                withAnimation(EnergyState.repeating(.easeInOut(duration: 1))) {
                     pulse = true
                 }
             }
         case .fullBattery:
-            withAnimation(.easeInOut(duration: 1).repeatForever(autoreverses: true)) {
+            withAnimation(EnergyState.repeating(.easeInOut(duration: 1))) {
                 pulse = true
             }
 

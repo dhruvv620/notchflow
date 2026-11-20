@@ -651,8 +651,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func resizeWindows(to requested: CGSize, animated: Bool, force: Bool) {
         guard requested.width > 0, requested.height > 0 else { return }
-        let headroom = openHeadroomSize()
-        let size = CGSize(width: max(requested.width, headroom.width), height: max(requested.height, headroom.height))
+        // Room for the biggest tab while open; with the Optimizer's "shrink the
+        // window", only the current tab's size once the notch is closed.
+        let isOpen = vm.notchState == .open || viewModels.values.contains { $0.notchState == .open }
+        let size: CGSize
+        if EnergyPolicy.keepsWindowHeadroom(switches: EnergyState.switches, isOpen: isOpen) {
+            let headroom = openHeadroomSize()
+            size = CGSize(width: max(requested.width, headroom.width), height: max(requested.height, headroom.height))
+        } else {
+            size = requested
+        }
 
         if Defaults[.showOnAllDisplays] {
             for (screen, window) in windows {
@@ -796,6 +804,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Observe tab changes - use immediate resize to keep the notch pinned
         // Deferred to next run loop tick because @Published fires on willSet,
         // so coordinator.currentView still holds the OLD value at emission time.
+        // Once the notch has closed (and its animation finished), let the
+        // window shrink if the Optimizer allows it.
+        vm.$notchState
+            .removeDuplicates()
+            .filter { $0 == .closed }
+            .debounce(for: .seconds(0.8), scheduler: RunLoop.main)
+            .sink { [weak self] _ in
+                guard let self, EnergyState.switches.shrinkWindow else { return }
+                guard self.vm.notchState == .closed else { return }
+                self.updateWindowSizeIfNeeded()
+            }
+            .store(in: &cancellables)
+
         coordinator.$currentView.sink { [weak self] _ in
             DispatchQueue.main.async {
                 self?.updateWindowSizeForTabSwitch()
@@ -883,6 +904,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         WhatsAppManager.shared.start()
         NotificationHub.shared.start()
         MeetingManager.shared.start()
+        EnergySaver.shared.start()
         FocusGuardManager.shared.start()
         FocusQuiet.shared.start()
         TimeTracker.shared.start()

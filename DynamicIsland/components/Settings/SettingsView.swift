@@ -67,6 +67,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
     case notes
     case smartTools
     case productivity
+    case optimizer
     case terminal
     case whatsapp
     case agents
@@ -82,7 +83,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
              .calendar, .timer, .shelf:                                          return .notch
         case .smartTools, .productivity, .notes, .clipboard, .screenAssistant,
              .colorPicker, .terminal, .stats:                                    return .tools
-        case .hudAndOSD, .battery, .devices, .downloads, .lockScreen:           return .system
+        case .hudAndOSD, .battery, .devices, .downloads, .lockScreen, .optimizer:           return .system
         case .about:                                                            return .info
         }
     }
@@ -111,6 +112,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .notes: return String(localized: "Notes")
         case .smartTools: return String(localized: "Smart Tools")
         case .productivity: return String(localized: "Productivity")
+        case .optimizer: return String(localized: "Optimizer")
         case .terminal: return String(localized: "Terminal")
         case .whatsapp: return String(localized: "WhatsApp")
         case .agents: return String(localized: "AI Agents")
@@ -142,6 +144,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .notes: return "note.text"
         case .smartTools: return "wand.and.stars"
         case .productivity: return "clock.badge.checkmark"
+        case .optimizer: return "gauge.with.dots.needle.33percent"
         case .terminal: return "apple.terminal"
         case .whatsapp: return "message.fill"
         case .agents: return "sparkles"
@@ -173,6 +176,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .notes: return Color(red: 0.979, green: 0.716, blue: 0.153, opacity: 1.000)
         case .smartTools: return .orange
         case .productivity: return .indigo
+        case .optimizer: return .green
         case .terminal: return Color(red: 0.2, green: 0.8, blue: 0.4)
         case .whatsapp: return .whatsAppGreen
         case .agents: return .orange
@@ -516,6 +520,7 @@ struct SettingsView: View {
             .devices,
             .downloads,
             .lockScreen,
+            .optimizer,
             // Info
             .about
         ]
@@ -934,6 +939,13 @@ struct SettingsView: View {
             SettingsSearchEntry(tab: .agents, title: "Ask in the agent's window when it is in front", keywords: ["terminal","front","approval"], highlightID: SettingsTab.agents.highlightID(for: "Ask in the agent's window when it is in front")),
             SettingsSearchEntry(tab: .agents, title: "Show working agents under the closed notch", keywords: ["status","working","closed notch"], highlightID: SettingsTab.agents.highlightID(for: "Show working agents under the closed notch")),
             SettingsSearchEntry(tab: .agents, title: "notchflow command", keywords: ["cli","command line","notchflow ask","notify","script"], highlightID: SettingsTab.agents.highlightID(for: "notchflow command")),
+            SettingsSearchEntry(tab: .optimizer, title: "Batch and slow the timers", keywords: ["optimizer", "battery", "cpu", "timers", "energy", "wake ups"], highlightID: SettingsTab.optimizer.highlightID(for: "Batch and slow the timers")),
+            SettingsSearchEntry(tab: .optimizer, title: "React to events instead of polling", keywords: ["optimizer", "polling", "events", "cpu", "energy"], highlightID: SettingsTab.optimizer.highlightID(for: "React to events instead of polling")),
+            SettingsSearchEntry(tab: .optimizer, title: "Pause when nobody's looking", keywords: ["optimizer", "idle", "locked", "sleep", "pause", "battery"], highlightID: SettingsTab.optimizer.highlightID(for: "Pause when nobody's looking")),
+            SettingsSearchEntry(tab: .optimizer, title: "Save battery on battery power", keywords: ["optimizer", "battery", "low power mode", "visualizer", "lyrics"], highlightID: SettingsTab.optimizer.highlightID(for: "Save battery on battery power")),
+            SettingsSearchEntry(tab: .optimizer, title: "Calm endless animations", keywords: ["optimizer", "animations", "gpu", "pulse"], highlightID: SettingsTab.optimizer.highlightID(for: "Calm endless animations")),
+            SettingsSearchEntry(tab: .optimizer, title: "Shrink the window when the notch closes", keywords: ["optimizer", "memory", "window", "gpu"], highlightID: SettingsTab.optimizer.highlightID(for: "Shrink the window when the notch closes")),
+            SettingsSearchEntry(tab: .optimizer, title: "Keep memory in check", keywords: ["optimizer", "memory", "ram", "cache"], highlightID: SettingsTab.optimizer.highlightID(for: "Keep memory in check")),
             SettingsSearchEntry(tab: .productivity, title: "Track where my time goes", keywords: ["time tracking", "hours", "apps", "screen time", "rescuetime", "productivity"], highlightID: SettingsTab.productivity.highlightID(for: "Track where my time goes")),
             SettingsSearchEntry(tab: .productivity, title: "Tell websites apart", keywords: ["browser", "sites", "youtube", "time tracking"], highlightID: SettingsTab.productivity.highlightID(for: "Tell websites apart")),
             SettingsSearchEntry(tab: .productivity, title: "Daily work goal", keywords: ["goal", "ring", "hours", "work"], highlightID: SettingsTab.productivity.highlightID(for: "Daily work goal")),
@@ -1080,6 +1092,10 @@ struct SettingsView: View {
         case .productivity:
             SettingsForm(tab: .productivity) {
                 ProductivitySettings()
+            }
+        case .optimizer:
+            SettingsForm(tab: .optimizer) {
+                OptimizerSettings()
             }
         case .agents:
             SettingsForm(tab: .agents) {

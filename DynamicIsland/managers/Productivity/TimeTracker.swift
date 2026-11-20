@@ -45,8 +45,10 @@ final class TimeTracker: ObservableObject {
     /// The Friday report, shown under the closed notch for a moment.
     @Published private(set) var weeklyReportReady = false
 
-    private let interval: TimeInterval = 5
-    private var timer: AnyCancellable?
+    private var timer: EnergyTimer?
+    /// The front window last asked about, to skip asking the browser again
+    /// while nothing changed (Optimizer: react to events).
+    private var lastProbe: (key: String, at: Date)?
     private var lastTick: Date?
     private var lastSave = Date()
     private var isAsleep = false
@@ -82,8 +84,10 @@ final class TimeTracker: ObservableObject {
         observers.append(NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.save() }
         })
-        timer = Timer.publish(every: interval, on: .main, in: .common).autoconnect()
-            .sink { [weak self] now in self?.tick(now: now) }
+        // Every 5 s, or 10 s batched; paused while the Mac is idle.
+        let timer = EnergyTimer(.timeTracking) { [weak self] in self?.tick(now: Date()) }
+        timer.start()
+        self.timer = timer
         Self.pruneOldLogs()
     }
 
@@ -93,16 +97,26 @@ final class TimeTracker: ObservableObject {
         rollOverIfNeeded(now: now)
         checkWeeklyReport(now: now)
         guard Defaults[.enableTimeTracking], !isAsleep else { lastTick = nil; return }
-        let elapsed = min(max(now.timeIntervalSince(lastTick ?? now), 0), interval * 2)
+        let interval = EnergyState.interval(.timeTracking)
+        let gap = max(now.timeIntervalSince(lastTick ?? now), 0)
+        // A long gap means sampling was paused (locked, asleep): count nothing for it.
+        let elapsed = gap > interval * 3 ? 0 : min(gap, interval * 2)
         lastTick = now
         guard elapsed > 0, let app = NSWorkspace.shared.frontmostApplication,
               let bundleID = app.bundleIdentifier else { return }
+        let windowTitle = Self.frontWindowTitle(of: app)
 
         // Browsers: ask for the tab's address (at most one request at a time).
+        // With "react to events", only when the window title changed (a new
+        // tab or page) or a minute passed.
         var host: String?
         if Defaults[.timeTrackingSites], let script = FocusGuardManager.browserScripts[bundleID] {
             host = lastHost?.bundleID == bundleID ? lastHost?.host : nil
-            if !probing {
+            let key = bundleID + "|" + (windowTitle ?? "")
+            let unchanged = EnergyState.switches.useEvents && lastProbe?.key == key
+                && now.timeIntervalSince(lastProbe?.at ?? .distantPast) < 60 && lastHost?.bundleID == bundleID
+            if !probing && !unchanged {
+                lastProbe = (key, now)
                 probing = true
                 Task { @MainActor [weak self] in
                     let address = try? await AppleScriptHelper.execute(script)?.stringValue
@@ -113,7 +127,7 @@ final class TimeTracker: ObservableObject {
             }
         }
         let sample = TimeSample(bundleID: bundleID, appName: app.localizedName ?? bundleID,
-                                windowTitle: Self.frontWindowTitle(of: app), host: host)
+                                windowTitle: windowTitle, host: host)
         let category = TimeTrackingPolicy.category(for: sample)
         let idle = CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: CGEventType(rawValue: ~0)!)
         guard TimeTrackingPolicy.shouldCount(idleSeconds: idle, category: category, locked: LockScreenManager.shared.isLocked) else { return }

@@ -46,12 +46,13 @@ struct MusicLyricsToggle: View {
 struct MusicLyricsPanel: View {
     @ObservedObject private var music = MusicManager.shared
     @ObservedObject private var appearance = NotchAppearanceModel.shared
+    @ObservedObject private var energy = EnergySaver.shared
 
     /// Extra height the Music tab takes while the panel is open.
     static let height: CGFloat = 64
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30, paused: !music.isPlaying)) { context in
+        TimelineView(.animation(minimumInterval: 1.0 / EnergyPolicy.lyricsFrameRate(switches: energy.switches, conditions: energy.conditions), paused: !music.isPlaying)) { context in
             let lines = music.syncedLyrics
             let position = LyricsKaraokePolicy.position(
                 timestamps: lines.map(\.timestamp),

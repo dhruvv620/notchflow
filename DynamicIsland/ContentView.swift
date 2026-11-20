@@ -1990,7 +1990,8 @@ struct ContentView: View {
                     }
                 }
 
-                try? await Task.sleep(for: .milliseconds(50))
+                // Every 50 ms; the Optimizer slows it, and waits longer while the mouse is still.
+                try? await Task.sleep(for: .seconds(EnergyState.hoverDelay))
             }
 
             self.hiddenEdgeHoverPollingTask = nil

@@ -45,6 +45,10 @@ jobs:
         run: |
           swiftc -swift-version 5 -parse-as-library DynamicIsland/helpers/AgentHookPolicy.swift DynamicIsland/helpers/AgentTranscriptPolicy.swift tests/AgentTranscriptRegression.swift -o /tmp/agent-transcript-tests
           /tmp/agent-transcript-tests
+      - name: Check the Optimizer
+        run: |
+          swiftc -swift-version 5 -parse-as-library DynamicIsland/helpers/EnergyPolicy.swift tests/EnergyRegression.swift -o /tmp/energy-tests
+          /tmp/energy-tests
       - name: Check time tracking, promises and workspaces
         run: |
           swiftc -swift-version 5 -parse-as-library DynamicIsland/helpers/TimeTrackingPolicy.swift tests/TimeTrackingRegression.swift -o /tmp/time-tracking-tests

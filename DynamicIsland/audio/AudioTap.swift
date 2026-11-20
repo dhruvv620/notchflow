@@ -156,6 +156,8 @@ class AudioTap: NSObject {
     }
 
     func startCapture() async {
+        // The Optimizer's battery saver turns the live visualizer off.
+        guard EnergyState.allowsVisualizer else { return }
         await withCheckedContinuation { continuation in
             audioQueue.async { [weak self] in
                 self?.startCaptureSync()
@@ -293,6 +295,7 @@ class AudioTap: NSObject {
     }
 
     func restartCapture() {
+        guard EnergyState.allowsVisualizer else { return }
         // Cancel any pending restart
         pendingRestartWorkItem?.cancel()
         

@@ -67,6 +67,12 @@ printf '\nChecking Cuely voice following...\n'
     "$SOURCE_DIR/tests/CuelyVoiceFollowRegression.swift" -o "$BUILD_ROOT/CuelyVoiceFollowRegression"
 "$BUILD_ROOT/CuelyVoiceFollowRegression"
 
+printf '\nChecking the Optimizer...\n'
+/usr/bin/xcrun swiftc -swift-version 5 -parse-as-library \
+    "$SOURCE_DIR/DynamicIsland/helpers/EnergyPolicy.swift" \
+    "$SOURCE_DIR/tests/EnergyRegression.swift" -o "$BUILD_ROOT/EnergyRegression"
+"$BUILD_ROOT/EnergyRegression"
+
 printf '\nChecking time tracking, promises and workspaces...\n'
 /usr/bin/xcrun swiftc -swift-version 5 -parse-as-library \
     "$SOURCE_DIR/DynamicIsland/helpers/TimeTrackingPolicy.swift" \
