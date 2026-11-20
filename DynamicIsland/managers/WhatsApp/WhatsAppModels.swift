@@ -22,7 +22,8 @@ import Foundation
 // MARK: - Domain models shown in the notch
 
 struct WhatsAppChat: Identifiable, Equatable {
-    /// The chat JID, e.g. `628123456789@s.whatsapp.net` or `1203630...@g.us`.
+    /// The chat JID, e.g. `628123456789@s.whatsapp.net` or `1203630...@g.us`;
+    /// for the second account, scoped (see `WhatsAppAccountSlot.scope`).
     let id: String
     var name: String
     var lastMessageTime: Date?
@@ -47,7 +48,7 @@ struct WhatsAppChat: Identifiable, Equatable {
 
 struct WhatsAppMessage: Identifiable, Equatable {
     let id: String
-    let chatJID: String
+    var chatJID: String
     let senderJID: String
     var senderName: String
     var text: String
@@ -130,30 +131,75 @@ enum WhatsAppConnectionState: Equatable {
     }
 }
 
+// MARK: - Accounts
+
+/// The WhatsApp accounts NotchFlow can link (say, business and personal),
+/// each a slot in the one gateway.
+enum WhatsAppAccountSlot: String, CaseIterable, Sendable {
+    case primary = "notchflow"
+    case second = "notchflow-2"
+
+    /// A chat's id in NotchFlow. The first account's chats keep their bare
+    /// JIDs, so everything saved before a second account existed still
+    /// matches; the second account's are "notchflow-2|<jid>", because the
+    /// same person can chat with both accounts.
+    func scope(_ jid: String) -> String {
+        let bare = WhatsAppJID.bare(jid)
+        return self == .primary ? bare : rawValue + WhatsAppJID.scopeSeparator + bare
+    }
+
+    /// The account a chat id belongs to.
+    static func of(_ chatID: String) -> WhatsAppAccountSlot {
+        guard let range = chatID.range(of: WhatsAppJID.scopeSeparator) else { return .primary }
+        return WhatsAppAccountSlot(rawValue: String(chatID[..<range.lowerBound])) ?? .primary
+    }
+
+    /// Which account a webhook event is for: the slot it names, else the
+    /// account it was received on, else the first.
+    static func forEvent(sessionID: String?, deviceJID: String?, accounts: [WhatsAppAccountSlot: String]) -> WhatsAppAccountSlot {
+        if let sessionID, let slot = WhatsAppAccountSlot(rawValue: sessionID) { return slot }
+        if let deviceJID, let match = allCases.first(where: { WhatsAppJID.sameUser(accounts[$0] ?? "", deviceJID) }) {
+            return match
+        }
+        return .primary
+    }
+}
+
 // MARK: - JID helpers
 
 enum WhatsAppJID {
-    static func isGroup(_ jid: String) -> Bool { jid.hasSuffix("@g.us") }
+    static let scopeSeparator = "|"
+
+    /// The JID without the account scope: `notchflow-2|628123@s.whatsapp.net` -> `628123@s.whatsapp.net`.
+    static func bare(_ id: String) -> String {
+        guard let range = id.range(of: scopeSeparator) else { return id }
+        return String(id[range.upperBound...])
+    }
+
+    static func isGroup(_ jid: String) -> Bool { bare(jid).hasSuffix("@g.us") }
 
     static func isPersonal(_ jid: String) -> Bool {
-        jid.hasSuffix("@s.whatsapp.net") || jid.hasSuffix("@lid")
+        let jid = bare(jid)
+        return jid.hasSuffix("@s.whatsapp.net") || jid.hasSuffix("@lid")
     }
 
     /// Chats that are not conversations a person reads: status updates,
     /// newsletters (channels) and broadcast lists.
     static func isHidden(_ jid: String) -> Bool {
-        jid == "status@broadcast" || jid.hasSuffix("@newsletter") || jid.hasSuffix("@broadcast")
+        let jid = bare(jid)
+        return jid == "status@broadcast" || jid.hasSuffix("@newsletter") || jid.hasSuffix("@broadcast")
     }
 
     /// The user part of a JID without the device suffix: `628123:12@s.whatsapp.net` -> `628123`.
     static func user(_ jid: String) -> String {
+        let jid = bare(jid)
         let local = jid.split(separator: "@").first.map(String.init) ?? jid
         return local.split(separator: ":").first.map(String.init) ?? local
     }
 
     static func displayNumber(_ jid: String) -> String {
         let user = user(jid)
-        guard isPersonal(jid), jid.hasSuffix("@s.whatsapp.net"), user.allSatisfy(\.isNumber) else { return user }
+        guard isPersonal(jid), bare(jid).hasSuffix("@s.whatsapp.net"), user.allSatisfy(\.isNumber) else { return user }
         return "+" + user
     }
 
@@ -383,12 +429,18 @@ struct GOWAIgnored: Decodable {
 struct WhatsAppWebhookEvent {
     let event: String
     let payload: [String: Any]
+    /// The gateway slot that received it (NotchFlow's account slot).
+    let sessionID: String?
+    /// The account (JID) that received it.
+    let deviceJID: String?
 
     init?(data: Data) {
         guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let event = object["event"] as? String else { return nil }
         self.event = event
         self.payload = object["payload"] as? [String: Any] ?? [:]
+        sessionID = (object["session_id"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+        deviceJID = (object["device_id"] as? String).flatMap { $0.isEmpty ? nil : $0 }
     }
 
     func string(_ key: String) -> String? {

@@ -1019,6 +1019,12 @@ extension Defaults.Keys {
     static let whatsAppLastRead = Key<[String: Double]>("whatsAppLastRead", default: [:])
     /// When the account was linked. Messages older than this never count as unread.
     static let whatsAppLinkedAt = Key<Double>("whatsAppLinkedAt", default: 0)
+    /// A second WhatsApp account (say, personal next to business) is set up.
+    static let whatsAppSecondAccountEnabled = Key<Bool>("whatsAppSecondAccountEnabled", default: false)
+    /// When the second account was linked.
+    static let whatsAppSecondLinkedAt = Key<Double>("whatsAppSecondLinkedAt", default: 0)
+    /// Names you gave the accounts, by slot ("Business", "Personal").
+    static let whatsAppAccountNames = Key<[String: String]>("whatsAppAccountNames", default: [:])
     
     // MARK: Timer Feature
     static let enableTimerFeature = Key<Bool>("enableTimerFeature", default: true)

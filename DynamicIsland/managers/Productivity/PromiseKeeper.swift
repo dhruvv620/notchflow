@@ -289,7 +289,7 @@ final class PromiseKeeper: ObservableObject {
 
     func canSendFollowUp(_ promise: TrackedPromise) -> Bool {
         switch promise.route {
-        case .whatsapp: return WhatsAppManager.shared.state.isConnected
+        case .whatsapp(let chat): return WhatsAppManager.shared.canSend(to: chat)
         case .messages: return true
         case .none: return false
         }

@@ -185,6 +185,11 @@ struct WhatsAppGatewayClient {
         try await call("/devices", method: "POST", body: ["device_id": deviceID], scoped: false)
     }
 
+    /// Removes this slot from the gateway (after logging it out).
+    func removeDevice() async throws {
+        try await call("/devices/\(Self.pathComponent(deviceID))", method: "DELETE", scoped: false)
+    }
+
     func status() async throws -> GOWAStatusResults {
         try await get("/app/status")
     }

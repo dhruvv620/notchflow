@@ -973,6 +973,7 @@ struct SettingsView: View {
             SettingsSearchEntry(tab: .whatsapp, title: "Show my WhatsApp messages", keywords: ["whatsapp", "messages", "chat", "reply", "qr", "link"], highlightID: SettingsTab.whatsapp.highlightID(for: "Show my WhatsApp messages")),
             SettingsSearchEntry(tab: .whatsapp, title: "Mute groups", keywords: ["whatsapp", "groups", "mute", "mention"], highlightID: SettingsTab.whatsapp.highlightID(for: "Mute groups")),
             SettingsSearchEntry(tab: .whatsapp, title: "Mark as read when I open a conversation", keywords: ["whatsapp", "read receipts", "blue ticks"], highlightID: SettingsTab.whatsapp.highlightID(for: "Mark as read when I open a conversation")),
+            SettingsSearchEntry(tab: .whatsapp, title: "Another account", keywords: ["whatsapp", "second account", "personal", "business", "two accounts", "multiple"], highlightID: SettingsTab.whatsapp.highlightID(for: "Another account")),
             SettingsSearchEntry(tab: .terminal, title: "Shell path", keywords: ["shell", "zsh", "bash", "terminal"], highlightID: SettingsTab.terminal.highlightID(for: "Shell path")),
             SettingsSearchEntry(tab: .terminal, title: "Font size", keywords: ["terminal", "font", "text size"], highlightID: SettingsTab.terminal.highlightID(for: "Font size")),
             SettingsSearchEntry(tab: .terminal, title: "Terminal opacity", keywords: ["terminal", "opacity", "transparency", "blur", "background"], highlightID: SettingsTab.terminal.highlightID(for: "Terminal opacity")),

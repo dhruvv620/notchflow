@@ -37,7 +37,7 @@ Only for features you turn on, and only to the service that feature needs:
 - **Promise keeper, Understand any language** (off by default): the same AI provider, with messages that contain a word hinting at a promise or a time, a few at a time and at most 300 a day. Other messages stay on your Mac.
 - **Screen assistant**: the AI provider you chose, with what you ask and the screenshot you take.
 - **Build watcher**: GitHub, with your token, for the repositories you list.
-- **WhatsApp**: the GOWA gateway runs on your Mac and talks to WhatsApp for your linked account.
+- **WhatsApp**: the GOWA gateway runs on your Mac and talks to WhatsApp for your linked account (or both, when you add a second one in Settings > WhatsApp; each is a separate linked device on its phone).
 - **LLM usage**: model prices from NotchFlow's repository, and the usage pages of the AI tools you connect.
 - **AI agents**: the bridge listens on this Mac only (127.0.0.1) and checks a token only your account can read.
 

@@ -140,7 +140,7 @@ private struct WhatsAppChatListColumn: View {
                 ScrollView(.vertical, showsIndicators: false) {
                     LazyVStack(spacing: 3) {
                         ForEach(manager.visibleChats) { chat in
-                            WhatsAppChatRow(chat: chat, isSelected: manager.selectedChatID == chat.id) {
+                            WhatsAppChatRow(chat: chat, accountLabel: manager.accountLabel(for: chat.id), isSelected: manager.selectedChatID == chat.id) {
                                 manager.openChat(chat.id)
                             }
                             .contextMenu {
@@ -168,6 +168,8 @@ private struct WhatsAppChatListColumn: View {
 
 private struct WhatsAppChatRow: View {
     let chat: WhatsAppChat
+    /// Which account it's on, when two are linked.
+    var accountLabel: String? = nil
     let isSelected: Bool
     let action: () -> Void
     @State private var isHovering = false
@@ -181,6 +183,9 @@ private struct WhatsAppChatRow: View {
                         Text(chat.displayName)
                             .font(.system(size: 12, weight: chat.unreadCount > 0 ? .semibold : .medium))
                             .lineLimit(1)
+                        if let accountLabel {
+                            WhatsAppAccountTag(label: accountLabel)
+                        }
                         Spacer(minLength: 2)
                         if let time = chat.lastMessageTime {
                             Text(WhatsAppTimeFormatter.short(time))
@@ -311,9 +316,14 @@ private struct WhatsAppConversationColumn: View {
 
             WhatsAppAvatar(initial: chat.initial, isGroup: chat.isGroup, size: 22)
             VStack(alignment: .leading, spacing: 0) {
-                Text(chat.displayName)
-                    .font(.system(size: 12, weight: .semibold))
-                    .lineLimit(1)
+                HStack(spacing: 4) {
+                    Text(chat.displayName)
+                        .font(.system(size: 12, weight: .semibold))
+                        .lineLimit(1)
+                    if let label = manager.accountLabel(for: chat.id) {
+                        WhatsAppAccountTag(label: label)
+                    }
+                }
                 if !chat.isGroup, chat.displayName != WhatsAppJID.displayNumber(chat.id) {
                     Text(WhatsAppJID.displayNumber(chat.id))
                         .font(.system(size: 10))
@@ -377,7 +387,7 @@ private struct WhatsAppConversationColumn: View {
                 placeholder: "Reply to \(chat.displayName)",
                 text: $draft,
                 isSending: isSending,
-                isEnabled: manager.state.isConnected,
+                isEnabled: manager.canSend(to: chat.id),
                 onSend: { send(to: chat.id) },
                 isFocused: $isReplyFocused
             )
@@ -399,7 +409,8 @@ private struct WhatsAppConversationColumn: View {
     }
 
     private var canSend: Bool {
-        !isSending && manager.state.isConnected && !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        !isSending && (manager.selectedChatID.map(manager.canSend(to:)) ?? false)
+            && !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     private func send(to chatID: String) {
@@ -481,5 +492,21 @@ private struct WhatsAppPlaceholder: View {
                 NotchPillButton(title: "Open Settings", symbol: "gear", prominent: true, action: action)
             }
         }
+    }
+}
+
+/// The account a chat is on (Business, Personal), when two are linked.
+struct WhatsAppAccountTag: View {
+    let label: String
+
+    var body: some View {
+        Text(label)
+            .font(.system(size: 9, weight: .semibold))
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .padding(.horizontal, 5)
+            .padding(.vertical, 1)
+            .background(Color.white.opacity(0.1), in: Capsule())
+            .fixedSize()
     }
 }

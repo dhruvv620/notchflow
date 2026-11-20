@@ -60,7 +60,12 @@ final class WhatsAppManager: ObservableObject {
     @Published private(set) var lastSendError: String?
     /// True once a webhook delivery has arrived, i.e. new messages show up at once.
     @Published private(set) var receivesLiveUpdates = false
-    @Published private(set) var accountJID: String = ""
+    /// Each account's own link state (waiting for a scan, connected,
+    /// reconnecting) and number. `state` sums them up: connected when any is.
+    @Published private(set) var linkStates: [WhatsAppAccountSlot: WhatsAppConnectionState] = [:]
+    @Published private(set) var accountJIDs: [WhatsAppAccountSlot: String] = [:]
+    /// The account the QR code on screen is for.
+    @Published private(set) var linkingSlot: WhatsAppAccountSlot?
 
     /// Set by the notch tab while it is on screen.
     var isTabVisible = false
@@ -79,13 +84,52 @@ final class WhatsAppManager: ObservableObject {
         return latestVersion.compare(installedVersion, options: .numeric) == .orderedDescending
     }
 
-    var accountPhone: String { WhatsAppJID.displayNumber(accountJID) }
+    var accountPhone: String { phone(for: .primary) }
+
+    func phone(for slot: WhatsAppAccountSlot) -> String { WhatsAppJID.displayNumber(accountJIDs[slot] ?? "") }
+
+    /// The accounts in use: the first, and the second once you add it.
+    var activeSlots: [WhatsAppAccountSlot] {
+        Defaults[.whatsAppSecondAccountEnabled] ? [.primary, .second] : [.primary]
+    }
+
+    /// One account's own state: its link state while the gateway runs, else the gateway's.
+    func linkState(for slot: WhatsAppAccountSlot) -> WhatsAppConnectionState {
+        if gateway != nil, let own = linkStates[slot] { return own }
+        // Not heard from yet: the gateway's own state (starting, failed…), or waiting for a scan.
+        return state.isLinked || state == .waitingForLink ? .waitingForLink : state
+    }
+
+    /// Both accounts linked: chats are labelled with the account's name.
+    var hasTwoLinkedAccounts: Bool {
+        activeSlots.count > 1 && activeSlots.allSatisfy { linkStates[$0]?.isLinked == true }
+    }
+
+    func accountName(_ slot: WhatsAppAccountSlot) -> String {
+        let name = (Defaults[.whatsAppAccountNames][slot.rawValue] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if !name.isEmpty { return name }
+        return slot == .primary ? String(localized: "Account 1") : String(localized: "Account 2")
+    }
+
+    func setAccountName(_ name: String, for slot: WhatsAppAccountSlot) {
+        var names = Defaults[.whatsAppAccountNames]
+        names[slot.rawValue] = name
+        Defaults[.whatsAppAccountNames] = names
+        objectWillChange.send()
+    }
+
+    /// The account label to show beside a chat, when two accounts are linked.
+    func accountLabel(for chatID: String) -> String? {
+        hasTwoLinkedAccounts ? accountName(WhatsAppAccountSlot.of(chatID)) : nil
+    }
+
+    /// Whether a message can go out to this chat right now.
+    func canSend(to chatID: String) -> Bool {
+        linkStates[WhatsAppAccountSlot.of(chatID)]?.isConnected == true
+    }
 
     // MARK: Private state
 
-    /// The slot NotchFlow uses inside the gateway. GOWA supports several accounts
-    /// per process; NotchFlow links exactly one.
-    private let deviceID = "notchflow"
     private let username = "notchflow"
     private static let deviceName = "NotchFlow"
     /// Messages kept in memory per chat.
@@ -94,23 +138,35 @@ final class WhatsAppManager: ObservableObject {
     /// for previews and unread counts.
     private static let summarizedChatCount = 25
 
-    private var client: WhatsAppGatewayClient?
+    /// The running gateway's address and this launch's password.
+    private var gateway: (url: URL, password: String)?
     private let process = WhatsAppGatewayProcess()
     private var webhook: WhatsAppWebhookServer?
 
     private var monitorTask: Task<Void, Never>?
     private var linkTask: Task<Void, Never>?
+    /// The current QR session, so a cancelled one doesn't tidy up the next.
+    private var linkToken = UUID()
     private var bannerTask: Task<Void, Never>?
     private var scheduledChatRefresh: Task<Void, Never>?
     private var restartTask: Task<Void, Never>?
     private var cancellables = Set<AnyCancellable>()
 
     private var lastFullRefresh: Date = .distantPast
-    private var lastReconnectAttempt: Date = .distantPast
+    private var lastReconnectAttempt: [WhatsAppAccountSlot: Date] = [:]
     private var unexpectedExitCount = 0
     private var started = false
 
     private init() {}
+
+    /// The gateway client for one account (its slot rides along on every request).
+    private func client(for slot: WhatsAppAccountSlot) -> WhatsAppGatewayClient? {
+        guard let gateway else { return nil }
+        return WhatsAppGatewayClient(baseURL: gateway.url, username: username, password: gateway.password, deviceID: slot.rawValue)
+    }
+
+    /// The first account's client, for calls about the gateway itself.
+    private var client: WhatsAppGatewayClient? { client(for: .primary) }
 
     // MARK: Lifecycle
 
@@ -198,13 +254,8 @@ final class WhatsAppManager: ObservableObject {
             return
         }
 
-        let client = WhatsAppGatewayClient(
-            baseURL: URL(string: "http://127.0.0.1:\(apiPort)")!,
-            username: username,
-            password: password,
-            deviceID: deviceID
-        )
-        self.client = client
+        gateway = (URL(string: "http://127.0.0.1:\(apiPort)")!, password)
+        guard let client else { return }
 
         // The gateway opens its database and connects before it serves HTTP.
         var info: GOWAAppInfo?
@@ -216,8 +267,8 @@ final class WhatsAppManager: ObservableObject {
             }
             try? await Task.sleep(nanoseconds: 500_000_000)
         }
-        guard info != nil, self.client != nil else {
-            if self.client != nil {
+        guard info != nil, gateway != nil else {
+            if gateway != nil {
                 shutdownGateway()
                 fail(String(localized: "The gateway did not respond. Its log is in Application Support › NotchFlow › WhatsAppGateway."))
             }
@@ -233,8 +284,8 @@ final class WhatsAppManager: ObservableObject {
 
         do {
             let devices = try await client.devices()
-            if !devices.contains(where: { $0.id == deviceID }) {
-                try await client.createDevice()
+            for slot in activeSlots where !devices.contains(where: { $0.id == slot.rawValue }) {
+                try await self.client(for: slot)?.createDevice()
             }
         } catch {
             shutdownGateway()
@@ -259,15 +310,18 @@ final class WhatsAppManager: ObservableObject {
         process.stop()
         webhook?.stop()
         webhook = nil
-        client = nil
+        gateway = nil
+        linkStates = [:]
         receivesLiveUpdates = false
         isLinking = false
+        linkingSlot = nil
         qrImage = nil
         qrExpiresAt = nil
     }
 
     private func gatewayExited(status: Int32) {
-        client = nil
+        gateway = nil
+        linkStates = [:]
         webhook?.stop()
         webhook = nil
         monitorTask?.cancel()
@@ -311,33 +365,40 @@ final class WhatsAppManager: ObservableObject {
     // MARK: Status and linking
 
     func refreshStatus() async {
-        guard let client else { return }
+        for slot in activeSlots {
+            await refreshStatus(slot)
+        }
+        recomputeState()
+    }
+
+    private func refreshStatus(_ slot: WhatsAppAccountSlot) async {
+        guard let client = self.client(for: slot) else { return }
         do {
             let status = try await client.status()
             let jid = status.jid ?? ""
             let loggedIn = status.isLoggedIn ?? false
             let linked = loggedIn || !jid.isEmpty
             guard linked else {
-                accountJID = ""
-                if state != .waitingForLink { state = .waitingForLink }
+                accountJIDs[slot] = nil
+                if linkStates[slot] != .waitingForLink { linkStates[slot] = .waitingForLink }
                 return
             }
 
-            let wasLinked = state.isLinked
-            if !jid.isEmpty { accountJID = jid }
-            let phone = WhatsAppJID.displayNumber(accountJID)
+            let wasLinked = linkStates[slot]?.isLinked ?? false
+            if !jid.isEmpty { accountJIDs[slot] = jid }
+            let phone = self.phone(for: slot)
             if loggedIn && (status.isConnected ?? false) {
-                state = .connected(phone: phone)
+                if linkStates[slot] != .connected(phone: phone) { linkStates[slot] = .connected(phone: phone) }
                 unexpectedExitCount = 0
             } else {
-                state = .reconnecting(phone: phone)
-                if Date().timeIntervalSince(lastReconnectAttempt) > 30 {
-                    lastReconnectAttempt = Date()
+                linkStates[slot] = .reconnecting(phone: phone)
+                if Date().timeIntervalSince(lastReconnectAttempt[slot] ?? .distantPast) > 30 {
+                    lastReconnectAttempt[slot] = Date()
                     try? await client.reconnect()
                 }
             }
             if !wasLinked {
-                didLink()
+                didLink(slot)
             }
         } catch WhatsAppGatewayError.notRunning {
             // The exit handler restarts the gateway.
@@ -346,26 +407,55 @@ final class WhatsAppManager: ObservableObject {
         }
     }
 
+    /// The overall state from the accounts': connected when any account is,
+    /// so everything that sends or lists chats works with either.
+    private func recomputeState() {
+        guard gateway != nil else { return }
+        let linked = activeSlots.filter { linkStates[$0]?.isLinked == true }
+        let next: WhatsAppConnectionState
+        if let connected = linked.first(where: { linkStates[$0]?.isConnected == true }) {
+            next = .connected(phone: phone(for: connected))
+        } else if let first = linked.first {
+            next = .reconnecting(phone: phone(for: first))
+        } else if activeSlots.contains(where: { linkStates[$0] != nil }) {
+            next = .waitingForLink
+        } else {
+            return
+        }
+        if state != next { state = next }
+    }
+
     /// Shows a QR code to scan from WhatsApp › Settings › Linked devices on
-    /// the phone. Codes expire, so a fresh one is requested until the scan
-    /// succeeds or a few minutes pass.
-    func beginLinking() {
-        guard client != nil, !state.isLinked else { return }
+    /// the phone of the account being linked. Codes expire, so a fresh one
+    /// is requested until the scan succeeds or a few minutes pass.
+    func beginLinking(_ slot: WhatsAppAccountSlot = .primary) {
+        guard gateway != nil, linkStates[slot]?.isLinked != true else { return }
         linkTask?.cancel()
         isLinking = true
+        linkingSlot = slot
+        qrImage = nil
         lastError = nil
+        let token = UUID()
+        linkToken = token
 
         linkTask = Task { [weak self] in
             guard let self else { return }
             defer {
-                self.isLinking = false
-                self.qrImage = nil
-                self.qrExpiresAt = nil
+                if self.linkToken == token {
+                    self.isLinking = false
+                    self.linkingSlot = nil
+                    self.qrImage = nil
+                    self.qrExpiresAt = nil
+                }
+            }
+            func linked() async -> Bool {
+                await self.refreshStatus(slot)
+                self.recomputeState()
+                return self.linkStates[slot]?.isLinked == true
             }
             for _ in 0..<6 {
-                guard !Task.isCancelled, let client = self.client else { return }
-                await self.refreshStatus()
-                if self.state.isLinked { return }
+                guard !Task.isCancelled, let client = self.client(for: slot) else { return }
+                if await linked() { return }
                 do {
                     let login = try await client.login()
                     if let link = login.qrLink, let data = try? await client.qrImageData(link: link) {
@@ -377,12 +467,11 @@ final class WhatsAppManager: ObservableObject {
                     while Date() < deadline {
                         try? await Task.sleep(nanoseconds: 2 * NSEC_PER_SEC)
                         if Task.isCancelled { return }
-                        await self.refreshStatus()
-                        if self.state.isLinked { return }
+                        if await linked() { return }
                     }
                 } catch let error as WhatsAppGatewayError where error.code == "ALREADY_LOGGED_IN" || error.code == "SESSION_SAVED_ERROR" {
                     try? await Task.sleep(nanoseconds: 2 * NSEC_PER_SEC)
-                    await self.refreshStatus()
+                    _ = await linked()
                     return
                 } catch {
                     if !Task.isCancelled { self.lastError = error.localizedDescription }
@@ -397,27 +486,65 @@ final class WhatsAppManager: ObservableObject {
         linkTask = nil
     }
 
-    private func didLink() {
-        linkTask?.cancel()
-        linkTask = nil
-        if Defaults[.whatsAppLinkedAt] == 0 {
-            Defaults[.whatsAppLinkedAt] = Date().timeIntervalSince1970
+    /// Adds a second account (say, personal next to business) and shows its QR code.
+    func addSecondAccount() async {
+        Defaults[.whatsAppSecondAccountEnabled] = true
+        objectWillChange.send()
+        guard let client = self.client(for: .second) else { return }
+        do {
+            let devices = try await client.devices()
+            if !devices.contains(where: { $0.id == WhatsAppAccountSlot.second.rawValue }) {
+                try await client.createDevice()
+            }
+        } catch {
+            lastError = error.localizedDescription
+            return
+        }
+        await refreshStatus(.second)
+        recomputeState()
+        beginLinking(.second)
+    }
+
+    private static func linkedAtKey(_ slot: WhatsAppAccountSlot) -> Defaults.Key<Double> {
+        slot == .primary ? .whatsAppLinkedAt : .whatsAppSecondLinkedAt
+    }
+
+    private func didLink(_ slot: WhatsAppAccountSlot) {
+        if linkingSlot == slot {
+            linkTask?.cancel()
+            linkTask = nil
+        }
+        if Defaults[Self.linkedAtKey(slot)] == 0 {
+            Defaults[Self.linkedAtKey(slot)] = Date().timeIntervalSince1970
         }
         Task { await refreshChats() }
     }
 
-    /// Logs the account out of the gateway, which also removes "NotchFlow" from
-    /// the phone's linked devices.
-    func unlink() async {
+    /// Logs an account out of the gateway, which also removes "NotchFlow"
+    /// from that phone's linked devices. The second account is removed
+    /// altogether.
+    func unlink(_ slot: WhatsAppAccountSlot = .primary) async {
         cancelLinking()
+        let client = self.client(for: slot)
         if let client {
             try? await client.logout()
         }
-        clearConversations()
-        Defaults[.whatsAppLastRead] = [:]
-        Defaults[.whatsAppLinkedAt] = 0
-        accountJID = ""
+        forget(slot)
+        if slot == .second {
+            try? await client?.removeDevice()
+            Defaults[.whatsAppSecondAccountEnabled] = false
+            Defaults[.whatsAppAccountNames][slot.rawValue] = nil
+            linkStates[slot] = nil
+        }
         await refreshStatus()
+    }
+
+    /// Drops what NotchFlow knows of one account's chats.
+    private func forget(_ slot: WhatsAppAccountSlot) {
+        clearConversations(of: slot)
+        Defaults[.whatsAppLastRead] = Defaults[.whatsAppLastRead].filter { WhatsAppAccountSlot.of($0.key) != slot }
+        Defaults[Self.linkedAtKey(slot)] = 0
+        accountJIDs[slot] = nil
     }
 
     private func clearConversations() {
@@ -426,6 +553,15 @@ final class WhatsAppManager: ObservableObject {
         selectedChatID = nil
         banner = nil
         loadingChatIDs = []
+    }
+
+    private func clearConversations(of slot: WhatsAppAccountSlot) {
+        func mine(_ id: String) -> Bool { WhatsAppAccountSlot.of(id) == slot }
+        chats.removeAll { mine($0.id) }
+        messages = messages.filter { !mine($0.key) }
+        if let selectedChatID, mine(selectedChatID) { self.selectedChatID = nil }
+        if let banner, mine(banner.chatJID) { self.banner = nil }
+        loadingChatIDs = loadingChatIDs.filter { !mine($0) }
     }
 
     // MARK: Install and update
@@ -480,6 +616,7 @@ final class WhatsAppManager: ObservableObject {
 
     /// Unlinks, stops the gateway and deletes it along with its data.
     func removeGateway() async {
+        if Defaults[.whatsAppSecondAccountEnabled] { await unlink(.second) }
         await unlink()
         shutdownGateway()
         WhatsAppGatewayInstaller.uninstall()
@@ -492,20 +629,33 @@ final class WhatsAppManager: ObservableObject {
     // MARK: Chats
 
     func refreshChats() async {
-        guard let client, state.isLinked, !isRefreshingChats else { return }
+        let slots = activeSlots.filter { linkStates[$0]?.isLinked == true }
+        guard gateway != nil, !slots.isEmpty, !isRefreshingChats else { return }
         isRefreshingChats = true
         defer { isRefreshingChats = false }
 
-        do {
-            let remote = try await client.chats(limit: 40)
-            let previous = Dictionary(chats.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-            var updated: [WhatsAppChat] = []
-            var seen = Set<String>()
-            for item in remote where !WhatsAppJID.isHidden(item.jid) && seen.insert(item.jid).inserted {
-                let old = previous[item.jid]
+        let previous = Dictionary(chats.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        var updated: [WhatsAppChat] = []
+        var seen = Set<String>()
+        for slot in slots {
+            guard let client = self.client(for: slot) else { continue }
+            let remote: [GOWAChat]
+            do {
+                remote = try await client.chats(limit: 40)
+            } catch {
+                if let gatewayError = error as? WhatsAppGatewayError, case .notRunning = gatewayError { return }  // Restarted by the exit handler.
+                lastError = error.localizedDescription
+                // Keep what this account had rather than emptying its chats.
+                updated += chats.filter { WhatsAppAccountSlot.of($0.id) == slot && seen.insert($0.id).inserted }
+                continue
+            }
+            for item in remote where !WhatsAppJID.isHidden(item.jid) {
+                let id = slot.scope(item.jid)
+                guard seen.insert(id).inserted else { continue }
+                let old = previous[id]
                 let remoteName = item.name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
                 updated.append(WhatsAppChat(
-                    id: item.jid,
+                    id: id,
                     name: remoteName.isEmpty ? (old?.name ?? "") : remoteName,
                     lastMessageTime: WhatsAppDateParser.parse(item.lastMessageTime) ?? old?.lastMessageTime,
                     archived: item.archived ?? false,
@@ -515,29 +665,35 @@ final class WhatsAppManager: ObservableObject {
                     unreadCount: old?.unreadCount ?? 0
                 ))
             }
+        }
 
-            for chat in updated.prefix(Self.summarizedChatCount) {
-                let old = previous[chat.id]
-                if let old, old.lastMessageTime == chat.lastMessageTime, messages[chat.id] != nil { continue }
-                guard let recent = try? await client.messages(chatJID: chat.id, limit: 20) else { continue }
-                merge(recent.map { $0.toMessage(fallbackChatJID: chat.id) }, into: chat.id)
-            }
+        for chat in Self.sorted(updated).prefix(Self.summarizedChatCount * slots.count) {
+            let old = previous[chat.id]
+            if let old, old.lastMessageTime == chat.lastMessageTime, messages[chat.id] != nil { continue }
+            guard let client = self.client(for: WhatsAppAccountSlot.of(chat.id)),
+                  let recent = try? await client.messages(chatJID: WhatsAppJID.bare(chat.id), limit: 20) else { continue }
+            merge(Self.messages(recent, in: chat.id), into: chat.id)
+        }
 
-            // Chats that only exist locally (a webhook raced this refresh) are kept.
-            let remoteIDs = Set(updated.map(\.id))
-            for chat in chats where !remoteIDs.contains(chat.id) && chat.lastMessageTime.map({ Date().timeIntervalSince($0) < 600 }) == true {
-                updated.append(chat)
-            }
+        // Chats that only exist locally (a webhook raced this refresh) are kept.
+        let remoteIDs = Set(updated.map(\.id))
+        for chat in chats where !remoteIDs.contains(chat.id) && chat.lastMessageTime.map({ Date().timeIntervalSince($0) < 600 }) == true {
+            updated.append(chat)
+        }
 
-            for index in updated.indices {
-                summarize(&updated[index])
-            }
-            chats = Self.sorted(updated)
-            lastFullRefresh = Date()
-        } catch WhatsAppGatewayError.notRunning {
-            // Restarted by the exit handler.
-        } catch {
-            lastError = error.localizedDescription
+        for index in updated.indices {
+            summarize(&updated[index])
+        }
+        chats = Self.sorted(updated)
+        lastFullRefresh = Date()
+    }
+
+    /// The gateway's messages of a chat, filed under NotchFlow's id for it.
+    private static func messages(_ items: [GOWAMessage], in chatID: String) -> [WhatsAppMessage] {
+        items.map { item in
+            var message = item.toMessage(fallbackChatJID: WhatsAppJID.bare(chatID))
+            message.chatJID = chatID
+            return message
         }
     }
 
@@ -594,12 +750,12 @@ final class WhatsAppManager: ObservableObject {
     }
 
     func loadMessages(_ chatID: String) async {
-        guard let client, !loadingChatIDs.contains(chatID) else { return }
+        guard let client = self.client(for: WhatsAppAccountSlot.of(chatID)), !loadingChatIDs.contains(chatID) else { return }
         loadingChatIDs.insert(chatID)
         defer { loadingChatIDs.remove(chatID) }
         do {
-            let recent = try await client.messages(chatJID: chatID, limit: 50)
-            merge(recent.map { $0.toMessage(fallbackChatJID: chatID) }, into: chatID)
+            let recent = try await client.messages(chatJID: WhatsAppJID.bare(chatID), limit: 50)
+            merge(Self.messages(recent, in: chatID), into: chatID)
             resummarize(chatID)
         } catch {
             lastError = error.localizedDescription
@@ -611,9 +767,9 @@ final class WhatsAppManager: ObservableObject {
     func markChatRead(_ chatID: String) async {
         let unreadIDs = unreadIncomingMessages(in: chatID).map(\.id)
         markReadLocally(chatID, at: Date())
-        guard let client, !unreadIDs.isEmpty else { return }
+        guard let client = self.client(for: WhatsAppAccountSlot.of(chatID)), !unreadIDs.isEmpty else { return }
         for id in unreadIDs.suffix(20) {
-            try? await client.markRead(messageID: id, chatJID: chatID)
+            try? await client.markRead(messageID: id, chatJID: WhatsAppJID.bare(chatID))
         }
     }
 
@@ -621,8 +777,11 @@ final class WhatsAppManager: ObservableObject {
     func send(_ text: String, to chatID: String) async -> Bool {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return false }
-        guard let client, state.isConnected else {
-            lastSendError = String(localized: "WhatsApp is not connected right now.")
+        let slot = WhatsAppAccountSlot.of(chatID)
+        guard let client = self.client(for: slot), canSend(to: chatID) else {
+            lastSendError = hasTwoLinkedAccounts || slot == .second
+                ? String(localized: "\(accountName(slot)) on WhatsApp is not connected right now.")
+                : String(localized: "WhatsApp is not connected right now.")
             return false
         }
         lastSendError = nil
@@ -631,7 +790,7 @@ final class WhatsAppManager: ObservableObject {
         let pending = WhatsAppMessage(
             id: pendingID,
             chatJID: chatID,
-            senderJID: accountJID,
+            senderJID: accountJIDs[slot] ?? "",
             senderName: String(localized: "You"),
             text: trimmed,
             timestamp: Date(),
@@ -642,7 +801,7 @@ final class WhatsAppManager: ObservableObject {
         resummarize(chatID)
 
         do {
-            let sentID = try await client.sendText(to: chatID, text: trimmed)
+            let sentID = try await client.sendText(to: WhatsAppJID.bare(chatID), text: trimmed)
             replacePending(pendingID, in: chatID, with: sentID)
             PromiseKeeper.shared.observe(text: trimmed, fromMe: true, person: chat(id: chatID)?.displayName ?? "",
                                          route: .whatsapp(chatJID: chatID), sourceName: "WhatsApp", at: Date(),
@@ -650,7 +809,7 @@ final class WhatsAppManager: ObservableObject {
             markReadLocally(chatID, at: Date())
             // Replying means the messages before it were read.
             for id in unreadIDs.suffix(20) {
-                try? await client.markRead(messageID: id, chatJID: chatID)
+                try? await client.markRead(messageID: id, chatJID: WhatsAppJID.bare(chatID))
             }
             return true
         } catch {
@@ -664,14 +823,14 @@ final class WhatsAppManager: ObservableObject {
     /// Sends files from the Shelf (or anywhere) to a chat.
     @discardableResult
     func sendFiles(_ urls: [URL], to chatID: String) async -> Bool {
-        guard let client, state.isConnected else {
+        guard let client = self.client(for: WhatsAppAccountSlot.of(chatID)), canSend(to: chatID) else {
             lastSendError = String(localized: "WhatsApp is not connected right now.")
             return false
         }
         lastSendError = nil
         for url in urls {
             do {
-                _ = try await client.sendFile(to: chatID, fileURL: url)
+                _ = try await client.sendFile(to: WhatsAppJID.bare(chatID), fileURL: url)
             } catch {
                 lastSendError = error.localizedDescription
                 return false
@@ -729,43 +888,46 @@ final class WhatsAppManager: ObservableObject {
     private func handleWebhook(_ data: Data) {
         guard let event = WhatsAppWebhookEvent(data: data) else { return }
         receivesLiveUpdates = true
+        let slot = WhatsAppAccountSlot.forEvent(sessionID: event.sessionID, deviceJID: event.deviceJID, accounts: accountJIDs)
+        guard activeSlots.contains(slot) else { return }
+        /// A chat named in the event, as NotchFlow files it for this account.
+        func scopedChat(_ key: String) -> String? { event.string(key).map(slot.scope) }
 
         switch event.event {
         case "message":
-            handleMessageEvent(event)
+            handleMessageEvent(event, slot: slot)
         case "message.edited":
-            guard let chatID = event.string("chat_id"), let original = event.string("original_message_id") else { return }
+            guard let chatID = scopedChat("chat_id"), let original = event.string("original_message_id") else { return }
             updateMessage(original, in: chatID) { message in
                 message.text = event.string("body") ?? message.text
                 message.isEdited = true
             }
         case "message.revoked":
             guard let original = event.string("revoked_message_id") else { return }
-            let chatID = event.string("revoked_chat") ?? event.string("chat_id") ?? ""
+            let chatID = scopedChat("revoked_chat") ?? scopedChat("chat_id") ?? ""
             updateMessage(original, in: chatID) { message in
                 message.isRevoked = true
                 message.text = ""
             }
         case "message.deleted":
-            guard let chatID = event.string("chat_id"), let original = event.string("deleted_message_id") else { return }
+            guard let chatID = scopedChat("chat_id"), let original = event.string("deleted_message_id") else { return }
             removeMessage(original, in: chatID)
             resummarize(chatID)
         case "message.ack":
-            handleReceipt(event)
+            handleReceipt(event, slot: slot)
         case "device.logged_out":
-            clearConversations()
-            accountJID = ""
-            Defaults[.whatsAppLastRead] = [:]
-            Defaults[.whatsAppLinkedAt] = 0
-            state = .waitingForLink
+            forget(slot)
+            linkStates[slot] = .waitingForLink
+            recomputeState()
             Task { await refreshStatus() }
         default:
             break
         }
     }
 
-    private func handleMessageEvent(_ event: WhatsAppWebhookEvent) {
-        guard let message = event.message(), !WhatsAppJID.isHidden(message.chatJID) else { return }
+    private func handleMessageEvent(_ event: WhatsAppWebhookEvent, slot: WhatsAppAccountSlot) {
+        guard var message = event.message(), !WhatsAppJID.isHidden(message.chatJID) else { return }
+        message.chatJID = slot.scope(message.chatJID)
         // Protocol messages and types NotchFlow cannot describe carry no text and no media.
         guard !message.text.isEmpty || message.mediaType != nil else { return }
         let chatID = message.chatJID
@@ -822,18 +984,19 @@ final class WhatsAppManager: ObservableObject {
             NotificationHub.shared.ingestWhatsApp(
                 message,
                 chatName: chat(id: chatID)?.displayName ?? message.senderName,
-                isGroup: WhatsAppJID.isGroup(chatID)
+                isGroup: WhatsAppJID.isGroup(chatID),
+                account: accountLabel(for: chatID)
             )
         }
         if isTabVisible && selectedChatID == chatID && Defaults[.whatsAppMarkReadOnOpen] {
             Task { await markChatRead(chatID) }
             return
         }
-        showBanner(for: message, mentionsMe: mentionsMe(event))
+        showBanner(for: message, mentionsMe: mentionsMe(event, slot: slot))
     }
 
-    private func mentionsMe(_ event: WhatsAppWebhookEvent) -> Bool {
-        let me = WhatsAppJID.user(accountJID)
+    private func mentionsMe(_ event: WhatsAppWebhookEvent, slot: WhatsAppAccountSlot) -> Bool {
+        let me = WhatsAppJID.user(accountJIDs[slot] ?? "")
         guard !me.isEmpty else { return false }
         if event.strings("mentions").contains(where: { WhatsAppJID.user($0) == me }) { return true }
         if let quoted = event.string("replied_to_sender"), WhatsAppJID.user(quoted) == me { return true }
@@ -841,14 +1004,14 @@ final class WhatsAppManager: ObservableObject {
         return false
     }
 
-    private func handleReceipt(_ event: WhatsAppWebhookEvent) {
+    private func handleReceipt(_ event: WhatsAppWebhookEvent, slot: WhatsAppAccountSlot) {
         let type = event.string("receipt_type") ?? ""
         guard type == "read" || type == "read-self",
               let chatID = event.string("chat_id"),
               let from = event.string("from"),
-              WhatsAppJID.sameUser(from, accountJID) else { return }
+              WhatsAppJID.sameUser(from, accountJIDs[slot] ?? "") else { return }
         // The account read this chat on another device.
-        markReadLocally(chatID, at: Date())
+        markReadLocally(slot.scope(chatID), at: Date())
     }
 
     // MARK: Message cache
@@ -920,7 +1083,7 @@ final class WhatsAppManager: ObservableObject {
     // MARK: Read state
 
     private func readCutoff(for chatID: String) -> Date {
-        let linked = Defaults[.whatsAppLinkedAt]
+        let linked = Defaults[Self.linkedAtKey(WhatsAppAccountSlot.of(chatID))]
         let read = Defaults[.whatsAppLastRead][chatID] ?? 0
         return Date(timeIntervalSince1970: max(linked, read))
     }

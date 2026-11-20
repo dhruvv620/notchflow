@@ -27,7 +27,8 @@ struct WhatsAppSettings: View {
     @Default(.whatsAppShowIncomingMessages) private var showIncomingMessages
     @Default(.whatsAppIgnoredChats) private var ignoredChats
     @Default(.whatsAppIgnoredChatNames) private var ignoredChatNames
-    @State private var confirmUnlink = false
+    @Default(.whatsAppAccountNames) private var accountNames
+    @State private var unlinkSlot: WhatsAppAccountSlot?
     @State private var confirmRemove = false
 
     private func highlightID(_ title: String) -> String {
@@ -188,64 +189,121 @@ struct WhatsAppSettings: View {
         }
     }
 
-    // MARK: Account
+    // MARK: Accounts
 
     @ViewBuilder
     private var accountSection: some View {
-        switch manager.state {
-        case .connected, .reconnecting:
+        if manager.state.isLinked || manager.state == .waitingForLink {
             Section {
-                HStack(spacing: 8) {
-                    Circle()
-                        .fill(manager.state.isConnected ? Color.whatsAppGreen : Color.orange)
-                        .frame(width: 8, height: 8)
-                    Text(manager.state.isConnected
-                         ? String(localized: "Connected as \(manager.accountPhone)")
-                         : String(localized: "Reconnecting as \(manager.accountPhone)…"))
-                    Spacer()
-                    Button("Unlink", role: .destructive) {
-                        confirmUnlink = true
-                    }
+                ForEach(manager.activeSlots, id: \.self) { slot in
+                    accountRow(slot)
                 }
-                Text(manager.receivesLiveUpdates
-                     ? "Live: new messages arrive at once."
-                     : "New messages arrive within a minute until the first live update comes in.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                if manager.activeSlots.count == 1, manager.linkState(for: .primary).isLinked {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Another account")
+                            Text("Link a second WhatsApp, say your personal one next to business: its messages arrive here too, and replies go out from the notch.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Button("Add Account") {
+                            Task { await manager.addSecondAccount() }
+                        }
+                        .disabled(manager.isLinking)
+                    }
+                    .settingsHighlight(id: highlightID("Another account"))
+                }
+                if manager.state.isLinked {
+                    Text(manager.receivesLiveUpdates
+                         ? "Live: new messages arrive at once."
+                         : "New messages arrive within a minute until the first live update comes in.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             } header: {
-                Text("Account")
+                Text(manager.activeSlots.count > 1 ? "Accounts" : "Account")
+            } footer: {
+                if manager.activeSlots.count > 1 {
+                    Text("Each account uses one of its phone's linked-device slots, like WhatsApp Web. With both linked, chats show which account they're on.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
-            .confirmationDialog("Unlink WhatsApp from NotchFlow?", isPresented: $confirmUnlink) {
+            .confirmationDialog("Unlink this WhatsApp account from NotchFlow?",
+                                isPresented: Binding(get: { unlinkSlot != nil }, set: { if !$0 { unlinkSlot = nil } })) {
                 Button("Unlink", role: .destructive) {
-                    Task { await manager.unlink() }
+                    if let slot = unlinkSlot {
+                        Task { await manager.unlink(slot) }
+                    }
+                    unlinkSlot = nil
                 }
             } message: {
-                Text("NotchFlow is removed from your phone's linked devices. You can link it again by scanning a new QR code.")
+                Text("NotchFlow is removed from that phone's linked devices. You can link it again by scanning a new QR code.")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func accountRow(_ slot: WhatsAppAccountSlot) -> some View {
+        let state = manager.linkState(for: slot)
+        switch state {
+        case .connected, .reconnecting:
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(state.isConnected ? Color.whatsAppGreen : Color.orange)
+                    .frame(width: 8, height: 8)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(state.isConnected
+                         ? String(localized: "Connected as \(manager.phone(for: slot))")
+                         : String(localized: "Reconnecting as \(manager.phone(for: slot))…"))
+                    if manager.activeSlots.count > 1 {
+                        TextField("Name", text: nameBinding(slot), prompt: Text(slot == .primary ? "Business" : "Personal"))
+                            .textFieldStyle(.roundedBorder)
+                            .frame(maxWidth: 200)
+                    }
+                }
+                Spacer()
+                Button("Unlink", role: .destructive) {
+                    unlinkSlot = slot
+                }
             }
         case .waitingForLink:
-            Section {
-                linkingView
-            } header: {
-                Text("Link your account")
+            if slot == .second {
+                HStack {
+                    Text("Second account")
+                        .font(.headline)
+                    Spacer()
+                    Button("Remove") {
+                        Task { await manager.unlink(.second) }
+                    }
+                }
             }
+            linkingView(slot)
         default:
             EmptyView()
         }
     }
 
+    private func nameBinding(_ slot: WhatsAppAccountSlot) -> Binding<String> {
+        Binding(get: { accountNames[slot.rawValue] ?? "" },
+                set: { manager.setAccountName($0, for: slot) })
+    }
+
     @ViewBuilder
-    private var linkingView: some View {
+    private func linkingView(_ slot: WhatsAppAccountSlot) -> some View {
+        let isMine = manager.isLinking && manager.linkingSlot == slot
         HStack(alignment: .top, spacing: 16) {
             ZStack {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .fill(Color.white)
-                if let image = manager.qrImage {
+                if isMine, let image = manager.qrImage {
                     Image(nsImage: image)
                         .resizable()
                         .interpolation(.none)
                         .scaledToFit()
                         .padding(8)
-                } else if manager.isLinking {
+                } else if isMine {
                     ProgressView().controlSize(.small)
                 } else {
                     Image(systemName: "qrcode")
@@ -256,17 +314,17 @@ struct WhatsAppSettings: View {
             .frame(width: 180, height: 180)
 
             VStack(alignment: .leading, spacing: 8) {
-                Text("Scan with your phone")
+                Text(slot == .primary ? "Scan with your phone" : "Scan with the other account's phone")
                     .font(.headline)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("1. Open WhatsApp on your phone.")
+                    Text(slot == .primary ? "1. Open WhatsApp on your phone." : "1. Open WhatsApp of the account to add (on a phone with two WhatsApps, the other app).")
                     Text("2. Go to Settings › Linked devices.")
                     Text("3. Tap Link a device and point the camera at this code.")
                 }
                 .font(.callout)
                 .foregroundStyle(.secondary)
 
-                if manager.isLinking {
+                if isMine {
                     if let expiry = manager.qrExpiresAt {
                         TimelineView(.periodic(from: .now, by: 1)) { context in
                             let remaining = max(0, Int(expiry.timeIntervalSince(context.date)))
@@ -277,9 +335,10 @@ struct WhatsAppSettings: View {
                     }
                     Button("Cancel") { manager.cancelLinking() }
                 } else {
-                    Button("Show QR Code") { manager.beginLinking() }
+                    Button("Show QR Code") { manager.beginLinking(slot) }
                         .buttonStyle(.borderedProminent)
                         .tint(.whatsAppGreen)
+                        .disabled(manager.isLinking)
                 }
             }
             Spacer(minLength: 0)

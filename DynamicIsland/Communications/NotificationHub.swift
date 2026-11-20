@@ -270,7 +270,8 @@ final class NotificationHub: ObservableObject {
     }
 
     /// Called by the WhatsApp integration for each incoming message.
-    func ingestWhatsApp(_ message: WhatsAppMessage, chatName: String, isGroup: Bool) {
+    /// `account`: which WhatsApp it came in on, when two are linked.
+    func ingestWhatsApp(_ message: WhatsAppMessage, chatName: String, isGroup: Bool, account: String? = nil) {
         guard enabled, !message.isFromMe else { return }
         let sender = message.senderName.trimmingCharacters(in: .whitespacesAndNewlines)
         let title = isGroup && !sender.isEmpty ? "\(sender) · \(chatName)" : chatName
@@ -280,7 +281,7 @@ final class NotificationHub: ObservableObject {
             bundleIdentifier: "net.whatsapp.WhatsApp",
             appName: "WhatsApp",
             title: title,
-            subtitle: "",
+            subtitle: account ?? "",
             body: message.previewText,
             date: message.timestamp,
             threadID: message.chatJID,

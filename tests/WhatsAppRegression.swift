@@ -19,6 +19,26 @@ struct WhatsAppRegression {
         try require(WhatsAppJID.sameUser("628123:3@s.whatsapp.net", "628123@s.whatsapp.net"), "Same account on another device not matched")
         try require(!WhatsAppJID.sameUser("", "628123@s.whatsapp.net"), "Empty JID matched an account")
 
+        // Two accounts: the second account's chats are scoped, the first's stay bare
+        let second = WhatsAppAccountSlot.second.scope("628123@s.whatsapp.net")
+        try require(second == "notchflow-2|628123@s.whatsapp.net", "Scoped id: \(second)")
+        try require(WhatsAppAccountSlot.primary.scope("628123@s.whatsapp.net") == "628123@s.whatsapp.net", "First account stays bare")
+        try require(WhatsAppAccountSlot.second.scope(second) == second && WhatsAppAccountSlot.primary.scope(second) == "628123@s.whatsapp.net",
+                    "Rescoping")
+        try require(WhatsAppAccountSlot.of(second) == .second && WhatsAppAccountSlot.of("628123@s.whatsapp.net") == .primary, "Slot of a chat")
+        try require(WhatsAppJID.bare(second) == "628123@s.whatsapp.net" && WhatsAppJID.displayNumber(second) == "+628123"
+                    && WhatsAppJID.isGroup("notchflow-2|1203630@g.us") && WhatsAppJID.user(second) == "628123"
+                    && WhatsAppJID.isHidden("notchflow-2|status@broadcast"), "JID helpers on scoped ids")
+        let accounts: [WhatsAppAccountSlot: String] = [.primary: "911111:3@s.whatsapp.net", .second: "912222@s.whatsapp.net"]
+        try require(WhatsAppAccountSlot.forEvent(sessionID: "notchflow-2", deviceJID: nil, accounts: accounts) == .second
+                    && WhatsAppAccountSlot.forEvent(sessionID: nil, deviceJID: "912222:7@s.whatsapp.net", accounts: accounts) == .second
+                    && WhatsAppAccountSlot.forEvent(sessionID: nil, deviceJID: "911111@s.whatsapp.net", accounts: accounts) == .primary
+                    && WhatsAppAccountSlot.forEvent(sessionID: "912222@s.whatsapp.net", deviceJID: nil, accounts: accounts) == .primary,
+                    "Which account an event is for")
+        let event = WhatsAppWebhookEvent(data: Data(#"{"event":"message","device_id":"912222@s.whatsapp.net","session_id":"notchflow-2","payload":{"id":"M1","chat_id":"913333@s.whatsapp.net","from":"913333@s.whatsapp.net","body":"hi"}}"#.utf8))
+        try require(event?.sessionID == "notchflow-2" && event?.deviceJID == "912222@s.whatsapp.net" && event?.message()?.text == "hi",
+                    "Event account fields")
+
         // Gateway timestamps (Go prints up to nine fractional digits)
         try require(WhatsAppDateParser.parse("2024-01-15T10:30:00Z")?.timeIntervalSince1970 == 1_705_314_600, "Plain RFC 3339 time misread")
         let nanos = WhatsAppDateParser.parse("2024-01-15T10:30:00.123456789Z")?.timeIntervalSince1970 ?? 0
