@@ -236,7 +236,7 @@ final class NotificationHub: ObservableObject {
                     // The banner's own reply field answers in place, without opening the app.
                     if banner.canReply, Self.bannerReplyIsBetter(than: next[index].reply) { next[index].reply = .banner(id: banner.id) }
                 }
-            } else if let index = next.firstIndex(where: { $0.id == candidate.id }) {
+            } else if let index = next.firstIndex(where: { $0.id == candidate.id || NotchNotificationPolicy.isSameBanner(candidate, as: $0) }) {
                 next[index].liveBannerID = candidate.liveBannerID
                 if case .banner = next[index].reply, !isLive { next[index].reply = Self.lastingRoute(next[index]) }
                 if isLive, banner.canReply { next[index].reply = .banner(id: banner.id) }
@@ -300,10 +300,19 @@ final class NotificationHub: ObservableObject {
         }
         guard announce, let newest = new.max(by: { $0.date < $1.date }),
               Date().timeIntervalSince(newest.date) < 600 else { return }
+        // The same message is announced once, however many ways it arrives.
+        let key = NotchNotificationPolicy.announcementKey(newest)
+        let now = Date()
+        recentlyAnnounced = recentlyAnnounced.filter { now.timeIntervalSince($0.value) < 600 }
+        guard recentlyAnnounced[key] == nil else { return }
+        recentlyAnnounced[key] = now
         showAlert(newest)
     }
 
     /// Chat apps whose notifications are checked for promises made to you.
+    /// What was announced in the last ten minutes, by app, title and text.
+    private var recentlyAnnounced: [String: Date] = [:]
+
     private static let promiseChatApps: Set<String> = NotchNotificationPolicy.whatsAppBundleIdentifiers.union([
         NotchNotificationPolicy.messagesBundleIdentifier, "com.tinyspeck.slackmacgap", "ru.keepcoder.Telegram",
         "com.hnc.Discord", "org.whispersystems.signal-desktop", "com.microsoft.teams2",

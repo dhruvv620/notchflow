@@ -77,6 +77,14 @@ struct NotificationCardRegression {
                     "Notification Center banner/alert subroles were not classified")
         try require(!NotificationCardPolicy.isCallCard(app: .whatsapp, texts: ["Group invitation"], buttonLabels: ["Accept", "Decline"]), "Invitation was incorrectly treated as a call")
         try require(NotificationCardPolicy.isCallCard(app: .faceTime, texts: ["Alex"], buttonLabels: ["Accept", "Decline"]), "Native incoming call was duplicated as notification")
+        try require(NotificationCardPolicy.isCallCard(app: .faceTime, texts: ["Rahul", "FaceTime Video"], buttonLabels: ["Mute", "End"]),
+                    "A FaceTime call in progress was read as a notification")
+        try require(NotificationCardPolicy.isCallCard(app: .whatsapp, texts: ["Rahul", "Ongoing voice call"], buttonLabels: ["Mute", "End call"]),
+                    "A WhatsApp call in progress was read as a notification")
+        try require(!NotificationCardPolicy.isCallCard(app: .faceTime, texts: ["Rahul", "Missed FaceTime Video"], buttonLabels: ["Call Back", "Message"]),
+                    "A missed call was dropped")
+        try require(!NotificationCardPolicy.isCallCard(app: .messages, texts: ["Rahul", "kal 3pm pe milte hain"], buttonLabels: ["Reply", "Close"]),
+                    "A message was treated as a call")
         try require(NotificationCardPolicy.button("Reply…", matches: .reply) && !NotificationCardPolicy.button("Reply from Alex", matches: .reply), "Reply matching was too broad")
         let first = NotificationCardPolicy.stableID(app: .messages, nativeIdentity: "1", sender: "Alex", body: "Hello")
         let replacement = NotificationCardPolicy.stableID(app: .messages, nativeIdentity: "2", sender: "Alex", body: "Hello")

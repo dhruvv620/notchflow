@@ -94,6 +94,33 @@ struct PromiseRegression {
                     "News taken as a plan")
         try require(P.agreedPlan(invitation: "coffee Friday 5pm?", reply: "can't, sorry", person: "Sam", now: now, calendar: calendar) == nil,
                     "A no taken as a yes")
+        // The conversation from the screenshot (Wednesday 14:00; "kal" is Thursday the 19th).
+        try require(P.isAgreement("Done bhai, kal 5 baje coffee ke liye ready.") && P.isAgreement("Perfect, kal 3pm pe milte hain")
+                    && P.isAgreement("kal 3pm pe milte hain"), "Long Hinglish yes not understood")
+        for notYes in ["Kal nahi yaar, busy hu", "kal kab milte hai?", "ok I'll let you know", "Sorry bhai, next time",
+                       "haan but 6 baje", "dekhta hu kal"] {
+            try require(!P.isAgreement(notYes), "Taken as a yes: \(notYes)")
+        }
+        let five = P.agreedPlan(invitation: "Bhai kal 5 baje coffe ke liye milte hai", reply: "Done bhai, kal 5 baje coffee ke liye ready.",
+                                person: "Rahul", now: now, calendar: calendar)
+        try require(five?.title == "Coffee with Rahul" && five?.due == at(19, 17, 0), "5 baje plan: \(show(five))")
+        let three = P.agreedPlan(invitation: "Kal 3pm  baje coffee ke liye milte hai", reply: "Perfect, kal 3pm pe milte hain",
+                                 person: "Rahul", now: now, calendar: calendar)
+        try require(three?.title == "Coffee with Rahul" && three?.due == at(19, 15, 0), "3pm plan: \(show(three))")
+        // The reply's time wins when it differs.
+        let moved = P.agreedPlan(invitation: "Bhai kal 5 baje coffee?", reply: "haan, par 6 baje", person: "Rahul", now: now, calendar: calendar)
+        try require(moved?.due == at(19, 18, 0), "Reply's time: \(show(moved))")
+        let later = P.agreedPlan(invitation: "coffee tomorrow 5pm?", reply: "ok see you later", person: "Rahul", now: now, calendar: calendar)
+        try require(later?.due == at(19, 17, 0), "\"see you later\" moved the plan: \(show(later))")
+        // Hindi, Gujarati and Marathi times.
+        func timeOf(_ text: String) -> Date? { let r = P.dueDate(in: " " + text + " ", now: now, calendar: calendar); return r.1 ? r.0 : nil }
+        try require(timeOf("kal subah 10 baje") == at(19, 10, 0), "kal subah 10 baje: \(String(describing: timeOf("kal subah 10 baje")))")
+        try require(timeOf("aaje saanje 7 vage") == at(18, 19, 0), "aaje saanje 7 vage")
+        try require(timeOf("udya sakali 9 vajta") == at(19, 9, 0), "udya sakali 9 vajta")
+        try require(timeOf("kal raat 9:30 baje") == at(19, 21, 30), "kal raat 9:30 baje: \(String(describing: timeOf("kal raat 9:30 baje")))")
+        try require(timeOf("kal 17 baje") == at(19, 17, 0), "kal 17 baje")
+        try require(timeOf("parso lunch") != nil, "parso")
+        try require(P.englishTimes("local train").contains("local"), "A word containing kal was rewritten")
         print("Promises: OK")
     }
 }

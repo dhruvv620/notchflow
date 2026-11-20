@@ -163,6 +163,7 @@ enum PromisePolicy {
 
     /// When the promise is due, and whether a time was actually said.
     static func dueDate(in lower: String, now: Date, calendar: Calendar = .current) -> (Date, Bool) {
+        let lower = englishTimes(lower)
         func at(_ hour: Int, _ minute: Int = 0, dayOffset: Int = 0) -> Date {
             let day = calendar.date(byAdding: .day, value: dayOffset, to: calendar.startOfDay(for: now)) ?? now
             return calendar.date(bySettingHour: hour, minute: minute, second: 0, of: day) ?? now
@@ -257,6 +258,50 @@ enum PromisePolicy {
 
     // MARK: Nudges and drafts
 
+    /// Hindi, Gujarati and Marathi time words in Latin letters, rewritten in
+    /// the English the date reader knows: "kal 5 baje" → "tomorrow at 5pm",
+    /// "aaje saanje 7 vage" → "today evening at 7pm", "udya sakali 9 vajta" →
+    /// "tomorrow morning at 9am". (In a plan, "kal" is tomorrow.)
+    static func englishTimes(_ text: String) -> String {
+        var result = " " + text.lowercased() + " "
+        let words: [(String, String)] = [
+            ("parso", "in 2 days"), ("kal", "tomorrow"), ("kale", "tomorrow"), ("kaale", "tomorrow"),
+            ("udya", "tomorrow"), ("udyaa", "tomorrow"), ("aaj", "today"), ("aj", "today"), ("aaje", "today"),
+            ("aje", "today"), ("subah", "morning"), ("savare", "morning"), ("sakali", "morning"),
+            ("dopahar", "afternoon"), ("bapore", "afternoon"), ("dupari", "afternoon"),
+            ("shaam", "evening"), ("sham", "evening"), ("saanje", "evening"), ("sanje", "evening"),
+            ("sandhyakali", "evening"), ("raat", "night"), ("raate", "night"), ("ratri", "night"),
+        ]
+        for (word, english) in words {
+            result = result.replacingOccurrences(of: #"(?<![a-z])"# + word + #"(?![a-z])"#, with: english, options: .regularExpression)
+        }
+        let morning = result.contains("morning")
+        let night = result.contains("night") || result.contains("evening") || result.contains("afternoon")
+        // "5 baje", "5:30 baje", "7 vage", "9 vajta", and a "3pm baje" that already says pm.
+        let pattern = #"(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\s*(baje|bje|vage|vagye|vajta|vajata|vajle|o'?clock)(?![a-z])"#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return result }
+        let ns = result as NSString
+        var output = result
+        for match in regex.matches(in: result, range: NSRange(location: 0, length: ns.length)).reversed() {
+            guard let hour = Int(ns.substring(with: match.range(at: 1))) else { continue }
+            let minute = match.range(at: 2).location != NSNotFound ? ns.substring(with: match.range(at: 2)) : nil
+            var suffix = match.range(at: 3).location != NSNotFound ? ns.substring(with: match.range(at: 3)) : ""
+            if suffix.isEmpty && hour > 12 {
+                // Already 24-hour: "17 baje".
+                output = (output as NSString).replacingCharacters(in: match.range, with: " at \(hour):\(minute ?? "00") ")
+                continue
+            }
+            if suffix.isEmpty {
+                // Plans with friends: 1 to 8 is afternoon or evening unless it's said to be morning.
+                if morning { suffix = "am" } else if night || (1...8).contains(hour) || hour == 12 { suffix = "pm" }
+                else { suffix = "am" }
+            }
+            let time = " at \(hour)" + (minute.map { ":\($0)" } ?? "") + suffix + " "
+            output = (output as NSString).replacingCharacters(in: match.range, with: time)
+        }
+        return output
+    }
+
     /// When to nudge: an hour (or `lead`) before it is due, never in the past.
     static func nudgeDate(due: Date, lead: TimeInterval, created: Date) -> Date {
         max(due.addingTimeInterval(-lead), created.addingTimeInterval(5 * 60))
@@ -297,9 +342,40 @@ extension PromisePolicy {
     ]
     private static let agreementEmoji: Set<Character> = ["👍", "👌", "🤝", "✅", "💯", "🙌", "👏"]
 
-    /// Whether a reply is a short yes ("ok", "okay bhai", "pakka", "haan chalo",
-    /// "sounds good", "👍"). Anything with "but", "not" or "can't" isn't.
+    /// Words that turn a reply into a no, a "maybe" or a question.
+    private static let notAYes: Set<String> = [
+        "not", "no", "nope", "can't", "cant", "cannot", "won't", "wont", "don't", "dont", "busy", "sorry", "cancel",
+        "postpone", "reschedule", "maybe", "check", "confirm", "try", "nahi", "nahin", "nai", "mat", "nathi", "nako",
+        "what", "when", "where", "which", "why", "how", "kya", "kab", "kaha", "kahan", "kitne", "kaun", "shu",
+        "kyare", "kevi", "but", "lekin",
+    ]
+    private static let notAYesPhrases = ["let you know", "tell you", "get back", "will see", "dekhta", "dekhti", "batata",
+                                         "batati", "bataunga", "bataungi", "sochta", "sochti", "another day", "next time",
+                                         "some other", "kisi aur", "pachi kahu", "nantar sangto"]
+    /// Words that say yes to a plan on their own, inside a longer reply.
+    private static let planYesPhrases = ["milte hain", "milte hai", "milenge", "see you", "see ya", "ready", "confirmed",
+                                         "chalega", "chalse", "thik hai", "theek hai", "done", "pakka", "malie", "bhetu"]
+
+    /// Whether a reply says yes to a plan: a short yes ("ok", "okay bhai",
+    /// "pakka", "haan chalo", "sounds good", "👍"), a yes that goes on to
+    /// repeat the plan ("Done bhai, kal 5 baje coffee ke liye ready",
+    /// "Perfect, kal 3pm pe milte hain"), or "kal 3pm pe milte hain". Anything
+    /// with a no, a maybe or a question ("ok but not Friday", "okay I'll check") isn't.
     static func isAgreement(_ text: String) -> Bool {
+        if isShortYes(text) { return true }
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, trimmed.count <= 160, !trimmed.contains("?") else { return false }
+        let lower = trimmed.lowercased().replacingOccurrences(of: "’", with: "'")
+        let words = lower.split(whereSeparator: { !($0.isLetter || $0 == "'") }).map(String.init)
+        let padded = " " + words.joined(separator: " ") + " "
+        guard !words.contains(where: notAYes.contains), !notAYesPhrases.contains(where: { padded.contains(" \($0) ") }) else { return false }
+        // A yes up front, then anything: "Done bhai, ...", "Perfect, ...".
+        if let first = lower.split(whereSeparator: { ",.!;:-–".contains($0) }).first, isShortYes(String(first)) { return true }
+        return planYesPhrases.contains { padded.contains(" \($0) ") }
+    }
+
+    /// Just a short yes.
+    private static func isShortYes(_ text: String) -> Bool {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, trimmed.count <= 40 else { return false }
         let lower = trimmed.lowercased().replacingOccurrences(of: "’", with: "'")
@@ -317,7 +393,7 @@ extension PromisePolicy {
         "movie", "gym", "party", "game", "match", "chalo", "chal ", "join", "come", "aaja", "aa jana", "aavje",
     ]
     private static let activities: [(words: [String], title: String)] = [
-        (["coffee", "cafe"], "Coffee"), (["chai", "tea"], "Chai"), (["breakfast", "nashta"], "Breakfast"),
+        (["coffee", "coffe", "cofee", "cafe"], "Coffee"), (["chai", "tea"], "Chai"), (["breakfast", "nashta"], "Breakfast"),
         (["lunch"], "Lunch"), (["dinner", "khana"], "Dinner"), (["drinks", "beer", "beers"], "Drinks"),
         (["movie", "film", "picture"], "Movie"), (["gym", "workout", "run"], "Gym"),
         (["cricket", "football", "badminton", "game", "match"], "Game"), (["party"], "Party"),
@@ -335,9 +411,23 @@ extension PromisePolicy {
             word.contains(" ") ? lower.contains(word) : words.contains(word)
         }
         guard isProposal else { return nil }
-        let (due, explicit) = dueDate(in: lower, now: now, calendar: calendar)
+        // The time the reply says is the one agreed ("Perfect, kal 3pm pe milte hain").
+        // A reply with only a time ("haan, par 6 baje") keeps the invitation's day.
+        let dayWords = ["tomorrow", "today", "tonight", "in 2 days", "next week", "weekend"] + weekdays
+        let replyEnglish = englishTimes(reply)
+        let invitationDays = dayWords.filter { englishTimes(lower).contains($0) }
+        let replyText = dayWords.contains(where: { replyEnglish.contains($0) }) ? replyEnglish
+            : invitationDays.joined(separator: " ") + " " + replyEnglish
+        let replySaysTime = (replyEnglish.contains(where: \.isNumber)
+            || ["morning", "afternoon", "evening", "night", "tonight"].contains(where: replyEnglish.contains))
+            && dueDate(in: " " + replyEnglish + " ", now: now, calendar: calendar).1
+        let replyTime = replySaysTime ? dueDate(in: " " + replyText + " ", now: now, calendar: calendar) : (now, false)
+        let (due, explicit) = replyTime.1 ? replyTime : dueDate(in: lower, now: now, calendar: calendar)
         guard explicit, due > now else { return nil }
-        return PromiseCandidate(kind: .mine, title: planTitle(lower, words: words, person: person), due: due, hasExplicitTime: true)
+        // What the plan is, from both messages ("coffe" in one, "coffee" in the other).
+        let both = lower + " " + reply.lowercased() + " "
+        let bothWords = Set(both.split(whereSeparator: { !($0.isLetter || $0 == "'") }).map(String.init))
+        return PromiseCandidate(kind: .mine, title: planTitle(both, words: bothWords, person: person), due: due, hasExplicitTime: true)
     }
 
     /// "Coffee with Rahul", "Call Rahul", "Meet Rahul", or "Plan with Rahul".

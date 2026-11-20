@@ -164,13 +164,15 @@ final class PromiseKeeper: ObservableObject {
         if let invitation = replyingTo, PromisePolicy.isAgreement(text) {
             if let plan = PromisePolicy.agreedPlan(invitation: invitation, reply: text, person: person, now: date) {
                 add(plan, title: plan.title, person: person, route: route, sourceName: sourceName,
-                    text: invitation + " \u{2192} " + text, date: date)
-            } else if Defaults[.promiseUseAI], AIClient.isReady(), PromiseAIPolicy.mightBePromise(invitation) {
+                    text: invitation + " \u{2192} " + text, date: date, reschedules: true)
+                return
+            }
+            if Defaults[.promiseUseAI], AIClient.isReady(), PromiseAIPolicy.mightBePromise(invitation) {
                 enqueue(PromiseAIMessage(id: nextMessageID, text: text, fromMe: fromMe, person: person, replyingTo: invitation),
                         route: route, sourceName: sourceName, date: date)
                 nextMessageID += 1
+                return
             }
-            return
         }
         guard !plansOnly, fromMe || Defaults[.promiseTrackTheirs] else { return }
         if let found = PromisePolicy.detect(text, fromMe: fromMe, now: date) {
@@ -184,7 +186,17 @@ final class PromiseKeeper: ObservableObject {
     }
 
     private func add(_ found: PromiseCandidate, title: String, person: String, route: TrackedPromise.Route,
-                     sourceName: String, text: String, date: Date) {
+                     sourceName: String, text: String, date: Date, reschedules: Bool = false) {
+        // A plan agreed again at another time ("kal 3pm" after "kal 5 baje") moves, instead of a second one.
+        if reschedules, let index = promises.firstIndex(where: { $0.status == .open && $0.kind == found.kind && $0.title == title
+            && $0.person == person && date.timeIntervalSince($0.created) < 3 * 86_400 }) {
+            guard abs(promises[index].due.timeIntervalSince(found.due)) >= 60 else { return }
+            update(promises[index].id) { promise in
+                promise.due = found.due
+                promise.nudged = false
+            }
+            return
+        }
         // The same message can arrive twice (sent here, echoed by the phone).
         if promises.contains(where: { $0.status == .open && $0.kind == found.kind && $0.person == person
             && $0.title == title && abs($0.created.timeIntervalSince(date)) < 10 * 60 }) { return }
@@ -246,7 +258,7 @@ final class PromiseKeeper: ObservableObject {
                     guard let item = batch.first(where: { $0.message.id == found.messageID }) else { continue }
                     let quote = item.message.replyingTo.map { $0 + " \u{2192} " + item.message.text } ?? item.message.text
                     add(found.candidate, title: found.candidate.title, person: item.message.person, route: item.route,
-                        sourceName: item.sourceName, text: quote, date: item.date)
+                        sourceName: item.sourceName, text: quote, date: item.date, reschedules: item.message.replyingTo != nil)
                 }
             } catch {
                 aiStatus = error.localizedDescription

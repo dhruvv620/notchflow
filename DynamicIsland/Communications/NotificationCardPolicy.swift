@@ -174,14 +174,28 @@ enum NotificationCardPolicy {
         guard sender.count <= 256, !body.isEmpty else { return nil }
         return Content(app: source, sender: sender, body: String(body.prefix(8_000)))
     }
+    /// A ringing call, or a call in progress (FaceTime keeps a card on screen
+    /// with End and Mute while you talk). Calls have their own UI in the notch;
+    /// read as notifications, they were announced over and over.
     static func isCallCard(app: CommunicationApp, texts: [String], buttonLabels: [String]) -> Bool {
         let labels = buttonLabels.map(normalized)
+        let text = texts.joined(separator: " ").lowercased()
         let answer = labels.contains { ["answer", "accept", "accept call", "answer call"].contains($0) }
         let decline = labels.contains { ["decline", "decline call", "reject call"].contains($0) }
-        guard answer && decline else { return false }
-        if app == .faceTime || app == .phone { return true }
-        let text = texts.joined(separator: " ").lowercased()
-        return ["incoming call", "incoming video call", "incoming audio call"].contains { text.contains($0) }
+        if answer && decline {
+            if app == .faceTime || app == .phone { return true }
+            return ["incoming call", "incoming video call", "incoming audio call"].contains { text.contains($0) }
+        }
+        // A missed call is a real notification; keep it.
+        if text.contains("missed") { return false }
+        let ending = labels.contains { ["end", "end call", "hang up", "leave", "leave call"].contains($0) }
+        let controls = labels.contains { ["mute", "unmute", "video", "camera", "turn camera off", "turn camera on",
+                                          "turn video off", "turn video on", "speaker", "share screen"].contains($0) }
+        if app == .faceTime || app == .phone {
+            return ending || controls
+                || ["facetime video", "facetime audio", "call in progress", "ongoing call", "calling"].contains { text.contains($0) }
+        }
+        return ending && controls
     }
     static func stableID(app: CommunicationApp, nativeIdentity: String, sender: String, body: String) -> String {
         // Deterministic FNV-1a avoids Swift's process-randomized Hasher. The native

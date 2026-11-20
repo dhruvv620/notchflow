@@ -87,6 +87,24 @@ enum NotchNotificationPolicy {
         return order.compactMap { groups[$0] }
     }
 
+    /// Whether two banners read from the screen are the same notification
+    /// seen again: macOS can hand the reader a new element (and so a new id)
+    /// for the same card between reads.
+    static func isSameBanner(_ banner: NotchNotification, as existing: NotchNotification, window: TimeInterval = 600) -> Bool {
+        guard banner.id != existing.id, banner.source == .banner, existing.source == .banner,
+              banner.bundleIdentifier == existing.bundleIdentifier || banner.appName == existing.appName,
+              abs(banner.date.timeIntervalSince(existing.date)) < window else { return false }
+        func clean(_ value: String) -> String { value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+        return clean(banner.title) == clean(existing.title) && clean(banner.body) == clean(existing.body) && !clean(banner.body).isEmpty
+    }
+
+    /// A key for "this was just announced", so the same message isn't announced twice.
+    static func announcementKey(_ item: NotchNotification) -> String {
+        [item.bundleIdentifier ?? item.appName, item.title, item.body]
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+            .joined(separator: "\u{1f}")
+    }
+
     /// Whether a banner is a notification already in the inbox: same app,
     /// title and text, within `window` seconds (the store and the banner
     /// reader date the same notification slightly differently). Cards seen
