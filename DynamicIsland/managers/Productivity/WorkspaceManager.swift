@@ -231,16 +231,18 @@ final class WorkspaceManager: ObservableObject {
         if workspace.startPomodoro, !TimerModesManager.shared.pomodoro.isActive {
             TimerModesManager.shared.startPomodoro(configuration: Self.pomodoroConfiguration())
         }
+        let session = UUID()
+        if workspace.layout == .restore { restoreSession = (session, [:], []) }
         if workspace.layout == .restore {
             // A saved window that isn't open (Chrome running with its window
             // closed) is opened again: right away for apps already running,
             // after a few seconds for apps just launched, which open their own.
             let alreadyRunning = Set(workspace.apps.map(\.bundleID)).intersection(running)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-                self?.openMissingWindows(workspace, only: alreadyRunning)
+                self?.openMissingWindows(workspace, only: alreadyRunning, session: session)
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) { [weak self] in
-                self?.openMissingWindows(workspace, only: Set(workspace.apps.map(\.bundleID)).subtracting(alreadyRunning))
+                self?.openMissingWindows(workspace, only: Set(workspace.apps.map(\.bundleID)).subtracting(alreadyRunning), session: session)
             }
         }
         if workspace.layout != .none {
@@ -248,7 +250,7 @@ final class WorkspaceManager: ObservableObject {
             // (more for "exactly as saved", which waits for every window).
             let delays: [Double] = workspace.layout == .restore ? [0.6, 2.0, 4.5, 6.5, 10.0] : [1.5, 4.0]
             for delay in delays {
-                DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in self?.arrange(workspace) }
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in self?.arrange(workspace, session: session) }
             }
         }
         // Bring the first app to the front at the end.
@@ -284,10 +286,12 @@ final class WorkspaceManager: ObservableObject {
     }
 
     /// Places the first apps' front windows side by side (needs Accessibility).
-    private func arrange(_ workspace: Workspace) {
+    private func arrange(_ workspace: Workspace, session: UUID) {
         guard AXIsProcessTrusted(), let screen = NSScreen.main else { return }
         if workspace.layout == .restore {
-            restoreWindows(workspace)
+            // Done once every window is in place; a newer open of a setup takes over.
+            guard !isRestoreComplete(workspace, session: session) else { return }
+            restoreWindows(workspace, session: session)
             return
         }
         // Accessibility uses a top-left origin on the main display.
@@ -315,14 +319,17 @@ final class WorkspaceManager: ObservableObject {
 
     /// Opens windows the setup saved but that aren't open: a new window in a
     /// browser, or the app's own reopen (as clicking its Dock icon does).
-    private func openMissingWindows(_ workspace: Workspace, only bundleIDs: Set<String>) {
-        guard AXIsProcessTrusted() else { return }
+    private func openMissingWindows(_ workspace: Workspace, only bundleIDs: Set<String>, session: UUID) {
+        guard AXIsProcessTrusted(), restoreSession?.id == session else { return }
         for app in workspace.apps where bundleIDs.contains(app.bundleID) {
-            let saved = app.windows?.count ?? 0
+            // Already placed (and maybe minimized or closed by you since): leave it.
+            let saved = (app.windows?.count ?? 0) - (restoreSession?.placed[app.bundleID]?.count ?? 0)
             guard saved > 0,
                   let running = NSRunningApplication.runningApplications(withBundleIdentifier: app.bundleID).first else { continue }
-            let missing = WorkspacePolicy.windowsToOpen(saved: saved,
-                                                        open: Self.standardWindows(of: running, includeMinimized: true).count)
+            let placedWindows = restoreSession?.windows ?? []
+            let unplaced = Self.standardWindows(of: running, includeMinimized: true)
+                .filter { window in !placedWindows.contains { CFEqual($0, window) } }
+            let missing = WorkspacePolicy.windowsToOpen(saved: saved, open: unplaced.count)
             guard missing > 0 else { continue }
             if let script = WorkspacePolicy.newWindowScript(for: app.bundleID) {
                 Task { for _ in 0..<missing { try? await AppleScriptHelper.executeVoid(script) } }
@@ -337,20 +344,41 @@ final class WorkspaceManager: ObservableObject {
 
     /// Puts every saved window back where it was, as far as the app has
     /// opened them (matched by title, then in order).
-    private func restoreWindows(_ workspace: Workspace) {
+    /// The setup being opened: which saved windows are already in place, and
+    /// the windows that were put there. Each window is placed once; later
+    /// passes only look for windows that hadn't appeared yet, so a window you
+    /// minimize or move right after isn't pulled back.
+    private var restoreSession: (id: UUID, placed: [String: Set<Int>], windows: [AXUIElement])?
+
+    private func restoreWindows(_ workspace: Workspace, session: UUID) {
+        guard var current = restoreSession, current.id == session else { return }
         let screens = Self.screensInAccessibilityCoordinates()
         for app in workspace.apps {
             guard let saved = app.windows, !saved.isEmpty,
                   let running = NSRunningApplication.runningApplications(withBundleIdentifier: app.bundleID).first else { continue }
+            let done = current.placed[app.bundleID] ?? []
+            let waiting = saved.indices.filter { !done.contains($0) }
+            guard !waiting.isEmpty else { continue }
             if running.isHidden { running.unhide() }
             let windows = Self.standardWindows(of: running, includeMinimized: true)
+                .filter { window in !current.windows.contains { CFEqual($0, window) } }
+            guard !windows.isEmpty else { continue }
             let titles = windows.map { Self.title(of: $0) ?? "" }
-            for pair in WorkspacePolicy.matchWindows(saved: saved, titles: titles) {
+            for pair in WorkspacePolicy.matchWindows(saved: waiting.map { saved[$0] }, titles: titles) {
                 let window = windows[pair.window]
                 AXUIElementSetAttributeValue(window, kAXMinimizedAttribute as CFString, kCFBooleanFalse)
-                Self.move(window, to: WorkspacePolicy.fitted(saved[pair.saved].frame, screens: screens))
+                Self.move(window, to: WorkspacePolicy.fitted(saved[waiting[pair.saved]].frame, screens: screens))
+                current.placed[app.bundleID, default: []].insert(waiting[pair.saved])
+                current.windows.append(window)
             }
         }
+        restoreSession = current
+    }
+
+    /// Whether every saved window of the setup being opened is in place.
+    private func isRestoreComplete(_ workspace: Workspace, session: UUID) -> Bool {
+        guard let current = restoreSession, current.id == session else { return true }
+        return workspace.apps.allSatisfy { app in (current.placed[app.bundleID]?.count ?? 0) >= (app.windows?.count ?? 0) }
     }
 
     // MARK: Accessibility helpers
