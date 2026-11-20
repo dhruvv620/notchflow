@@ -17,6 +17,8 @@ extension Defaults.Keys {
     static let workspaceDismissedSuggestions = Key<[String]>("workspaceDismissedSuggestions", default: [])
     /// "Done for the day" quits the apps workspaces opened today.
     static let workspaceDoneQuitsApps = Key<Bool>("workspaceDoneQuitsApps", default: true)
+    /// Setups saved from the screen were cut down to their windows once.
+    static let workspacesWindowsOnly = Key<Bool>("workspacesWindowsOnly", default: false)
 }
 
 /// Saved setups you switch to from the Flow tab: apps, pages, folders, a
@@ -32,6 +34,8 @@ final class WorkspaceManager: ObservableObject {
     /// Set by Done for the day, to show the day's summary.
     @Published var showDaySummary = false
     @Published private(set) var lastMessage: String?
+
+    func clearMessage() { lastMessage = nil }
     /// The workspace just deleted, for Undo (cleared after a few seconds).
     @Published private(set) var recentlyDeleted: (workspace: Workspace, index: Int)?
     private var undoWork: DispatchWorkItem?
@@ -46,6 +50,13 @@ final class WorkspaceManager: ObservableObject {
 
     private init() {
         workspaces = (try? JSONDecoder().decode([Workspace].self, from: Defaults[.workspacesData])) ?? []
+        // Setups are windows only now: saved web pages (opened again every
+        // time, as duplicate tabs) and apps without a window are dropped once.
+        if !Defaults[.workspacesWindowsOnly] {
+            workspaces = workspaces.map(WorkspacePolicy.windowsOnlySetup)
+            if let data = try? JSONEncoder().encode(workspaces) { Defaults[.workspacesData] = data }
+            Defaults[.workspacesWindowsOnly] = true
+        }
         launches = (try? JSONDecoder().decode([AppLaunch].self, from: Defaults[.workspaceLaunchLog])) ?? []
     }
 
@@ -111,13 +122,18 @@ final class WorkspaceManager: ObservableObject {
         if let data = try? JSONEncoder().encode(workspaces) { Defaults[.workspacesData] = data }
     }
 
-    /// What's open right now, as a new workspace: running apps with every
-    /// window's position and size, and the front browser window's tabs.
+    /// The windows on screen right now, as a new setup: each visible window's
+    /// app, position, size and screen. Not apps without a window, not
+    /// minimized windows, not browser tabs.
     func captureCurrentSetup(named name: String = "My setup") async -> Workspace {
         var workspace = Workspace(name: name)
-        workspace.apps = Self.currentApps()
-        workspace.urls = await frontBrowserTabs()
-        if workspace.apps.contains(where: { !($0.windows ?? []).isEmpty }) { workspace.layout = .restore }
+        guard AXIsProcessTrusted() else {
+            lastMessage = "Allow NotchFlow in System Settings › Privacy & Security › Accessibility to save window setups."
+            return workspace
+        }
+        workspace.apps = WorkspacePolicy.windowsOnly(Self.currentApps())
+        workspace.layout = .restore
+        if workspace.apps.isEmpty { lastMessage = "No windows on screen to save." }
         return workspace
     }
 
@@ -141,11 +157,19 @@ final class WorkspaceManager: ObservableObject {
     /// now, keeping its name and options.
     func updateFromCurrent(_ id: UUID) async {
         guard let index = workspaces.firstIndex(where: { $0.id == id }) else { return }
+        guard AXIsProcessTrusted() else {
+            lastMessage = "Allow NotchFlow in System Settings › Privacy & Security › Accessibility to save window setups."
+            return
+        }
+        let apps = WorkspacePolicy.windowsOnly(Self.currentApps())
+        guard !apps.isEmpty else {
+            lastMessage = "No windows on screen to save."
+            return
+        }
         var workspace = workspaces[index]
-        workspace.apps = Self.currentApps()
-        let tabs = await frontBrowserTabs()
-        if !tabs.isEmpty { workspace.urls = tabs }
-        if workspace.apps.contains(where: { !($0.windows ?? []).isEmpty }) { workspace.layout = .restore }
+        workspace.apps = apps
+        workspace.urls = []
+        workspace.layout = .restore
         save(workspace)
         lastMessage = "Updated \(workspace.name) to the current layout."
     }
@@ -155,30 +179,6 @@ final class WorkspaceManager: ObservableObject {
         guard !trimmed.isEmpty, let index = workspaces.firstIndex(where: { $0.id == id }) else { return }
         workspaces[index].name = trimmed
         persist()
-    }
-
-    private func frontBrowserTabs() async -> [String] {
-        let running = Set(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier))
-        let scripts: [(String, String)] = [
-            ("com.apple.Safari", #"tell application id "com.apple.Safari" to get URL of every tab of front window"#),
-            ("com.google.Chrome", #"tell application id "com.google.Chrome" to get URL of every tab of front window"#),
-            ("company.thebrowser.Browser", #"tell application id "company.thebrowser.Browser" to get URL of every tab of front window"#),
-            ("com.brave.Browser", #"tell application id "com.brave.Browser" to get URL of every tab of front window"#),
-            ("com.microsoft.edgemac", #"tell application id "com.microsoft.edgemac" to get URL of every tab of front window"#),
-        ]
-        for (id, script) in scripts where running.contains(id) {
-            guard let result = try? await AppleScriptHelper.execute(script) else { continue }
-            var urls: [String] = []
-            if result.numberOfItems > 0 {
-                for index in 1...result.numberOfItems {
-                    if let url = result.atIndex(index)?.stringValue, url.hasPrefix("http") { urls.append(url) }
-                }
-            } else if let url = result.stringValue, url.hasPrefix("http") {
-                urls.append(url)
-            }
-            if !urls.isEmpty { return Array(urls.prefix(10)) }
-        }
-        return []
     }
 
     // MARK: Opening
@@ -231,10 +231,22 @@ final class WorkspaceManager: ObservableObject {
         if workspace.startPomodoro, !TimerModesManager.shared.pomodoro.isActive {
             TimerModesManager.shared.startPomodoro(configuration: Self.pomodoroConfiguration())
         }
+        if workspace.layout == .restore {
+            // A saved window that isn't open (Chrome running with its window
+            // closed) is opened again: right away for apps already running,
+            // after a few seconds for apps just launched, which open their own.
+            let alreadyRunning = Set(workspace.apps.map(\.bundleID)).intersection(running)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                self?.openMissingWindows(workspace, only: alreadyRunning)
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) { [weak self] in
+                self?.openMissingWindows(workspace, only: Set(workspace.apps.map(\.bundleID)).subtracting(alreadyRunning))
+            }
+        }
         if workspace.layout != .none {
             // Apps take a moment to open their windows; arrange a few times
             // (more for "exactly as saved", which waits for every window).
-            let delays: [Double] = workspace.layout == .restore ? [0.6, 2.0, 4.5, 9.0] : [1.5, 4.0]
+            let delays: [Double] = workspace.layout == .restore ? [0.6, 2.0, 4.5, 6.5, 10.0] : [1.5, 4.0]
             for delay in delays {
                 DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in self?.arrange(workspace) }
             }
@@ -297,6 +309,28 @@ final class WorkspaceManager: ObservableObject {
             }
             if let sizeValue = AXValueCreate(.cgSize, &size) {
                 AXUIElementSetAttributeValue(window as! AXUIElement, kAXSizeAttribute as CFString, sizeValue)
+            }
+        }
+    }
+
+    /// Opens windows the setup saved but that aren't open: a new window in a
+    /// browser, or the app's own reopen (as clicking its Dock icon does).
+    private func openMissingWindows(_ workspace: Workspace, only bundleIDs: Set<String>) {
+        guard AXIsProcessTrusted() else { return }
+        for app in workspace.apps where bundleIDs.contains(app.bundleID) {
+            let saved = app.windows?.count ?? 0
+            guard saved > 0,
+                  let running = NSRunningApplication.runningApplications(withBundleIdentifier: app.bundleID).first else { continue }
+            let missing = WorkspacePolicy.windowsToOpen(saved: saved,
+                                                        open: Self.standardWindows(of: running, includeMinimized: true).count)
+            guard missing > 0 else { continue }
+            if let script = WorkspacePolicy.newWindowScript(for: app.bundleID) {
+                Task { for _ in 0..<missing { try? await AppleScriptHelper.executeVoid(script) } }
+            } else if Self.standardWindows(of: running, includeMinimized: true).isEmpty,
+                      let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: app.bundleID) {
+                let configuration = NSWorkspace.OpenConfiguration()
+                configuration.activates = true
+                NSWorkspace.shared.openApplication(at: url, configuration: configuration)
             }
         }
     }

@@ -30,6 +30,15 @@ struct NotchFlowView: View {
         VStack(alignment: .leading, spacing: NotchTokens.Spacing.s) {
             header
             if workspacesEnabled { workspaceStrip }
+            if workspacesEnabled, let message = workspaces.lastMessage {
+                Text(message)
+                    .font(NotchTokens.Typography.caption).foregroundStyle(.secondary).lineLimit(2)
+                    .transition(.opacity)
+                    .task(id: message) {
+                        try? await Task.sleep(for: .seconds(4))
+                        withAnimation(.smooth(duration: 0.25)) { workspaces.clearMessage() }
+                    }
+            }
             if let deleted = workspaces.recentlyDeleted {
                 HStack(spacing: 8) {
                     Image(systemName: "trash").foregroundStyle(.secondary)
@@ -183,7 +192,7 @@ struct NotchFlowView: View {
                         if !draft.isEmpty { workspaces.save(draft) }
                     }
                 }
-                .help("Saves the open apps, where each window is and how big it is, and your browser's tabs. Click the setup later to put everything back.")
+                .help("Saves the windows on your screen: which app, where, and how big. Click the setup later to put them back, opening any that are closed. No tabs are saved, so none are opened twice.")
             }
         }
     }
@@ -235,10 +244,13 @@ struct NotchFlowView: View {
 
     private func describe(_ workspace: Workspace) -> String {
         var parts: [String] = []
-        if !workspace.apps.isEmpty { parts.append(workspace.apps.map(\.name).joined(separator: ", ")) }
-        if !workspace.urls.isEmpty { parts.append("\(workspace.urls.count) page\(workspace.urls.count == 1 ? "" : "s")") }
         let windows = workspace.apps.reduce(0) { $0 + ($1.windows?.count ?? 0) }
-        if workspace.layout == .restore && windows > 0 { parts.append("\(windows) window\(windows == 1 ? "" : "s") put back in place") }
+        if workspace.layout == .restore && windows > 0 {
+            parts.append("\(windows) window\(windows == 1 ? "" : "s"): " + workspace.apps.map(\.name).joined(separator: ", "))
+        } else if !workspace.apps.isEmpty {
+            parts.append(workspace.apps.map(\.name).joined(separator: ", "))
+        }
+        if !workspace.urls.isEmpty { parts.append("\(workspace.urls.count) page\(workspace.urls.count == 1 ? "" : "s")") }
         if workspace.turnOnFocus { parts.append("Focus on") }
         if workspace.startPomodoro { parts.append("Pomodoro") }
         return parts.joined(separator: " · ")

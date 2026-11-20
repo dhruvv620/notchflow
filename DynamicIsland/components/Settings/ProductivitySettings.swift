@@ -223,7 +223,7 @@ struct ProductivitySettings: View {
             Defaults.Toggle(key: .enableWorkspaces) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Workspaces")
-                    Text("One tap in the Flow tab opens your apps, pages, folders and a terminal, arranges the windows and can turn on Focus, music and a Pomodoro. Done for the day closes it all again.")
+                    Text("Arrange your windows, then Save current in the Flow tab: one tap later puts every window back where it was and as big as it was, opening the apps (or windows) that are closed. Setups can also turn on Focus, music and a Pomodoro. Done for the day closes the apps again.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }
@@ -310,6 +310,9 @@ struct WorkspaceEditor: View {
                     ForEach(workspace.apps, id: \.bundleID) { app in
                         HStack {
                             Text(app.name)
+                            if let count = app.windows?.count, count > 0 {
+                                Text("\(count) window\(count == 1 ? "" : "s") in place").font(.caption).foregroundStyle(.secondary)
+                            }
                             Spacer()
                             Button(role: .destructive) { workspace.apps.removeAll { $0.bundleID == app.bundleID } } label: {
                                 Image(systemName: "minus.circle")

@@ -229,6 +229,43 @@ enum WorkspacePolicy {
         return CGRect(x: x, y: y, width: size.width, height: size.height)
     }
 
+    // MARK: Window setups
+
+    /// What "Save current" keeps: the apps that have windows on screen, each
+    /// with those windows. Apps without a visible window aren't part of it.
+    static func windowsOnly(_ apps: [WorkspaceApp]) -> [WorkspaceApp] {
+        apps.filter { !($0.windows ?? []).isEmpty }
+    }
+
+    /// A setup saved from the screen, as setups are kept now: just its
+    /// windows, no web pages (opening them every time made duplicate tabs).
+    /// Setups made by hand in Settings, without saved windows, are left alone.
+    static func windowsOnlySetup(_ workspace: Workspace) -> Workspace {
+        guard workspace.layout == .restore || workspace.apps.contains(where: { !($0.windows ?? []).isEmpty }) else { return workspace }
+        var setup = workspace
+        setup.apps = windowsOnly(workspace.apps)
+        setup.urls = []
+        setup.layout = .restore
+        return setup
+    }
+
+    /// How many windows to open for an app that has fewer than the setup saved.
+    static func windowsToOpen(saved: Int, open: Int) -> Int {
+        max(0, min(saved - open, 4))
+    }
+
+    /// AppleScript that opens one new window in a browser, when there is one for it.
+    static func newWindowScript(for bundleID: String) -> String? {
+        switch bundleID {
+        case "com.apple.Safari":
+            return #"tell application id "com.apple.Safari" to make new document"#
+        case "com.google.Chrome", "com.brave.Browser", "com.microsoft.edgemac", "company.thebrowser.Browser", "com.vivaldi.Vivaldi":
+            return "tell application id \"\(bundleID)\" to make new window"
+        default:
+            return nil
+        }
+    }
+
     // MARK: Done for the day
 
     /// The apps to quit: ones a workspace opened today that are still running.

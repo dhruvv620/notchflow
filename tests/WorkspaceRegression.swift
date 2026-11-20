@@ -88,6 +88,26 @@ struct WorkspaceRegression {
         let old = #"{"bundleID":"com.apple.Safari","name":"Safari"}"#
         let oldApp = try JSONDecoder().decode(WorkspaceApp.self, from: Data(old.utf8))
         try require(oldApp.windows == nil, "Old workspace app did not load")
+        // Setups are windows only: apps without a window and web pages are dropped.
+        var screen = Workspace(name: "Setup 1")
+        screen.layout = .restore
+        screen.urls = ["https://mail.google.com", "https://github.com"]
+        screen.apps = [WorkspaceApp(bundleID: "com.anthropic.claudefordesktop", name: "Claude", windows: [saved[0]]),
+                       WorkspaceApp(bundleID: "com.spotify.client", name: "Spotify", windows: [saved[1]]),
+                       WorkspaceApp(bundleID: "com.google.Chrome", name: "Chrome", windows: [saved[2]]),
+                       WorkspaceApp(bundleID: "com.apple.mail", name: "Mail", windows: [])]
+        let cleaned = P.windowsOnlySetup(screen)
+        try require(cleaned.apps.map(\.name) == ["Claude", "Spotify", "Chrome"] && cleaned.urls.isEmpty, "Windows-only setup: \(cleaned.apps.map(\.name))")
+        var handMade = Workspace(name: "Study")
+        handMade.apps = [WorkspaceApp(bundleID: "com.apple.Notes", name: "Notes")]
+        handMade.urls = ["https://wikipedia.org"]
+        handMade.layout = .sideBySide
+        try require(P.windowsOnlySetup(handMade) == handMade, "A setup made by hand was changed")
+        try require(P.windowsToOpen(saved: 2, open: 0) == 2 && P.windowsToOpen(saved: 1, open: 3) == 0 && P.windowsToOpen(saved: 9, open: 0) == 4,
+                    "Windows to open")
+        try require(P.newWindowScript(for: "com.google.Chrome") == #"tell application id "com.google.Chrome" to make new window"#
+                    && P.newWindowScript(for: "com.apple.Safari")?.contains("make new document") == true
+                    && P.newWindowScript(for: "com.spotify.client") == nil, "New window scripts")
         print("Workspaces: OK")
     }
 }
