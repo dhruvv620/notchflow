@@ -35,6 +35,8 @@ struct MusicSearchResult: Identifiable, Equatable, Sendable {
     let artworkURL: URL?
     /// The song's page on Apple Music.
     let storeURL: URL?
+    /// The exact Spotify track, when the result came from Spotify's search.
+    var spotifyURI: String? = nil
 }
 
 /// Searching songs (Apple's public catalog, no account needed) and handing

@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Connect Spotify for exact search** (Settings > Music > Spotify search): "Log in with Spotify" with your own free Spotify developer app (paste its Client ID, click Connect, agree in the browser; no password or secret is stored, the sign-in token stays in the Keychain). Then the Music tab's Spotify searches use Spotify's own catalog and play the exact track in the Spotify app, in the background. Without it, songs are still matched through song.link. When the track is found but macOS blocks NotchFlow from controlling Spotify, the notch now says so (Privacy & Security > Automation) instead of "couldn't find the exact track".
 - **Search and play songs from the notch**: a search button in the Music tab lists songs as you type, with artwork, from Apple's song catalog. Pick one and it plays without leaving the notch: on Spotify by its exact track (found through song.link), in the background; from your Apple Music library right away; on YouTube Music in a browser tab opened behind what you're doing. Only when that can't be done (a song not in your Apple Music library, a track Spotify doesn't have) does the player open, also in the background. It starts with the player you use; Escape or the X closes it.
 - **Artwork glow**: a soft glow of the album art's colors behind the artwork in the Music tab, brighter while playing (Settings > Music > Artwork glow).
 

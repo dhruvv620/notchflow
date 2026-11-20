@@ -108,6 +108,10 @@ printf '\nChecking music search...\n'
     "$SOURCE_DIR/DynamicIsland/helpers/MusicSearchPolicy.swift" \
     "$SOURCE_DIR/tests/MusicSearchRegression.swift" -o "$BUILD_ROOT/MusicSearchRegression"
 "$BUILD_ROOT/MusicSearchRegression"
+/usr/bin/xcrun swiftc -swift-version 5 -parse-as-library \
+    "$SOURCE_DIR/DynamicIsland/helpers/SpotifyAPIPolicy.swift" \
+    "$SOURCE_DIR/tests/SpotifyAPIRegression.swift" -o "$BUILD_ROOT/SpotifyAPIRegression"
+"$BUILD_ROOT/SpotifyAPIRegression"
 
 printf '\nChecking the window stash...\n'
 /usr/bin/xcrun swiftc -swift-version 5 -parse-as-library \

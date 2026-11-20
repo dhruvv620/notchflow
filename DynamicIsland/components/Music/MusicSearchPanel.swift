@@ -28,7 +28,7 @@ final class MusicSearchService: ObservableObject {
 
     var target: MusicSearchTarget {
         get { MusicSearchTarget(rawValue: Defaults[.musicSearchTarget]) ?? .preferred(forPlayer: MusicManager.shared.bundleIdentifier) }
-        set { Defaults[.musicSearchTarget] = newValue.rawValue; objectWillChange.send() }
+        set { Defaults[.musicSearchTarget] = newValue.rawValue; objectWillChange.send(); scheduleSearch() }
     }
 
     private init() {}
@@ -42,9 +42,35 @@ final class MusicSearchService: ObservableObject {
     }
 
     /// Searches a moment after typing stops.
+    /// Whether this search goes to Spotify's own catalog (Spotify connected).
+    var usesSpotifySearch: Bool { target == .spotify && SpotifyConnection.shared.isConnected }
+
     private func scheduleSearch() {
         searchTask?.cancel()
         message = nil
+        if usesSpotifySearch, query.trimmingCharacters(in: .whitespacesAndNewlines).count >= 2 {
+            let query = self.query
+            isSearching = true
+            searchTask = Task { [weak self] in
+                try? await Task.sleep(for: .milliseconds(350))
+                guard !Task.isCancelled else { return }
+                do {
+                    let tracks = try await SpotifyConnection.shared.search(query)
+                    guard !Task.isCancelled, let self else { return }
+                    self.results = tracks.map { track in
+                        MusicSearchResult(id: track.uri.hashValue, title: track.title, artist: track.artists, album: track.album,
+                                          artworkURL: track.artworkURL, storeURL: nil, spotifyURI: track.uri)
+                    }
+                    self.isSearching = false
+                    if self.results.isEmpty { self.message = "No songs found on Spotify." }
+                } catch {
+                    guard !Task.isCancelled, let self else { return }
+                    self.isSearching = false
+                    self.message = error.localizedDescription
+                }
+            }
+            return
+        }
         guard let url = MusicSearchPolicy.searchURL(query, country: Locale.current.region?.identifier ?? "US") else {
             results = []
             isSearching = false
@@ -91,12 +117,22 @@ final class MusicSearchService: ObservableObject {
                     message = "Not in your library: opened in Music, behind this. Press play there."
                 }
             case .spotify:
-                if let uri = MusicSearchPolicy.spotifyTrackURI(from: await Self.link(for: result, on: "spotify")),
-                   (try? await AppleScriptHelper.executeVoid(MusicSearchPolicy.spotifyPlayScript(trackURI: uri))) != nil {
-                    message = "Playing \(result.title) on Spotify."
+                // The exact track: from Spotify's search when connected, else through song.link.
+                var uri = result.spotifyURI
+                if uri == nil { uri = MusicSearchPolicy.spotifyTrackURI(from: await Self.link(for: result, on: "spotify")) }
+                if let uri {
+                    do {
+                        try await AppleScriptHelper.executeVoid(MusicSearchPolicy.spotifyPlayScript(trackURI: uri))
+                        message = "Playing \(result.title) on Spotify."
+                    } catch {
+                        // Found, but macOS didn't let NotchFlow tell Spotify to play.
+                        message = "Allow NotchFlow to control Spotify: System Settings › Privacy & Security › Automation."
+                    }
                 } else if let url = MusicSearchPolicy.spotifySearchURL(title: result.title, artist: result.artist) {
                     Self.openInBackground(url)
-                    message = "Couldn't find the exact track: opened Spotify's search, behind this."
+                    message = SpotifyConnection.shared.isConnected
+                        ? "Couldn't find the exact track: opened Spotify's search, behind this."
+                        : "Couldn't find the exact track: opened Spotify's search. Connect Spotify in Settings › Music for exact results."
                 }
             case .youtubeMusic:
                 // A website plays in a browser tab: the exact song, opened behind what you're doing.
@@ -130,6 +166,7 @@ final class MusicSearchService: ObservableObject {
 /// The Music tab's search: a field, the player to use, and songs with artwork.
 struct MusicSearchPanel: View {
     @ObservedObject private var search = MusicSearchService.shared
+    @ObservedObject private var spotify = SpotifyConnection.shared
     @ObservedObject private var appearance = NotchAppearanceModel.shared
     @EnvironmentObject private var vm: DynamicIslandViewModel
     @FocusState private var focused: Bool
@@ -157,7 +194,10 @@ struct MusicSearchPanel: View {
             .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.white.opacity(0.07)))
 
             if let message = search.message {
-                Text(message).font(.system(size: 10)).foregroundStyle(.secondary).lineLimit(1)
+                Text(message).font(.system(size: 10)).foregroundStyle(.secondary).lineLimit(2)
+            } else if search.target == .spotify && !spotify.isConnected {
+                Button("Connect Spotify for exact results (Settings › Music)") { SettingsWindowController.shared.showWindow() }
+                    .buttonStyle(.plain).font(.system(size: 10)).foregroundStyle(appearance.accentColor)
             }
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(spacing: 2) {
