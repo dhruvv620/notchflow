@@ -46,7 +46,7 @@ final class WindowStash: ObservableObject {
 
     /// While a window is being dragged: whether it's near the notch or over
     /// the drop spot, so the closed notch can show where to let go.
-    enum DropTarget: Equatable { case none, near, over }
+    enum DropTarget: Equatable { case none, near, over, stashed(String) }
     @Published private(set) var dropTarget: DropTarget = .none
 
     private var monitors: [Any] = []
@@ -151,7 +151,8 @@ final class WindowStash: ObservableObject {
             guard wasOver || WindowStashPolicy.isDropIntoNotch(down: down, up: up, frameAtStart: drag.frameBefore,
                                                                frameAtEnd: AXWindowTools.frame(of: drag.element),
                                                                zones: screens.map(\.zone)) else { return }
-            Task { await stash(drag.element, pid: drag.pid, returningTo: drag.frameBefore) }
+            DynamicIslandViewCoordinator.shared.suppressHoverOpen(for: 1.5)
+            Task { if await stash(drag.element, pid: drag.pid, returningTo: drag.frameBefore) { confirm(drag.pid) } }
             return
         }
         // macOS didn't report the drag: if the button came up on the drop spot
@@ -163,7 +164,21 @@ final class WindowStash: ObservableObject {
               let window = AXWindowTools.focusedWindow(of: front.processIdentifier), AXWindowTools.isStandard(window),
               let frame = AXWindowTools.frame(of: window),
               WindowStashPolicy.isPushedAgainstTop(frame, screen: screen.frame, menuBarHeight: screen.menuBarHeight) else { return }
-        Task { await stash(window, pid: front.processIdentifier, returningTo: frame) }
+        DynamicIslandViewCoordinator.shared.suppressHoverOpen(for: 1.5)
+        Task { if await stash(window, pid: front.processIdentifier, returningTo: frame) { confirm(front.processIdentifier) } }
+    }
+
+    /// "Stashed · Chrome" under the closed notch for a moment.
+    private var confirmWork: DispatchWorkItem?
+    private func confirm(_ pid: pid_t) {
+        setDropTarget(.stashed(NSRunningApplication(processIdentifier: pid)?.localizedName ?? "Window"))
+        confirmWork?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self, case .stashed = self.dropTarget else { return }
+            self.setDropTarget(.none)
+        }
+        confirmWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.6, execute: work)
     }
 
     private func setDropTarget(_ target: DropTarget) {
@@ -184,7 +199,7 @@ final class WindowStash: ObservableObject {
             lastMessage = "No window in front to stash."
             return
         }
-        await stash(window, pid: app.processIdentifier, returningTo: frame)
+        if await stash(window, pid: app.processIdentifier, returningTo: frame) { confirm(app.processIdentifier) }
     }
 
     /// Parks every window except the front app's.

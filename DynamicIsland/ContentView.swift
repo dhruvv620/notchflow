@@ -2105,6 +2105,14 @@ struct ContentView: View {
     private func handleHover(_ hovering: Bool) {
         hoverTask?.cancel()
 
+        // A button held down while arriving means something is being dragged:
+        // a window toward the stash's drop spot (which the closed notch shows),
+        // or a file for the Shelf (opened by its own drop detector). Don't grow,
+        // peek or open under it.
+        if hovering, vm.notchState == .closed, NSEvent.pressedMouseButtons & 0x1 != 0 {
+            return
+        }
+
         if hovering {
             startHoverClickMonitor()
             removeStickyTerminalClickMonitor()

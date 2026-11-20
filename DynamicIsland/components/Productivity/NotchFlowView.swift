@@ -492,8 +492,24 @@ struct WindowStashDropActivity: View {
     let isHovering: Bool
 
     var body: some View {
+        if case .stashed(let app) = stash.dropTarget {
+            ClosedNotchWings(isHovering: isHovering) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(appearance.accentColor)
+                Text("Stashed").font(.system(size: 10, weight: .semibold)).foregroundStyle(.white.opacity(0.9)).lineLimit(1)
+            } trailing: {
+                Text(app).font(.system(size: 10, weight: .semibold)).foregroundStyle(appearance.accentColor).lineLimit(1)
+            }
+            .accessibilityLabel("Stashed \(app). It's in the Flow tab.")
+        } else {
+            dropHint
+        }
+    }
+
+    private var dropHint: some View {
         let over = stash.dropTarget == .over
-        ClosedNotchWings(isHovering: isHovering) {
+        return ClosedNotchWings(isHovering: isHovering) {
             Image(systemName: over ? "tray.and.arrow.down.fill" : "tray.and.arrow.down")
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(over ? appearance.accentColor : .white.opacity(0.7))
