@@ -221,6 +221,15 @@ printf '\nChecking WhatsApp message parsing...\n'
 # Release.command sets the version shown to users and the build number
 # Sparkle compares; local builds keep the project's own values.
 VERSION_SETTINGS=()
+# A Release build made here (not by Release.command) checks for updates. Give
+# it the current version and a build number from the commit count, so the
+# updater never offers an older published release as an "update".
+if [ "$CONFIGURATION" = Release ] && [ -z "${NOTCHFLOW_BUILD_NUMBER:-}" ]; then
+    NOTCHFLOW_BUILD_NUMBER="$(git -C "$SOURCE_DIR" rev-list --count HEAD 2>/dev/null || true)"
+    if [ -z "${NOTCHFLOW_MARKETING_VERSION:-}" ] && [ -f "$SOURCE_DIR/VERSION" ]; then
+        NOTCHFLOW_MARKETING_VERSION="$(/usr/bin/tr -d '[:space:]' < "$SOURCE_DIR/VERSION")"
+    fi
+fi
 if [ -n "${NOTCHFLOW_MARKETING_VERSION:-}" ]; then VERSION_SETTINGS+=("MARKETING_VERSION=$NOTCHFLOW_MARKETING_VERSION"); fi
 if [ -n "${NOTCHFLOW_BUILD_NUMBER:-}" ]; then VERSION_SETTINGS+=("CURRENT_PROJECT_VERSION=$NOTCHFLOW_BUILD_NUMBER"); fi
 

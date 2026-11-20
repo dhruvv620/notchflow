@@ -34,8 +34,9 @@ cd notchflow && bash Build.command && open -a NotchFlow
 2. Keep each change focused, and follow the existing style: Swift API Design Guidelines, small views, and logic that can be tested kept in Foundation-only files under `DynamicIsland/helpers/` with a regression test in `tests/`.
 3. Adding or changing a setting? Read [docs/SETTINGS.md](docs/SETTINGS.md) first; `tests/test_settings_integrity.py` checks its rules.
 4. Run `bash Build.command` and make sure it finishes without errors.
-5. Describe the change for users in the Unreleased section of [CHANGELOG.md](CHANGELOG.md).
-6. Open a pull request with what changed and why, and screenshots or a short recording for anything visible.
+5. For anything that runs in the background, compare `bash tools/energy-report.sh 5 before` and `… 5 after` (CPU, energy impact, idle wake-ups, memory).
+6. Describe the change for users in the Unreleased section of [CHANGELOG.md](CHANGELOG.md).
+7. Open a pull request with what changed and why, and screenshots or a short recording for anything visible.
 
 ## Design
 
