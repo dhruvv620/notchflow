@@ -20,9 +20,11 @@ enum SettingsCleanup {
         "extensionNotchExperienceCapacity", "enableExtensionFileSharing",
         // The clipboard button in the notch header (replaced by the Focus button).
         "showClipboardIcon",
+        // Time tracking was on by default; it is now off until turned on again.
+        "enableTimeTracking",
     ]
 
-    private static let doneKey = "settingsCleanup.v3"
+    private static let doneKey = "settingsCleanup.v4"
 
     static func run(defaults: UserDefaults = .standard) {
         guard !defaults.bool(forKey: doneKey) else { return }

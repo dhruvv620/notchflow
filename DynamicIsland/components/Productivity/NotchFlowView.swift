@@ -12,7 +12,7 @@ struct NotchFlowView: View {
     @ObservedObject private var promises = PromiseKeeper.shared
     @ObservedObject private var appearance = NotchAppearanceModel.shared
     @ObservedObject private var coordinator = DynamicIslandViewCoordinator.shared
-    @Default(.enableTimeTracking) private var trackingEnabled
+    @Default(.timeTrackingEnabled) private var trackingEnabled
     @Default(.enableWorkspaces) private var workspacesEnabled
     @Default(.enablePromiseKeeper) private var promisesEnabled
     @Default(.timeTrackingGoalHours) private var goalHours
@@ -38,12 +38,10 @@ struct NotchFlowView: View {
                 .transition(.opacity)
             }
             if let suggestion = workspaces.suggestion, workspacesEnabled { suggestionBanner(suggestion) }
-            if workspaces.showDaySummary { daySummary }
+            // Time tracking shows only when turned on in Settings > Productivity.
+            if workspaces.showDaySummary && trackingEnabled { daySummary }
             if trackingEnabled {
                 if showWeek { WeekReportView(report: tracker.weekReport()) } else { todayView }
-            } else {
-                NotchEmptyState(symbol: "clock", title: "Time tracking is off",
-                                detail: "Turn it on in Settings > Productivity to see where your day goes.")
             }
         }
         .notchTabPadding()

@@ -10,7 +10,9 @@ import SwiftUI
 
 extension Defaults.Keys {
     /// Track which apps, sites and projects your time goes to (on this Mac only).
-    static let enableTimeTracking = Key<Bool>("enableTimeTracking", default: true)
+    /// Off by default (it reads the front browser tab); the earlier
+    /// "enableTimeTracking" key, on by default, is cleared by SettingsCleanup.
+    static let timeTrackingEnabled = Key<Bool>("timeTrackingEnabled", default: false)
     /// Read the address of the front browser tab, so sites are told apart.
     static let timeTrackingSites = Key<Bool>("timeTrackingSites", default: true)
     /// The daily work goal, in hours.
@@ -96,7 +98,7 @@ final class TimeTracker: ObservableObject {
     private func tick(now: Date) {
         rollOverIfNeeded(now: now)
         checkWeeklyReport(now: now)
-        guard Defaults[.enableTimeTracking], !isAsleep else { lastTick = nil; return }
+        guard Defaults[.timeTrackingEnabled], !isAsleep else { lastTick = nil; return }
         let interval = EnergyState.interval(.timeTracking)
         let gap = max(now.timeIntervalSince(lastTick ?? now), 0)
         // A long gap means sampling was paused (locked, asleep): count nothing for it.
@@ -203,7 +205,7 @@ final class TimeTracker: ObservableObject {
 
     /// Friday from 5 pm, once a week.
     private func checkWeeklyReport(now: Date) {
-        guard Defaults[.enableTimeTracking], Defaults[.timeTrackingWeeklyReport], !weeklyReportReady else { return }
+        guard Defaults[.timeTrackingEnabled], Defaults[.timeTrackingWeeklyReport], !weeklyReportReady else { return }
         let calendar = Calendar.current
         guard calendar.component(.weekday, from: now) == 6, calendar.component(.hour, from: now) >= 17 else { return }
         let week = "\(calendar.component(.yearForWeekOfYear, from: now))-\(calendar.component(.weekOfYear, from: now))"

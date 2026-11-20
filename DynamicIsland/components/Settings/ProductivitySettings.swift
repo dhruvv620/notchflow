@@ -11,7 +11,7 @@ struct ProductivitySettings: View {
     @ObservedObject private var tracker = TimeTracker.shared
     @ObservedObject private var keeper = PromiseKeeper.shared
     @ObservedObject private var workspaces = WorkspaceManager.shared
-    @Default(.enableTimeTracking) private var trackingEnabled
+    @Default(.timeTrackingEnabled) private var trackingEnabled
     @Default(.timeTrackingGoalHours) private var goalHours
     @Default(.timeTrackingWorkCategories) private var workCategories
     @Default(.timeTrackingProjects) private var extraProjects
@@ -49,7 +49,7 @@ struct ProductivitySettings: View {
 
     private var timeSection: some View {
         Section {
-            Defaults.Toggle(key: .enableTimeTracking) {
+            Defaults.Toggle(key: .timeTrackingEnabled) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Track where my time goes")
                     Text("NotchFlow notes the app in front every few seconds (and the website, for browsers) and adds up your day by category and project. Idle time and a locked screen don't count. Everything stays on this Mac.")

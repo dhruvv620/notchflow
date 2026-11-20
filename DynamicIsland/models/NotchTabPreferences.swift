@@ -94,7 +94,7 @@ enum NotchBuiltinTab: String, CaseIterable, Identifiable {
         case .calendar: return Defaults[.showCalendar]
         case .terminal: return Defaults[.enableTerminalFeature]
         case .agents: return Defaults[.enableAgentsFeature]
-        case .flow: return Defaults[.enableTimeTracking] || Defaults[.enableWorkspaces]
+        case .flow: return Defaults[.timeTrackingEnabled] || Defaults[.enableWorkspaces]
         }
     }
     var settingsDestination: String {
@@ -154,7 +154,7 @@ final class NotchTabPreferences: ObservableObject {
         changes.append(Defaults.publisher(.enableMinimalisticUI, options: []).map { _ in true }.eraseToAnyPublisher())
         changes.append(Defaults.publisher(.communicationsEnabled, options: []).map { _ in true }.eraseToAnyPublisher())
         changes.append(Defaults.publisher(.enableWhatsAppFeature, options: []).map { _ in true }.eraseToAnyPublisher())
-        changes.append(Defaults.publisher(.enableTimeTracking, options: []).map { _ in true }.eraseToAnyPublisher())
+        changes.append(Defaults.publisher(.timeTrackingEnabled, options: []).map { _ in true }.eraseToAnyPublisher())
         changes.append(Defaults.publisher(.enableWorkspaces, options: []).map { _ in true }.eraseToAnyPublisher())
         Publishers.MergeMany(changes)
             .receive(on: RunLoop.main).sink { [weak self] _ in

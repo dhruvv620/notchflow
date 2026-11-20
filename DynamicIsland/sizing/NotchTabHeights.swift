@@ -92,8 +92,8 @@ extension NotchViews {
             // Sessions beside a conversation and its message field.
             return .taller(by: 90)
         case .flow:
-            // Workspace chips above today's time.
-            return .taller(by: 50)
+            // Workspace chips above today's time; just the chips without time tracking.
+            return Defaults[.timeTrackingEnabled] ? .taller(by: 50) : .preset
         case .notifications:
             // A short inbox gets a short panel; a long one grows a little.
             return .fitsContent(shrinkBy: 40, growBy: 60)

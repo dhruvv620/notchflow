@@ -68,7 +68,7 @@ struct ContentView: View {
     @ObservedObject var timeTracker = TimeTracker.shared
     @ObservedObject var promiseKeeper = PromiseKeeper.shared
     @Default(.timeTrackingShowRing) var timeTrackingShowRing
-    @Default(.enableTimeTracking) var enableTimeTracking
+    @Default(.timeTrackingEnabled) var enableTimeTracking
     @ObservedObject var agentHub = AgentHub.shared
     @Default(.agentShowWorkingInClosedNotch) var agentShowWorkingInClosedNotch
     @ObservedObject var remindersManager = RemindersManager.shared
