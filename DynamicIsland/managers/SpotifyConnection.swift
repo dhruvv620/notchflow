@@ -191,9 +191,9 @@ final class SpotifyConnection: ObservableObject {
 
     // MARK: Search
 
-    func search(_ query: String) async throws -> [SpotifyTrack] {
-        guard let url = SpotifyAPIPolicy.searchURL(query, market: Locale.current.region?.identifier) else { return [] }
-        var request = URLRequest(url: url, timeoutInterval: 15)
+    func search(_ query: String, limit: Int = 10, timeout: TimeInterval = 15) async throws -> [SpotifyTrack] {
+        guard let url = SpotifyAPIPolicy.searchURL(query, market: Locale.current.region?.identifier, limit: limit) else { return [] }
+        var request = URLRequest(url: url, timeoutInterval: timeout)
         request.setValue("Bearer \(try await validToken())", forHTTPHeaderField: "Authorization")
         let (data, response) = try await URLSession.shared.data(for: request)
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
@@ -222,7 +222,26 @@ final class SpotifyConnection: ObservableObject {
 
     /// Starts a track through Spotify: on the device already playing, else
     /// on this Mac's Spotify app, without touching its window.
-    func play(trackURI: String, albumURI: String? = nil) async -> PlayResult {
+    /// Songs like `seed` to play after it, found on Spotify (see SongRadioPolicy).
+    func radio(after seed: SongRadioPolicy.Song) async -> [String] {
+        let candidates = await SongRadio.candidates(for: seed)
+        guard !candidates.isEmpty else { return [] }
+        var found = [String?](repeating: nil, count: candidates.count)
+        await withTaskGroup(of: (Int, String?).self) { group in
+            for (index, song) in candidates.enumerated() {
+                group.addTask { @MainActor in
+                    let tracks = (try? await self.search(SongRadioPolicy.spotifyQuery(for: song), limit: 3, timeout: 4)) ?? []
+                    let match = tracks.first { SongRadioPolicy.isMatch(title: $0.title, artists: $0.artists, for: song) }
+                    return (index, match?.uri)
+                }
+            }
+            for await (index, uri) in group { found[index] = uri }
+        }
+        var seen = Set<String>()
+        return found.compactMap { $0 }.filter { seen.insert($0).inserted }
+    }
+
+    func play(trackURI: String, albumURI: String? = nil, upNext: [String] = []) async -> PlayResult {
         guard canControlPlayback else { return .failed(nil) }
         do {
             var listRequest = URLRequest(url: SpotifyAPIPolicy.devicesURL, timeoutInterval: 10)
@@ -238,7 +257,7 @@ final class SpotifyConnection: ObservableObject {
             request.httpMethod = "PUT"
             request.setValue("Bearer \(try await validToken())", forHTTPHeaderField: "Authorization")
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            request.httpBody = SpotifyAPIPolicy.playBody(trackURI: trackURI, albumURI: albumURI)
+            request.httpBody = SpotifyAPIPolicy.playBody(trackURI: trackURI, albumURI: albumURI, upNext: upNext)
             let (data, response) = try await URLSession.shared.data(for: request)
             let status = (response as? HTTPURLResponse)?.statusCode ?? 0
             if (200..<300).contains(status) {
@@ -261,6 +280,21 @@ final class SpotifyConnection: ObservableObject {
         }
         if status == 403 { return .failed("Spotify only lets Premium accounts start songs from other apps.") }
         return .failed(nil)
+    }
+}
+
+/// Deezer's public artist radio, for songs like the one you picked (no account).
+enum SongRadio {
+    static func candidates(for seed: SongRadioPolicy.Song) async -> [SongRadioPolicy.Song] {
+        func fetch(_ url: URL) async -> Data? {
+            try? await URLSession.shared.data(for: URLRequest(url: url, timeoutInterval: 4)).0
+        }
+        guard let searchURL = SongRadioPolicy.deezerSearchURL(title: seed.title, artist: seed.artist),
+              let found = await fetch(searchURL),
+              let artistID = SongRadioPolicy.deezerArtistID(from: found),
+              let radioURL = SongRadioPolicy.deezerRadioURL(artistID: artistID),
+              let radio = await fetch(radioURL) else { return [] }
+        return SongRadioPolicy.upNext(SongRadioPolicy.songs(fromRadio: radio), after: seed)
     }
 }
 

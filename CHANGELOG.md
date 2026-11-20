@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 ### Fixed
-- **Next works after playing a searched Spotify song**: a song picked in the notch played on its own, with nothing after it, so Next did nothing. It now plays inside its album, as in Spotify, so Next and Previous move through the album.
+- **Song radio for songs played from the notch**: a song picked in the notch's search played on its own, so Next did nothing. Now it starts with up to 20 songs like it lined up after it, as Spotify's song radio and Autoplay do, so Next and Previous keep going. Spotify doesn't give new apps its recommendations, so the similar songs come from Deezer's public artist radio and are matched on Spotify. When none are found, the song plays inside its album instead. Needs Spotify connected (Settings > Music).
 
 ## [1.2.4] - 2026-11-20
 

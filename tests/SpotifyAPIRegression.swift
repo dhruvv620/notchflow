@@ -50,6 +50,9 @@ struct SpotifyAPIRegression {
         try require(String(decoding: P.playBody(trackURI: "spotify:track:X"), as: UTF8.self) == #"{"uris":["spotify:track:X"]}"#, "Play body")
         try require(String(decoding: P.playBody(trackURI: "spotify:track:X", albumURI: "spotify:album:A"), as: UTF8.self)
                     == #"{"context_uri":"spotify:album:A","offset":{"uri":"spotify:track:X"}}"#, "Play inside the album")
+        try require(String(decoding: P.playBody(trackURI: "spotify:track:X", albumURI: "spotify:album:A",
+                                                upNext: ["spotify:track:Y", "spotify:track:X", "spotify:track:Z"]), as: UTF8.self)
+                    == #"{"uris":["spotify:track:X","spotify:track:Y","spotify:track:Z"]}"#, "Play with its radio after it")
         try require(P.isScopeError("Insufficient client scope") && !P.isScopeError("Forbidden") && !P.isScopeError(nil), "Scope error")
         try require(P.token(from: Data(#"{"error":"invalid_grant","error_description":"Invalid authorization code"}"#.utf8)) == nil
                     && P.errorMessage(in: Data(#"{"error":"invalid_grant","error_description":"Invalid authorization code"}"#.utf8)) == "Invalid authorization code",

@@ -195,11 +195,14 @@ enum SpotifyAPIPolicy {
         return components?.url
     }
 
-    /// Starts the track inside its album when the album is known, so Next
-    /// and Previous move through the album as in Spotify; else the track alone.
-    static func playBody(trackURI: String, albumURI: String? = nil) -> Data {
+    /// Starts the track with songs like it after it (its radio) when there
+    /// are some, else inside its album, so Next and Previous have somewhere
+    /// to go; else the track alone.
+    static func playBody(trackURI: String, albumURI: String? = nil, upNext: [String] = []) -> Data {
         let body: [String: Any]
-        if let albumURI {
+        if !upNext.isEmpty {
+            body = ["uris": [trackURI] + upNext.filter { $0 != trackURI }.prefix(49)]
+        } else if let albumURI {
             body = ["context_uri": albumURI, "offset": ["uri": trackURI]]
         } else {
             body = ["uris": [trackURI]]

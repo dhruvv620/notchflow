@@ -123,7 +123,8 @@ final class MusicSearchService: ObservableObject {
                 if uri == nil { uri = MusicSearchPolicy.spotifyTrackURI(from: await Self.link(for: result, on: "spotify")) }
                 if let uri {
                     // Its album when Spotify's search found it, so Next plays the album's next track.
-                    await playOnSpotify(uri, album: result.spotifyURI == uri ? result.spotifyAlbumURI : nil, title: result.title)
+                    await playOnSpotify(uri, album: result.spotifyURI == uri ? result.spotifyAlbumURI : nil,
+                                        title: result.title, artist: result.artist)
                 } else if let url = MusicSearchPolicy.spotifySearchURL(title: result.title, artist: result.artist) {
                     Self.openInBackground(url)
                     message = SpotifyConnection.shared.isConnected
@@ -149,15 +150,24 @@ final class MusicSearchService: ObservableObject {
     /// isn't open anywhere is opened normally once (it always shows its
     /// window when it starts) and then plays. Without the connection, the
     /// Spotify app is told to play it.
-    private func playOnSpotify(_ uri: String, album: String?, title: String) async {
+    private func playOnSpotify(_ uri: String, album: String?, title: String, artist: String) async {
         let spotifyID = "com.spotify.client"
         let connection = SpotifyConnection.shared
         var note: String?
 
+        // Songs like it after it, as Spotify's radio does (the album when none are found).
+        var upNext: [String] = []
+        if connection.canControlPlayback {
+            message = "Finding songs like \(title)…"
+            upNext = await connection.radio(after: SongRadioPolicy.Song(title: title, artist: artist))
+        }
+
         func played(_ result: SpotifyConnection.PlayResult) -> Bool {
             switch result {
             case .played(let elsewhere):
-                message = elsewhere.map { "Playing \(title) on Spotify (\($0))." } ?? "Playing \(title) on Spotify."
+                let place = elsewhere.map { " (\($0))" } ?? ""
+                message = upNext.isEmpty ? "Playing \(title) on Spotify\(place)."
+                    : "Playing \(title) on Spotify\(place), with songs like it up next."
                 return true
             case .noDevice:
                 return false
@@ -168,7 +178,7 @@ final class MusicSearchService: ObservableObject {
         }
 
         // Spotify already open here or on another device: start it there, nothing comes forward.
-        if connection.canControlPlayback, played(await connection.play(trackURI: uri, albumURI: album)) { return }
+        if connection.canControlPlayback, played(await connection.play(trackURI: uri, albumURI: album, upNext: upNext)) { return }
 
         if NSRunningApplication.runningApplications(withBundleIdentifier: spotifyID).isEmpty {
             guard let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: spotifyID) else {
@@ -181,7 +191,7 @@ final class MusicSearchService: ObservableObject {
                 // This Mac's Spotify shows up as a device a few seconds after it opens.
                 for _ in 0..<12 {
                     try? await Task.sleep(for: .seconds(1))
-                    let result = await connection.play(trackURI: uri, albumURI: album)
+                    let result = await connection.play(trackURI: uri, albumURI: album, upNext: upNext)
                     if played(result) { return }
                     if case .failed = result { break }
                 }
