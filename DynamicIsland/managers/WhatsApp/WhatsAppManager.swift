@@ -448,7 +448,7 @@ final class WhatsAppManager: ObservableObject {
                     self.qrExpiresAt = nil
                 }
             }
-            func linked() async -> Bool {
+            @MainActor func linked() async -> Bool {
                 await self.refreshStatus(slot)
                 self.recomputeState()
                 return self.linkStates[slot]?.isLinked == true

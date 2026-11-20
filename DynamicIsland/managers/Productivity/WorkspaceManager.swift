@@ -415,7 +415,7 @@ final class WorkspaceManager: ObservableObject {
                             if Self.windowCountOnAnyDesktop(of: running.processIdentifier) == 0, let url {
                                 let configuration = NSWorkspace.OpenConfiguration()
                                 configuration.activates = true
-                                NSWorkspace.shared.openApplication(at: url, configuration: configuration)
+                                NSWorkspace.shared.openApplication(at: url, configuration: configuration, completionHandler: nil)
                             } else {
                                 self?.lastMessage = "Allow NotchFlow to control \(app.name) (System Settings › Privacy & Security › Automation) so setups can open its windows."
                             }
