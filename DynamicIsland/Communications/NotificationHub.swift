@@ -10,6 +10,9 @@ extension Defaults.Keys {
     static let notificationReadCenterHistory = Key<Bool>("notificationReadCenterHistory", default: true)
     /// Announce new notifications in the closed notch.
     static let notificationAlertInNotch = Key<Bool>("notificationAlertInNotch", default: true)
+    /// Replying to someone (from the notch, Messages, your phone or WhatsApp)
+    /// clears the rest of that conversation's notifications.
+    static let notificationClearOnReply = Key<Bool>("notificationClearOnReply", default: true)
     /// Bundle identifiers whose notifications are never collected.
     static let notificationMutedApps = Key<[String]>("notificationMutedApps", default: [])
     /// Highest Notification Center record already collected.
@@ -345,6 +348,23 @@ final class NotificationHub: ObservableObject {
         offerUndo(removed)
     }
 
+    /// Removes every notification in this item's conversation (Rahul's five
+    /// messages once you've answered one).
+    func clearConversation(of item: NotchNotification, offeringUndo: Bool) {
+        let removed = items.filter { NotchNotificationPolicy.isSameConversation(item, $0) }
+        guard !removed.isEmpty else { return }
+        replaceItems(items.filter { !NotchNotificationPolicy.isSameConversation(item, $0) })
+        if offeringUndo { offerUndo(removed) }
+    }
+
+    /// You answered in a chat somewhere else (Messages, your phone, WhatsApp):
+    /// its notifications here are read.
+    func clearConversation(answeredIn route: NotchNotification.ReplyRoute) {
+        guard Defaults[.notificationClearOnReply], let key = NotchNotificationPolicy.chatKey(route) else { return }
+        let remaining = items.filter { NotchNotificationPolicy.chatKey($0.reply) != key }
+        if remaining.count != items.count { replaceItems(remaining) }
+    }
+
     func clearGroup(_ key: String) {
         let removed = items.filter { $0.groupKey == key }
         guard !removed.isEmpty else { return }
@@ -470,6 +490,7 @@ final class NotificationHub: ObservableObject {
                 repliedIDs.insert(item.id)
                 if replyingID == item.id { replyingID = nil }
             }
+            if Defaults[.notificationClearOnReply] { clearConversation(of: item, offeringUndo: true) }
         }
         return sent
     }

@@ -811,7 +811,13 @@ final class WhatsAppManager: ObservableObject {
                                      replyingTo: lastText(in: chatID, before: message.timestamp, fromMe: !message.isFromMe,
                                                           excluding: message.id))
 
-        guard !message.isFromMe else { return }
+        guard !message.isFromMe else {
+            // You answered this chat (from the notch or your phone): its notifications are read.
+            if Date().timeIntervalSince(message.timestamp) < 600 {
+                NotificationHub.shared.clearConversation(answeredIn: .whatsapp(chatJID: chatID))
+            }
+            return
+        }
         if !isIgnored(chatID), Date().timeIntervalSince(message.timestamp) < 600 {
             NotificationHub.shared.ingestWhatsApp(
                 message,

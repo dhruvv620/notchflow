@@ -106,6 +106,28 @@ struct NotificationHubRegression {
                     == .messages(chatID: "iMessage;-;+15551234567"), "Messages route")
         try require(N.lastingReplyRoute(bundleIdentifier: "com.tinyspeck.slackmacgap", threadID: "919876543210@s.whatsapp.net") == .none, "Slack route")
 
+        // One reply clears the conversation: Rahul's five messages, not Riya's.
+        func message(_ id: String, _ sender: String, chat: String?, at seconds: TimeInterval) -> NotchNotification {
+            NotchNotification(id: id, source: .notificationCenter, bundleIdentifier: "com.apple.MobileSMS", appName: "Messages",
+                              title: sender, subtitle: "", body: "hi", date: Date(timeIntervalSince1970: seconds), threadID: chat,
+                              reply: chat.map { .messages(chatID: $0) } ?? .none, liveBannerID: nil)
+        }
+        let rahul = (1...5).map { message("r\($0)", "Rahul", chat: "iMessage;-;+919800000001", at: TimeInterval($0)) }
+        let riya = message("y1", "Riya", chat: "iMessage;-;+919800000002", at: 3)
+        let rahulBanner = NotchNotification(id: "banner-r", source: .banner, bundleIdentifier: "com.apple.MobileSMS", appName: "Messages",
+                                            title: "Rahul", subtitle: "", body: "kal?", date: Date(timeIntervalSince1970: 6),
+                                            threadID: nil, reply: .banner(id: "b"), liveBannerID: "b")
+        try require((rahul + [riya, rahulBanner]).filter { NotchNotificationPolicy.isSameConversation(rahul[4], $0) }.count == 6,
+                    "Rahul's conversation")
+        try require(NotchNotificationPolicy.isSameConversation(rahulBanner, rahul[0]), "Rahul's banner not in his conversation")
+        try require(!NotchNotificationPolicy.isSameConversation(rahul[0], riya), "Riya's message in Rahul's conversation")
+        try require(NotchNotificationPolicy.chatKey(.messages(chatID: "any;-;+919800000001"))
+                    == NotchNotificationPolicy.chatKey(.messages(chatID: "iMessage;-;+919800000001")), "Messages chat ids from Messages history")
+        try require(NotchNotificationPolicy.chatKey(.whatsapp(chatJID: "919800000001@s.whatsapp.net"))
+                    == NotchNotificationPolicy.chatKey(.whatsappApp(phone: "919800000001")), "WhatsApp chat keys")
+        try require(!NotchNotificationPolicy.isSameConversation(rahul[0], item("s1", app: "com.tinyspeck.slackmacgap", name: "Slack", title: "Rahul", body: "hi", at: 1)),
+                    "Slack and Messages are one conversation")
+
         // An old notification hovered in the open Notification Center panel, an hour later.
         let browsed = item("banner-w", app: "com.apple.MobileSMS", name: "Messages", title: "Selene", body: "Are you coming?", at: 3_700, source: .banner)
         try require(NotchNotificationPolicy.isSameNotification(browsed, as: stored, window: .infinity), "Panel card not matched to its notification")

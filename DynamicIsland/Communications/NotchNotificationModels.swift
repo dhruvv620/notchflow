@@ -98,6 +98,35 @@ enum NotchNotificationPolicy {
         return clean(banner.title) == clean(existing.title) && clean(banner.body) == clean(existing.body) && !clean(banner.body).isEmpty
     }
 
+    /// The chat a reply route points at ("messages:iMessage;-;+1555…",
+    /// "whatsapp:9198…@s.whatsapp.net", "whatsapp:9198…" for the Mac app).
+    static func chatKey(_ route: NotchNotification.ReplyRoute) -> String? {
+        switch route {
+        case .messages(let chat):
+            // "iMessage;-;+1555…", "SMS;-;+1555…" and "any;-;+1555…" are one chat.
+            let parts = chat.lowercased().split(separator: ";", maxSplits: 1, omittingEmptySubsequences: false)
+            return "messages:" + (parts.count == 2 ? String(parts[1]) : chat.lowercased())
+        case .whatsapp(let jid): return "whatsapp:" + (jid.split(separator: "@").first.map(String.init) ?? jid)
+        case .whatsappApp(let phone): return "whatsapp:" + phone
+        case .banner, .none: return nil
+        }
+    }
+
+    /// Whether two notifications belong to the same conversation: the same
+    /// chat when both name one, otherwise the same app and sender.
+    static func isSameConversation(_ lhs: NotchNotification, _ rhs: NotchNotification) -> Bool {
+        if lhs.id == rhs.id { return true }
+        func app(_ item: NotchNotification) -> String {
+            if let id = item.bundleIdentifier, whatsAppBundleIdentifiers.contains(id) { return "whatsapp" }
+            return item.groupKey
+        }
+        guard app(lhs) == app(rhs) else { return false }
+        if let left = chatKey(lhs.reply), let right = chatKey(rhs.reply) { return left == right }
+        if let left = lhs.threadID, let right = rhs.threadID, !left.isEmpty, !right.isEmpty { return left == right }
+        func person(_ item: NotchNotification) -> String { item.headline.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+        return !person(lhs).isEmpty && person(lhs) == person(rhs)
+    }
+
     /// A key for "this was just announced", so the same message isn't announced twice.
     static func announcementKey(_ item: NotchNotification) -> String {
         [item.bundleIdentifier ?? item.appName, item.title, item.body]

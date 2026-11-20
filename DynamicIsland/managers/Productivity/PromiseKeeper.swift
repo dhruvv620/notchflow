@@ -125,6 +125,10 @@ final class PromiseKeeper: ObservableObject {
             messagesHistoryStatus = nil
             if Int(batch.latestRowID) != Defaults[.messagesHistoryLastRowID] { Defaults[.messagesHistoryLastRowID] = Int(batch.latestRowID) }
             for message in batch.messages {
+                // You answered this chat (here or on your phone): its notifications are read.
+                if message.fromMe, !message.chatGUID.isEmpty {
+                    NotificationHub.shared.clearConversation(answeredIn: .messages(chatID: message.chatGUID))
+                }
                 let person = message.groupName.isEmpty ? personName(forChat: message.chatGUID, handle: message.handle) : message.groupName
                 let route: TrackedPromise.Route = message.chatGUID.isEmpty ? .none : .messages(chatID: message.chatGUID)
                 observe(text: message.text, fromMe: message.fromMe, person: person, route: route, sourceName: "Messages",

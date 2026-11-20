@@ -146,6 +146,13 @@ struct CommunicationsSettingsView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     Toggle("Show notification and caller previews", isOn: $showPreviews)
                     Defaults.Toggle(key: .notificationAlertInNotch) { Text("Announce new notifications in the closed notch") }
+                    Defaults.Toggle(key: .notificationClearOnReply) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Clear a conversation when I reply")
+                            Text("Answer Rahul once and all his messages leave the inbox, whether you replied from the notch, Messages, your phone or WhatsApp.")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
                     Toggle("Respect Focus for notification alerts", isOn: $respectFocus)
                     Text("Reply appears only when the source exposes a native reply action. Otherwise, use Open app. Visible browser notifications may provide fewer actions than desktop apps.")
                         .font(.caption).foregroundStyle(.secondary)
