@@ -91,7 +91,7 @@ final class NativeNotificationBridge: @unchecked Sendable {
         var next: [String: Record] = [:]
         var result: [CommunicationNotification] = []
         /// Cards seen for the first time in this scan, and whether each already looks browsed.
-        var arrivals: [(id: String, browsed: Bool, age: TimeInterval?)] = []
+        var arrivals: [(id: String, message: String, browsed: Bool, age: TimeInterval?)] = []
         let now = Date()
         var windowCount = 0
         var candidateCount = 0
@@ -130,7 +130,8 @@ final class NativeNotificationBridge: @unchecked Sendable {
                         } ?? false
                         let looksBrowsed = NotificationCardPolicy.isBrowsedInPanel(shownAge: age, pointerOnCard: pointerOnCard,
                                                                                    newCardsInScan: 0)
-                        arrivals.append((id, looksBrowsed, age))
+                        let message = [card.content.app.rawValue, card.content.sender, card.content.body].joined(separator: "\u{1f}")
+                        arrivals.append((id, message, looksBrowsed, age))
                     }
                     let date = firstSeen[id] ?? now
                     next[id] = Record(card: element, pid: pid, content: card.content, observedAt: Date())
@@ -190,8 +191,9 @@ final class NativeNotificationBridge: @unchecked Sendable {
             }
         }
         records = next
-        // Several unknown cards at once means the panel was opened.
-        let arrivedTogether = Set(arrivals.map(\.id)).count
+        // Several unknown messages at once means the panel was opened. (One
+        // banner can be read from more than one element, so count messages.)
+        let arrivedTogether = Set(arrivals.map(\.message)).count
         for arrival in arrivals {
             if arrival.browsed || NotificationCardPolicy.isBrowsedInPanel(shownAge: arrival.age, pointerOnCard: false,
                                                                           newCardsInScan: arrivedTogether) {

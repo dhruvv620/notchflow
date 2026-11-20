@@ -71,6 +71,21 @@ struct NotificationHubRegression {
         try require(!NotchNotificationPolicy.isSameNotification(late, as: stored), "Banners minutes apart merged")
         let other = item("banner-z", app: "com.apple.MobileSMS", name: "Messages", title: "Khushii", body: "Are you coming?", at: 101, source: .banner)
         try require(!NotchNotificationPolicy.isSameNotification(other, as: stored), "Different senders merged")
+        // The WhatsApp app on this Mac and the linked account: the same message once, other messages always.
+        let gateway = NotchNotification(id: "wa-1", source: .whatsapp, bundleIdentifier: "net.whatsapp.WhatsApp", appName: "WhatsApp",
+                                        title: "Riya · Family", subtitle: "", body: "Running 10 minutes late", date: Date(timeIntervalSince1970: 500),
+                                        threadID: nil, reply: .none, liveBannerID: nil)
+        let macApp = item("nc-2", app: "net.whatsapp.WhatsApp", name: "WhatsApp", title: "Family", body: "Riya: Running 10 minutes late", at: 503)
+        try require(NotchNotificationPolicy.isSameWhatsAppMessage(macApp, gateway) && NotchNotificationPolicy.isSameWhatsAppMessage(gateway, macApp),
+                    "Same WhatsApp message not merged")
+        let personal = item("nc-3", app: "net.whatsapp.WhatsApp", name: "WhatsApp", title: "Mom", body: "Call me when free", at: 502)
+        try require(!NotchNotificationPolicy.isSameWhatsAppMessage(personal, gateway), "Another account's message merged")
+        let shortReply = item("nc-4", app: "net.whatsapp.WhatsApp", name: "WhatsApp", title: "Sam", body: "late", at: 501)
+        try require(!NotchNotificationPolicy.isSameWhatsAppMessage(shortReply, gateway), "A short word matched inside another message")
+        let hourLater = item("nc-5", app: "net.whatsapp.WhatsApp", name: "WhatsApp", title: "Family", body: "Running 10 minutes late", at: 4_000)
+        try require(!NotchNotificationPolicy.isSameWhatsAppMessage(hourLater, gateway), "Messages an hour apart merged")
+        try require(!NotchNotificationPolicy.isSameWhatsAppMessage(macApp, stored), "Messages app treated as WhatsApp")
+
         // An old notification hovered in the open Notification Center panel, an hour later.
         let browsed = item("banner-w", app: "com.apple.MobileSMS", name: "Messages", title: "Selene", body: "Are you coming?", at: 3_700, source: .banner)
         try require(NotchNotificationPolicy.isSameNotification(browsed, as: stored, window: .infinity), "Panel card not matched to its notification")

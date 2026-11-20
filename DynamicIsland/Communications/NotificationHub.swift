@@ -178,7 +178,7 @@ final class NotificationHub: ObservableObject {
                 Defaults[.notificationCenterLastRecordID] = Int(nextLast)
             }
             let incoming = batch.records
-                .filter { !isMuted($0.bundleIdentifier) && !coveredByWhatsAppGateway($0.bundleIdentifier) }
+                .filter { !isMuted($0.bundleIdentifier) }
                 .map { $0.notification(appName: appName(for: $0.bundleIdentifier)) }
             // The first read fills the inbox quietly; later ones announce.
             add(incoming, announce: !isFirstRead)
@@ -213,7 +213,7 @@ final class NotificationHub: ObservableObject {
         var fresh: [NotchNotification] = []
         for banner in banners {
             let bundle = banner.app.bundleIdentifiers.first
-            if isMuted(bundle) || coveredByWhatsAppGateway(bundle) { continue }
+            if isMuted(bundle) { continue }
             let isLive = liveIDs.contains(banner.id)
             let candidate = NotchNotification(
                 id: "banner-\(banner.id)",
@@ -272,18 +272,24 @@ final class NotificationHub: ObservableObject {
         add([item], announce: false)
     }
 
-    private func coveredByWhatsAppGateway(_ bundle: String?) -> Bool {
-        guard let bundle, NotchNotificationPolicy.whatsAppBundleIdentifiers.contains(bundle) else { return false }
-        return Defaults[.enableWhatsAppFeature] && WhatsAppManager.shared.state.isLinked
-    }
-
     // MARK: Inbox changes
 
     private func add(_ incoming: [NotchNotification], announce: Bool) {
         let known = Set(items.map(\.id))
-        let new = incoming.filter { !known.contains($0.id) }
+        // A message the linked WhatsApp account already delivered, shown again
+        // by the WhatsApp app on this Mac (when both are the same account).
+        let new = incoming.filter { item in
+            !known.contains(item.id)
+                && !(item.source != .whatsapp && items.contains { NotchNotificationPolicy.isSameWhatsAppMessage(item, $0) })
+        }
         guard !new.isEmpty else { return }
-        replaceItems(new + items)
+        // And the other way round: the linked account's copy replaces the Mac
+        // app's, since it can be replied to from the notch.
+        let gatewayMessages = new.filter { $0.source == .whatsapp }
+        let remaining = gatewayMessages.isEmpty ? items : items.filter { existing in
+            !gatewayMessages.contains { NotchNotificationPolicy.isSameWhatsAppMessage($0, existing) }
+        }
+        replaceItems(new + remaining)
         // Promises people make you in chat apps (WhatsApp is watched by its gateway).
         for item in new where item.source != .whatsapp && Self.promiseChatApps.contains(item.bundleIdentifier ?? "") {
             let route: TrackedPromise.Route
@@ -297,10 +303,10 @@ final class NotificationHub: ObservableObject {
     }
 
     /// Chat apps whose notifications are checked for promises made to you.
-    private static let promiseChatApps: Set<String> = [
+    private static let promiseChatApps: Set<String> = NotchNotificationPolicy.whatsAppBundleIdentifiers.union([
         NotchNotificationPolicy.messagesBundleIdentifier, "com.tinyspeck.slackmacgap", "ru.keepcoder.Telegram",
         "com.hnc.Discord", "org.whispersystems.signal-desktop", "com.microsoft.teams2",
-    ]
+    ])
 
     private func replaceItems(_ next: [NotchNotification]) {
         let normalized = NotchNotificationPolicy.normalized(next, limit: Self.historyLimit)

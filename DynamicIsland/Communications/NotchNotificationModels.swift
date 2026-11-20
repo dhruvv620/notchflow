@@ -130,6 +130,28 @@ enum NotchNotificationPolicy {
     static let messagesBundleIdentifier = "com.apple.MobileSMS"
     static let whatsAppBundleIdentifiers: Set<String> = ["net.whatsapp.WhatsApp", "desktop.WhatsApp"]
 
+    /// Whether a notification from the WhatsApp app on this Mac and a message
+    /// from the linked WhatsApp account are the same message (when both are
+    /// the same account). They name the chat differently (contact name vs.
+    /// push name, "Sam: hi" in groups), so only the text and time are compared.
+    /// The Mac app may be another account than the linked one (personal vs.
+    /// business): its other messages must still come through.
+    static func isSameWhatsAppMessage(_ lhs: NotchNotification, _ rhs: NotchNotification) -> Bool {
+        guard lhs.source != rhs.source, lhs.source == .whatsapp || rhs.source == .whatsapp,
+              let left = lhs.bundleIdentifier, let right = rhs.bundleIdentifier,
+              whatsAppBundleIdentifiers.contains(left), whatsAppBundleIdentifiers.contains(right),
+              abs(lhs.date.timeIntervalSince(rhs.date)) < 180 else { return false }
+        func clean(_ value: String) -> String {
+            value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        }
+        let a = clean(lhs.body), b = clean(rhs.body)
+        guard !a.isEmpty, !b.isEmpty else { return false }
+        if a == b { return true }
+        let (shorter, longer) = a.count <= b.count ? (a, b) : (b, a)
+        // "Sam: running late" in a group notification is "running late" from the gateway.
+        return shorter.count >= 6 && (longer.hasSuffix(shorter) || longer.hasPrefix(shorter))
+    }
+
     /// Escapes text for a double-quoted AppleScript string literal.
     static func appleScriptString(_ value: String) -> String {
         var result = "\""
