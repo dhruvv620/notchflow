@@ -36,8 +36,17 @@ enum SpotifyAPIPolicy {
 
     /// What NotchFlow asks for: your account's country, which search uses to
     /// pick tracks you can play (without it, Spotify answers search with
-    /// "Insufficient client scope").
-    static let scopes = "user-read-private"
+    /// "Insufficient client scope"), and seeing and starting playback on your
+    /// devices, so a song plays without Spotify's window coming forward.
+    static let searchScopes = "user-read-private"
+    static let playbackScopes = "user-read-playback-state user-modify-playback-state"
+    static var scopes: String { searchScopes + " " + playbackScopes }
+
+    /// Whether every one of `required` is among `granted` (space-separated).
+    static func grants(_ granted: String, _ required: String) -> Bool {
+        let set = Set(granted.split(separator: " ").map(String.init))
+        return required.split(separator: " ").allSatisfy { set.contains(String($0)) }
+    }
 
     /// The page where you approve NotchFlow.
     static func authorizeURL(clientID: String, codeChallenge: String, state: String) -> URL? {
@@ -78,11 +87,16 @@ enum SpotifyAPIPolicy {
         /// The permissions Spotify granted, space-separated (nil when not said).
         var scope: String? = nil
 
-        /// Whether it carries what NotchFlow asks for now.
+        /// Whether search can use it.
         var hasRequiredScopes: Bool {
             guard let scope else { return true }
-            let granted = Set(scope.split(separator: " ").map(String.init))
-            return scopes.split(separator: " ").allSatisfy { granted.contains(String($0)) }
+            return grants(scope, searchScopes)
+        }
+
+        /// Whether it can start playback (false when not said: ask again).
+        var canControlPlayback: Bool {
+            guard let scope else { return false }
+            return grants(scope, playbackScopes)
         }
     }
 
@@ -133,6 +147,53 @@ enum SpotifyAPIPolicy {
             return SpotifyTrack(uri: uri, title: title, artists: artists, album: album?["name"] as? String ?? "",
                                 artworkURL: (images.last ?? images.first).flatMap(URL.init(string:)))
         }
+    }
+
+    // MARK: Playback
+
+    /// One of your Spotify devices (this Mac's app, your phone, a speaker).
+    struct Device: Equatable {
+        let id: String
+        let name: String
+        let type: String
+        let isActive: Bool
+        let isRestricted: Bool
+    }
+
+    static let devicesURL = URL(string: "https://api.spotify.com/v1/me/player/devices")!
+
+    static func devices(from data: Data) -> [Device] {
+        guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let items = object["devices"] as? [[String: Any]] else { return [] }
+        return items.compactMap { item in
+            guard let id = item["id"] as? String, !id.isEmpty else { return nil }
+            return Device(id: id, name: item["name"] as? String ?? "", type: item["type"] as? String ?? "",
+                          isActive: item["is_active"] as? Bool ?? false, isRestricted: item["is_restricted"] as? Bool ?? false)
+        }
+    }
+
+    /// Where a song picked in the notch plays: the device already playing
+    /// (or last used), else this Mac's Spotify (a computer named like this
+    /// Mac, or the only computer). Never a phone or speaker that isn't in use.
+    static func device(toPlayOn devices: [Device], computerName: String?) -> Device? {
+        let usable = devices.filter { !$0.isRestricted }
+        if let active = usable.first(where: \.isActive) { return active }
+        let computers = usable.filter { $0.type.lowercased() == "computer" }
+        if let computerName, let mac = computers.first(where: { $0.name.caseInsensitiveCompare(computerName) == .orderedSame }) {
+            return mac
+        }
+        return computers.count == 1 ? computers[0] : nil
+    }
+
+    /// Starts a track on a device.
+    static func playURL(deviceID: String) -> URL? {
+        var components = URLComponents(string: "https://api.spotify.com/v1/me/player/play")
+        components?.queryItems = [URLQueryItem(name: "device_id", value: deviceID)]
+        return components?.url
+    }
+
+    static func playBody(trackURI: String) -> Data {
+        (try? JSONSerialization.data(withJSONObject: ["uris": [trackURI]])) ?? Data()
     }
 
     /// The code (or error) from the browser's request to the callback:

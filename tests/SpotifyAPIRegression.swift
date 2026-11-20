@@ -18,7 +18,7 @@ struct SpotifyAPIRegression {
         try require(authorize.hasPrefix("https://accounts.spotify.com/authorize?client_id=abc123&response_type=code")
                     && authorize.contains("redirect_uri=http://127.0.0.1:47863/callback")
                     && authorize.contains("code_challenge_method=S256&code_challenge=chal&state=st")
-                    && authorize.hasSuffix("&scope=user-read-private"), "Authorize URL: \(authorize)")
+                    && authorize.hasSuffix("&scope=user-read-private%20user-read-playback-state%20user-modify-playback-state"), "Authorize URL: \(authorize)")
         try require(P.tokenBody(code: "c d", verifier: "v", clientID: "id")
                     == "client_id=id&code=c%20d&code_verifier=v&grant_type=authorization_code&redirect_uri=http%3A%2F%2F127.0.0.1%3A47863%2Fcallback",
                     "Token body: \(P.tokenBody(code: "c d", verifier: "v", clientID: "id"))")
@@ -28,6 +28,26 @@ struct SpotifyAPIRegression {
         let scoped = P.token(from: Data(#"{"access_token":"A","expires_in":3600,"scope":"user-read-private user-read-email"}"#.utf8))
         let unscoped = P.token(from: Data(#"{"access_token":"A","expires_in":3600,"scope":""}"#.utf8))
         try require(scoped?.hasRequiredScopes == true && unscoped?.hasRequiredScopes == false, "Granted scopes")
+        let playback = P.token(from: Data(#"{"access_token":"A","expires_in":3600,"scope":"user-modify-playback-state user-read-private user-read-playback-state"}"#.utf8))
+        try require(playback?.canControlPlayback == true && scoped?.canControlPlayback == false && token?.canControlPlayback == false,
+                    "Playback scopes")
+        let devicesJSON = #"""
+        {"devices":[
+          {"id":"phone1","is_active":false,"is_restricted":false,"name":"My iPhone","type":"Smartphone"},
+          {"id":"mac1","is_active":false,"is_restricted":false,"name":"My MacBook Pro","type":"Computer"},
+          {"id":"tv","is_active":false,"is_restricted":true,"name":"TV","type":"TV"},
+          {"id":null,"is_active":false,"name":"Ghost","type":"Computer"}
+        ]}
+        """#
+        let devices = P.devices(from: Data(devicesJSON.utf8))
+        try require(devices.count == 3, "Devices: \(devices)")
+        try require(P.device(toPlayOn: devices, computerName: "my macbook pro")?.id == "mac1", "This Mac")
+        try require(P.device(toPlayOn: devices, computerName: "Other")?.id == "mac1", "The only computer")
+        try require(P.device(toPlayOn: devices.filter { $0.type != "Computer" }, computerName: nil) == nil, "Not an idle phone")
+        let phoneActive = devices.map { P.Device(id: $0.id, name: $0.name, type: $0.type, isActive: $0.id == "phone1", isRestricted: $0.isRestricted) }
+        try require(P.device(toPlayOn: phoneActive, computerName: "My MacBook Pro")?.id == "phone1", "The device in use")
+        try require(P.playURL(deviceID: "mac1")?.absoluteString == "https://api.spotify.com/v1/me/player/play?device_id=mac1", "Play URL")
+        try require(String(decoding: P.playBody(trackURI: "spotify:track:X"), as: UTF8.self) == #"{"uris":["spotify:track:X"]}"#, "Play body")
         try require(P.isScopeError("Insufficient client scope") && !P.isScopeError("Forbidden") && !P.isScopeError(nil), "Scope error")
         try require(P.token(from: Data(#"{"error":"invalid_grant","error_description":"Invalid authorization code"}"#.utf8)) == nil
                     && P.errorMessage(in: Data(#"{"error":"invalid_grant","error_description":"Invalid authorization code"}"#.utf8)) == "Invalid authorization code",

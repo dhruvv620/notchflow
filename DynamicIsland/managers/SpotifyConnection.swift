@@ -10,6 +10,8 @@ import SwiftUI
 extension Defaults.Keys {
     /// The Client ID of your own Spotify developer app (not a secret).
     static let spotifyClientID = Key<String>("spotifyClientID", default: "")
+    /// The permissions Spotify granted the connection (not a secret).
+    static let spotifyGrantedScopes = Key<String>("spotifyGrantedScopes", default: "")
 }
 
 /// "Log in with Spotify" for the Music tab's search: authorization code with
@@ -21,6 +23,10 @@ final class SpotifyConnection: ObservableObject {
 
     enum State: Equatable { case notConnected, connecting, connected, failed(String) }
     @Published private(set) var state: State = .notConnected
+    /// Whether songs can be started through Spotify (no window coming
+    /// forward). A connection made before NotchFlow asked for it needs one
+    /// more Connect.
+    @Published private(set) var canControlPlayback = SpotifyAPIPolicy.grants(Defaults[.spotifyGrantedScopes], SpotifyAPIPolicy.playbackScopes)
 
     private static let refreshAccount = "spotify-refresh-token"
     private var accessToken: String?
@@ -64,6 +70,8 @@ final class SpotifyConnection: ObservableObject {
         SecretStore.write("", account: Self.refreshAccount)
         accessToken = nil
         accessExpiry = .distantPast
+        Defaults[.spotifyGrantedScopes] = ""
+        canControlPlayback = false
         stopListening()
         state = .notConnected
     }
@@ -156,6 +164,10 @@ final class SpotifyConnection: ObservableObject {
         accessExpiry = Date().addingTimeInterval(token.expiresIn - 60)
         // Spotify may hand out a new refresh token; keep the newest.
         if let refresh = token.refreshToken { SecretStore.write(refresh, account: Self.refreshAccount) }
+        if let scope = token.scope {
+            Defaults[.spotifyGrantedScopes] = scope
+            canControlPlayback = token.canControlPlayback
+        }
     }
 
     /// A valid access token, refreshed when it has run out.
@@ -197,6 +209,59 @@ final class SpotifyConnection: ObservableObject {
         }
         return SpotifyAPIPolicy.tracks(from: data)
     }
+
+    // MARK: Playback
+
+    enum PlayResult: Equatable {
+        /// Started; `deviceName` when it's not a computer (your phone, a speaker).
+        case played(elsewhere: String?)
+        /// None of your devices can take it right now (Spotify isn't open anywhere).
+        case noDevice
+        case failed(String?)
+    }
+
+    /// Starts a track through Spotify: on the device already playing, else
+    /// on this Mac's Spotify app, without touching its window.
+    func play(trackURI: String) async -> PlayResult {
+        guard canControlPlayback else { return .failed(nil) }
+        do {
+            var listRequest = URLRequest(url: SpotifyAPIPolicy.devicesURL, timeoutInterval: 10)
+            listRequest.setValue("Bearer \(try await validToken())", forHTTPHeaderField: "Authorization")
+            let (listData, listResponse) = try await URLSession.shared.data(for: listRequest)
+            let listStatus = (listResponse as? HTTPURLResponse)?.statusCode ?? 0
+            guard listStatus == 200 else { return failure(status: listStatus, data: listData) }
+            let devices = SpotifyAPIPolicy.devices(from: listData)
+            guard let device = SpotifyAPIPolicy.device(toPlayOn: devices, computerName: Host.current().localizedName),
+                  let url = SpotifyAPIPolicy.playURL(deviceID: device.id) else { return .noDevice }
+
+            var request = URLRequest(url: url, timeoutInterval: 10)
+            request.httpMethod = "PUT"
+            request.setValue("Bearer \(try await validToken())", forHTTPHeaderField: "Authorization")
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = SpotifyAPIPolicy.playBody(trackURI: trackURI)
+            let (data, response) = try await URLSession.shared.data(for: request)
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            if (200..<300).contains(status) {
+                return .played(elsewhere: device.type.lowercased() == "computer" ? nil : device.name)
+            }
+            if status == 404 { return .noDevice }
+            return failure(status: status, data: data)
+        } catch {
+            return .failed(nil)
+        }
+    }
+
+    private func failure(status: Int, data: Data) -> PlayResult {
+        if status == 401 { accessExpiry = .distantPast }
+        let reason = SpotifyAPIPolicy.errorMessage(in: data)
+        if status == 403 || status == 401, SpotifyAPIPolicy.isScopeError(reason) {
+            Defaults[.spotifyGrantedScopes] = ""
+            canControlPlayback = false
+            return .failed("Reconnect Spotify in Settings › Music so songs play without Spotify coming forward.")
+        }
+        if status == 403 { return .failed("Spotify only lets Premium accounts start songs from other apps.") }
+        return .failed(nil)
+    }
 }
 
 /// Settings › Music: connect your Spotify, so the Music tab's search uses
@@ -216,6 +281,9 @@ struct SpotifyConnectRow: View {
                 Spacer()
                 switch spotify.state {
                 case .connected:
+                    if !spotify.canControlPlayback {
+                        Button("Reconnect") { spotify.connect() }
+                    }
                     Button("Disconnect", role: .destructive) { spotify.disconnect() }
                 case .connecting:
                     ProgressView().controlSize(.small)
@@ -253,7 +321,10 @@ struct SpotifyConnectRow: View {
 
     private var status: String {
         switch spotify.state {
-        case .connected: return "Connected: Spotify searches use Spotify's catalog and play the exact track."
+        case .connected:
+            return spotify.canControlPlayback
+                ? "Connected: Spotify searches use Spotify's catalog and play the exact track, without Spotify coming forward."
+                : "Connected for search. Click Reconnect and Agree so songs also play without Spotify coming forward."
         case .connecting: return "Waiting for you to agree in the browser…"
         case .notConnected: return "Not connected: Spotify songs are matched through song.link."
         case .failed(let reason): return reason

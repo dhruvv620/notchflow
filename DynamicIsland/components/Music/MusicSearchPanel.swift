@@ -121,13 +121,7 @@ final class MusicSearchService: ObservableObject {
                 var uri = result.spotifyURI
                 if uri == nil { uri = MusicSearchPolicy.spotifyTrackURI(from: await Self.link(for: result, on: "spotify")) }
                 if let uri {
-                    do {
-                        try await Self.playInBackground(uri)
-                        message = "Playing \(result.title) on Spotify."
-                    } catch {
-                        // Found, but macOS didn't let NotchFlow tell Spotify to play.
-                        message = "Allow NotchFlow to control Spotify: System Settings › Privacy & Security › Automation."
-                    }
+                    await playOnSpotify(uri, title: result.title)
                 } else if let url = MusicSearchPolicy.spotifySearchURL(title: result.title, artist: result.artist) {
                     Self.openInBackground(url)
                     message = SpotifyConnection.shared.isConnected
@@ -147,34 +141,59 @@ final class MusicSearchService: ObservableObject {
         }
     }
 
-    /// Plays a track in Spotify without Spotify coming forward: a Spotify
-    /// that isn't running is started hidden first (an app launched by a
-    /// command otherwise opens its window in front), and if it still jumps
-    /// forward when it starts playing, it's hidden again and you're back
-    /// where you were.
-    private static func playInBackground(_ uri: String) async throws {
+    /// Plays a track on Spotify. Connected (with permission to start
+    /// playback), Spotify's servers start it on the device in use or this
+    /// Mac's app, and Spotify's window stays where it is. A Spotify that
+    /// isn't open anywhere is opened normally once (it always shows its
+    /// window when it starts) and then plays. Without the connection, the
+    /// Spotify app is told to play it.
+    private func playOnSpotify(_ uri: String, title: String) async {
         let spotifyID = "com.spotify.client"
-        let previous = NSWorkspace.shared.frontmostApplication
-        var launchedNow = false
-        if NSRunningApplication.runningApplications(withBundleIdentifier: spotifyID).isEmpty,
-           let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: spotifyID) {
-            let configuration = NSWorkspace.OpenConfiguration()
-            configuration.activates = false
-            configuration.hides = true
-            _ = try? await NSWorkspace.shared.openApplication(at: url, configuration: configuration)
-            launchedNow = true
-            // Ready to take commands a moment after it starts.
-            try? await Task.sleep(for: .seconds(2.5))
+        let connection = SpotifyConnection.shared
+        var note: String?
+
+        func played(_ result: SpotifyConnection.PlayResult) -> Bool {
+            switch result {
+            case .played(let elsewhere):
+                message = elsewhere.map { "Playing \(title) on Spotify (\($0))." } ?? "Playing \(title) on Spotify."
+                return true
+            case .noDevice:
+                return false
+            case .failed(let reason):
+                note = reason
+                return false
+            }
         }
-        try await AppleScriptHelper.executeVoid(MusicSearchPolicy.spotifyPlayScript(trackURI: uri))
-        try? await Task.sleep(for: .milliseconds(400))
-        guard let spotify = NSRunningApplication.runningApplications(withBundleIdentifier: spotifyID).first else { return }
-        let spotifyWasInFront = previous?.bundleIdentifier == spotifyID
-        if spotify.isActive, !spotifyWasInFront {
-            spotify.hide()
-            if let previous, previous.bundleIdentifier != Bundle.main.bundleIdentifier { previous.activate() }
-        } else if launchedNow, !spotify.isHidden {
-            spotify.hide()
+
+        // Spotify already open here or on another device: start it there, nothing comes forward.
+        if connection.canControlPlayback, played(await connection.play(trackURI: uri)) { return }
+
+        if NSRunningApplication.runningApplications(withBundleIdentifier: spotifyID).isEmpty {
+            guard let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: spotifyID) else {
+                message = "Spotify isn't installed on this Mac."
+                return
+            }
+            message = "Opening Spotify…"
+            _ = try? await NSWorkspace.shared.openApplication(at: app, configuration: NSWorkspace.OpenConfiguration())
+            if connection.canControlPlayback, note == nil {
+                // This Mac's Spotify shows up as a device a few seconds after it opens.
+                for _ in 0..<12 {
+                    try? await Task.sleep(for: .seconds(1))
+                    let result = await connection.play(trackURI: uri)
+                    if played(result) { return }
+                    if case .failed = result { break }
+                }
+            } else {
+                try? await Task.sleep(for: .seconds(2.5))
+            }
+        }
+
+        do {
+            try await AppleScriptHelper.executeVoid(MusicSearchPolicy.spotifyPlayScript(trackURI: uri))
+            message = ["Playing \(title) on Spotify.", note].compactMap { $0 }.joined(separator: " ")
+        } catch {
+            // Found, but macOS didn't let NotchFlow tell Spotify to play.
+            message = note ?? "Allow NotchFlow to control Spotify: System Settings › Privacy & Security › Automation."
         }
     }
 
