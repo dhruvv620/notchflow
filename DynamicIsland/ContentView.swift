@@ -1920,15 +1920,22 @@ struct ContentView: View {
            let contextView = NotchContextTabResolver.preferredView() {
             coordinator.currentView = contextView
         }
-        withAnimation(.bouncy.speed(1.2)) {
-            vm.open()
-            if let announced {
+        if let announced {
+            // Switch to Notifications before opening, without the tab slide, so
+            // the notch opens straight onto it (the slide ran during the open
+            // morph and made it lurch sideways).
+            var instant = Transaction()
+            instant.disablesAnimations = true
+            withTransaction(instant) {
                 coordinator.currentView = .notifications
                 notificationHub.filter = nil
                 // Land on the announced notification with its actions showing.
                 notificationHub.highlight(announced.id)
                 notificationHub.dismissAlert()
             }
+        }
+        withAnimation(.bouncy.speed(1.2)) {
+            vm.open()
         }
     }
 

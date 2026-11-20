@@ -102,10 +102,13 @@ class DynamicIslandViewCoordinator: ObservableObject {
 
     /// Lets a tab say how much room its content needs. The notch animates to
     /// the height its rule allows; nil returns the tab to its default height.
-    func reportContentHeight(_ height: CGFloat?, for view: NotchViews) {
+    /// A tab's measured height. `asTabAppears` for the first measurement as a
+    /// tab appears: it uses the notch's own opening spring, so the opening
+    /// simply heads for the right height instead of resizing again after it.
+    func reportContentHeight(_ height: CGFloat?, for view: NotchViews, asTabAppears: Bool = false) {
         let value = height.map { NotchTabHeightPolicy.quantized($0) }
         guard reportedContentHeights[view] != value else { return }
-        withAnimation(.smooth(duration: NotchTabHeightPolicy.animationDuration)) {
+        withAnimation(asTabAppears ? .bouncy.speed(1.2) : .smooth(duration: NotchTabHeightPolicy.animationDuration)) {
             reportedContentHeights[view] = value
         }
     }

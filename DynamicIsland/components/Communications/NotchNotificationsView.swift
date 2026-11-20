@@ -19,6 +19,8 @@ struct NotchNotificationsView: View {
     /// Header row, spacing and padding around the list.
     private static let chromeHeight: CGFloat = 36
     private static let emptyStateHeight: CGFloat = 130
+    /// Whether the list was measured since the tab appeared (main thread only).
+    nonisolated(unsafe) private static var measuredSinceAppear = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -35,7 +37,7 @@ struct NotchNotificationsView: View {
             } else if hub.items.isEmpty {
                 emptyInbox
                     .onAppear {
-                        DynamicIslandViewCoordinator.shared.reportContentHeight(Self.emptyStateHeight, for: .notifications)
+                        DynamicIslandViewCoordinator.shared.reportContentHeight(Self.emptyStateHeight, for: .notifications, asTabAppears: true)
                     }
             } else {
                 list
@@ -56,6 +58,7 @@ struct NotchNotificationsView: View {
             vm.setAutoCloseSuppression(value != nil, token: token)
         }
         .onDisappear {
+            Self.measuredSinceAppear = false
             hub.markViewed()
             hub.replyingID = nil
             vm.setAutoCloseSuppression(false, token: token)
@@ -138,9 +141,14 @@ struct NotchNotificationsView: View {
             // The panel follows the list: a couple of notifications make a
             // short notch, a long inbox a taller one, within the tab's limits.
             .onPreferenceChange(NotificationListHeightKey.self) { height in
-                // The preference callback is not main-actor isolated on newer SDKs.
-                Task { @MainActor in
-                    DynamicIslandViewCoordinator.shared.reportContentHeight(height + Self.chromeHeight, for: .notifications)
+                // Reported in the same pass (a Task waited a frame, so the notch
+                // opened at the old height and then resized). The first height
+                // after the tab appears uses the opening's own spring.
+                MainActor.assumeIsolated {
+                    let first = !Self.measuredSinceAppear
+                    Self.measuredSinceAppear = true
+                    DynamicIslandViewCoordinator.shared.reportContentHeight(height + Self.chromeHeight, for: .notifications,
+                                                                            asTabAppears: first)
                 }
             }
             .onHover { vm.setScrollGestureSuppression($0, token: token) }
