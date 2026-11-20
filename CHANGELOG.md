@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 ### Fixed
+- **No more doubled notifications**: with banners read the instant they appear, a message's banner often reached the inbox before Notification Center's record of it, and the two showed as separate notifications (one with Reply, one without). The record now merges into the banner's entry: one notification, with Reply, announced once.
 - **Notifications arrive instantly**: instead of checking every few seconds (up to ten on battery), NotchFlow now reacts the moment Notification Center's store changes and the moment a banner appears on screen; the timed checks remain as a slow backup.
 - **Cleared notifications stay cleared**: replying to a WhatsApp message (or clearing or dismissing notifications) while its macOS banner was still on screen let the banner bring it straight back into the inbox. What you clear is remembered for a day.
 - **Setups respect desktops**: a setup works on the desktop you're on. It saves and moves only that desktop's windows, never touches a window on another desktop, opens a new browser window here when the setup's is elsewhere, and no longer activates an app at the end (which could jump to another desktop where its window was and then move that window). Switching desktops while a setup is being placed stops it.

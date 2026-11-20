@@ -294,10 +294,30 @@ final class NotificationHub: ObservableObject {
     // MARK: Inbox changes
 
     private func add(_ incoming: [NotchNotification], announce: Bool) {
+        // Notification Center's record of a message whose banner was read first
+        // (banners are read the instant they appear): one notification, keeping
+        // the record's reply route and the banner's live actions, announced once.
+        var merged = items
+        var arriving: [NotchNotification] = []
+        for item in incoming {
+            guard item.source != .banner, !merged.contains(where: { $0.id == item.id }),
+                  let index = merged.firstIndex(where: { $0.source == .banner && NotchNotificationPolicy.isSameNotification($0, as: item) })
+            else { arriving.append(item); continue }
+            let banner = merged[index]
+            var combined = item
+            combined.liveBannerID = banner.liveBannerID
+            if !combined.reply.isAvailable { combined.reply = banner.reply }
+            merged[index] = combined
+            if alert?.id == banner.id { alert = combined }
+            if highlightedID == banner.id { highlightedID = combined.id }
+            if replyingID == banner.id { replyingID = combined.id }
+        }
+        if merged != items { replaceItems(merged) }
+
         let known = Set(items.map(\.id))
         // A message the linked WhatsApp account already delivered, shown again
         // by the WhatsApp app on this Mac (when both are the same account).
-        let new = incoming.filter { item in
+        let new = arriving.filter { item in
             !known.contains(item.id)
                 && !(item.source != .whatsapp && items.contains { NotchNotificationPolicy.isSameWhatsAppMessage(item, $0) })
                 // Yesterday's message handed over again by an app catching up, dated now.
