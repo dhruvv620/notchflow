@@ -208,7 +208,7 @@ final class WorkspaceManager: ObservableObject {
                 let folders = workspace.folders.map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath) }
                 NSWorkspace.shared.open(folders, withApplicationAt: url, configuration: configuration)
             } else {
-                NSWorkspace.shared.openApplication(at: url, configuration: configuration)
+                launch(app, at: url, configuration: configuration)
             }
         }
         if opener == nil {
@@ -236,24 +236,13 @@ final class WorkspaceManager: ObservableObject {
             TimerModesManager.shared.startPomodoro(configuration: Self.pomodoroConfiguration())
         }
         let session = UUID()
-        if workspace.layout == .restore { restoreSession = (session, [:], []) }
         if workspace.layout == .restore {
-            // A saved window that isn't open (Chrome running with its window
-            // closed) is opened again: right away for apps already running,
-            // after a few seconds for apps just launched, which open their own.
-            let alreadyRunning = Set(workspace.apps.map(\.bundleID)).intersection(running)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-                self?.openMissingWindows(workspace, only: alreadyRunning, session: session)
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) { [weak self] in
-                self?.openMissingWindows(workspace, only: Set(workspace.apps.map(\.bundleID)).subtracting(alreadyRunning), session: session)
-            }
-        }
-        if workspace.layout != .none {
+            restoreSession = (session, [:], [])
+            followRestore(workspace, session: session, alreadyRunning: Set(workspace.apps.map(\.bundleID)).intersection(running))
+        } else if workspace.layout != .none {
             // Apps take a moment to open their windows; arrange a few times
             // (more for "exactly as saved", which waits for every window).
-            let delays: [Double] = workspace.layout == .restore ? [0.6, 2.0, 4.5, 6.5, 10.0] : [1.5, 4.0]
-            for delay in delays {
+            for delay in [1.5, 4.0] {
                 DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in self?.arrange(workspace, session: session) }
             }
         }
@@ -336,6 +325,70 @@ final class WorkspaceManager: ObservableObject {
         }
     }
 
+    /// Starts an app the setup needs. If it doesn't start in the background
+    /// (some apps refuse, or the request is lost), it's asked again in the
+    /// usual way, and you're told when it can't be opened at all.
+    private func launch(_ app: WorkspaceApp, at url: URL, configuration: NSWorkspace.OpenConfiguration) {
+        NSWorkspace.shared.openApplication(at: url, configuration: configuration) { running, error in
+            guard running == nil || error != nil else { return }
+            DispatchQueue.main.async {
+                let retry = NSWorkspace.OpenConfiguration()
+                retry.activates = true
+                NSWorkspace.shared.openApplication(at: url, configuration: retry) { running, error in
+                    guard running == nil, let error else { return }
+                    DispatchQueue.main.async { [weak self] in
+                        self?.lastMessage = "\(app.name) didn't open: \(error.localizedDescription)"
+                    }
+                }
+            }
+        }
+    }
+
+    private var restoreTask: Task<Void, Never>?
+
+    /// Follows a window setup as it opens, every half second for up to half
+    /// a minute: each window is put in place as soon as it appears, an app
+    /// that hasn't started is started again, and once an app has started
+    /// (or right away, when it was already running) the windows it didn't
+    /// open itself are opened: a new window in a browser, or the app's own
+    /// reopen. Stops when every window is in place.
+    private func followRestore(_ workspace: Workspace, session: UUID, alreadyRunning: Set<String>) {
+        restoreTask?.cancel()
+        restoreTask = Task { [weak self] in
+            var startedAt: [String: Date] = [:]
+            var opened = Set<String>()
+            var relaunched = Set<String>()
+            for step in 1...60 {
+                try? await Task.sleep(nanoseconds: 500_000_000)
+                guard let self, !Task.isCancelled, self.restoreSession?.id == session else { return }
+                self.arrange(workspace, session: session)
+                if self.isRestoreComplete(workspace, session: session) { return }
+                let elapsed = Double(step) * 0.5
+                for app in workspace.apps where !opened.contains(app.bundleID) {
+                    guard let running = NSRunningApplication.runningApplications(withBundleIdentifier: app.bundleID).first else {
+                        // Not running yet after a few seconds: ask once more.
+                        if elapsed >= 4, relaunched.insert(app.bundleID).inserted,
+                           let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: app.bundleID) {
+                            let configuration = NSWorkspace.OpenConfiguration()
+                            configuration.activates = false
+                            self.launch(app, at: url, configuration: configuration)
+                        }
+                        continue
+                    }
+                    // A just-started app opens its own windows first (a browser
+                    // restoring its last windows); give it a moment.
+                    let wait: TimeInterval = alreadyRunning.contains(app.bundleID) ? 0 : 2.5
+                    guard running.isFinishedLaunching else { continue }
+                    let since = startedAt[app.bundleID] ?? Date()
+                    startedAt[app.bundleID] = since
+                    guard Date().timeIntervalSince(since) >= wait else { continue }
+                    opened.insert(app.bundleID)
+                    self.openMissingWindows(workspace, only: [app.bundleID], session: session)
+                }
+            }
+        }
+    }
+
     /// Opens windows the setup saved but that aren't open: a new window in a
     /// browser, or the app's own reopen (as clicking its Dock icon does).
     private func openMissingWindows(_ workspace: Workspace, only bundleIDs: Set<String>, session: UUID) {
@@ -351,8 +404,25 @@ final class WorkspaceManager: ObservableObject {
             let missing = WorkspacePolicy.windowsToOpen(saved: saved, open: unplaced.count)
             guard missing > 0 else { continue }
             if let script = WorkspacePolicy.newWindowScript(for: app.bundleID) {
-                // A new browser window opens on the desktop you're on.
-                Task { for _ in 0..<missing { try? await AppleScriptHelper.executeVoid(script) } }
+                // A new browser window opens on the desktop you're on. If the
+                // browser can't be told (Automation not allowed), its reopen does it.
+                let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: app.bundleID)
+                Task { @MainActor [weak self] in
+                    for _ in 0..<missing {
+                        do {
+                            try await AppleScriptHelper.executeVoid(script)
+                        } catch {
+                            if Self.windowCountOnAnyDesktop(of: running.processIdentifier) == 0, let url {
+                                let configuration = NSWorkspace.OpenConfiguration()
+                                configuration.activates = true
+                                NSWorkspace.shared.openApplication(at: url, configuration: configuration)
+                            } else {
+                                self?.lastMessage = "Allow NotchFlow to control \(app.name) (System Settings › Privacy & Security › Automation) so setups can open its windows."
+                            }
+                            break
+                        }
+                    }
+                }
             } else if Self.windowCountOnAnyDesktop(of: running.processIdentifier) == 0,
                       let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: app.bundleID) {
                 // No window anywhere: reopening it puts one here.
