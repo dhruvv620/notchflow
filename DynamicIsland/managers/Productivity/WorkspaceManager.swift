@@ -144,7 +144,8 @@ final class WorkspaceManager: ObservableObject {
             .filter { $0.activationPolicy == .regular && !$0.isHidden }
             .compactMap { app -> WorkspaceApp? in
                 guard let id = app.bundleIdentifier, id != own, !WorkspacePolicy.alwaysRunning.contains(id) else { return nil }
-                let windows = standardWindows(of: app).compactMap { window -> WorkspaceWindow? in
+                // Only this desktop's windows: a setup is the desktop you made it on.
+                let windows = windowsOnThisDesktop(of: app).compactMap { window -> WorkspaceWindow? in
                     guard let frame = frame(of: window) else { return nil }
                     return WorkspaceWindow(frame: frame, title: title(of: window))
                 }
@@ -197,6 +198,9 @@ final class WorkspaceManager: ObservableObject {
         let opener = WorkspacePolicy.folderOpener(for: workspace)
         for app in workspace.apps {
             guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: app.bundleID) else { continue }
+            // A window setup leaves running apps alone (opening one could switch
+            // to the desktop where its window is); missing windows are handled below.
+            if workspace.layout == .restore && running.contains(app.bundleID) { continue }
             if !running.contains(app.bundleID) { launchedToday.insert(app.bundleID) }
             let configuration = NSWorkspace.OpenConfiguration()
             configuration.activates = false
@@ -253,10 +257,25 @@ final class WorkspaceManager: ObservableObject {
                 DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in self?.arrange(workspace, session: session) }
             }
         }
-        // Bring the first app to the front at the end.
-        if let first = workspace.apps.first,
-           let app = NSRunningApplication.runningApplications(withBundleIdentifier: first.bundleID).first {
+        // Bring the first app to the front at the end, unless that would switch
+        // to another desktop (its windows are elsewhere); window setups stay on
+        // the desktop you're on.
+        if workspace.layout != .restore, let first = workspace.apps.first,
+           let app = NSRunningApplication.runningApplications(withBundleIdentifier: first.bundleID).first,
+           !Self.onScreenWindowFrames(of: app.processIdentifier).isEmpty {
             app.activate()
+        }
+        // Switching desktops while the windows are being placed stops it there.
+        if workspace.layout == .restore {
+            spaceWatch.map(NSWorkspace.shared.notificationCenter.removeObserver)
+            spaceWatch = NSWorkspace.shared.notificationCenter.addObserver(
+                forName: NSWorkspace.activeSpaceDidChangeNotification, object: nil, queue: .main
+            ) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    guard let self, self.restoreSession?.id == session else { return }
+                    self.restoreSession = nil
+                }
+            }
         }
         withAnimation(.smooth(duration: 0.25)) { activeID = workspace.id; showDaySummary = false }
         lastMessage = "Opened \(workspace.name)."
@@ -327,17 +346,23 @@ final class WorkspaceManager: ObservableObject {
             guard saved > 0,
                   let running = NSRunningApplication.runningApplications(withBundleIdentifier: app.bundleID).first else { continue }
             let placedWindows = restoreSession?.windows ?? []
-            let unplaced = Self.standardWindows(of: running, includeMinimized: true)
+            let unplaced = Self.windowsOnThisDesktop(of: running)
                 .filter { window in !placedWindows.contains { CFEqual($0, window) } }
             let missing = WorkspacePolicy.windowsToOpen(saved: saved, open: unplaced.count)
             guard missing > 0 else { continue }
             if let script = WorkspacePolicy.newWindowScript(for: app.bundleID) {
+                // A new browser window opens on the desktop you're on.
                 Task { for _ in 0..<missing { try? await AppleScriptHelper.executeVoid(script) } }
-            } else if Self.standardWindows(of: running, includeMinimized: true).isEmpty,
+            } else if Self.windowCountOnAnyDesktop(of: running.processIdentifier) == 0,
                       let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: app.bundleID) {
+                // No window anywhere: reopening it puts one here.
                 let configuration = NSWorkspace.OpenConfiguration()
                 configuration.activates = true
                 NSWorkspace.shared.openApplication(at: url, configuration: configuration)
+            } else {
+                // Its window is on another desktop: left there (switching to it
+                // would take you away from this one).
+                lastMessage = "\(app.name)'s window is on another desktop, so it was left there."
             }
         }
     }
@@ -349,6 +374,42 @@ final class WorkspaceManager: ObservableObject {
     /// passes only look for windows that hadn't appeared yet, so a window you
     /// minimize or move right after isn't pulled back.
     private var restoreSession: (id: UUID, placed: [String: Set<Int>], windows: [AXUIElement])?
+    private var spaceWatch: NSObjectProtocol?
+
+    /// The frames of an app's windows on the desktop you're looking at (Window
+    /// Server's on-screen list holds only the current desktop's windows).
+    private static func onScreenWindowFrames(of pid: pid_t) -> [CGRect] {
+        guard let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
+                as? [[String: Any]] else { return [] }
+        return list.compactMap { info in
+            guard (info[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value == pid,
+                  (info[kCGWindowLayer as String] as? NSNumber)?.intValue == 0,
+                  let bounds = info[kCGWindowBounds as String] as? [String: Any] else { return nil }
+            return CGRect(dictionaryRepresentation: bounds as CFDictionary)
+        }
+    }
+
+    /// How many normal windows an app has on any desktop.
+    private static func windowCountOnAnyDesktop(of pid: pid_t) -> Int {
+        guard let list = CGWindowListCopyWindowInfo([.optionAll, .excludeDesktopElements], kCGNullWindowID)
+                as? [[String: Any]] else { return 0 }
+        return list.filter { info in
+            (info[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value == pid
+                && (info[kCGWindowLayer as String] as? NSNumber)?.intValue == 0
+                && ((info[kCGWindowBounds as String] as? [String: Any]).flatMap { CGRect(dictionaryRepresentation: $0 as CFDictionary) }?.height ?? 0) > 40
+        }.count
+    }
+
+    /// The app's normal windows on the desktop you're on: never one on
+    /// another desktop, so a setup made on Desktop 2 leaves Desktop 1 alone.
+    private static func windowsOnThisDesktop(of app: NSRunningApplication) -> [AXUIElement] {
+        let visible = onScreenWindowFrames(of: app.processIdentifier)
+        return standardWindows(of: app, includeMinimized: false).filter { window in
+            guard let frame = frame(of: window) else { return false }
+            return visible.contains { abs($0.minX - frame.minX) < 3 && abs($0.minY - frame.minY) < 3
+                && abs($0.width - frame.width) < 3 && abs($0.height - frame.height) < 3 }
+        }
+    }
 
     private func restoreWindows(_ workspace: Workspace, session: UUID) {
         guard var current = restoreSession, current.id == session else { return }
@@ -360,13 +421,12 @@ final class WorkspaceManager: ObservableObject {
             let waiting = saved.indices.filter { !done.contains($0) }
             guard !waiting.isEmpty else { continue }
             if running.isHidden { running.unhide() }
-            let windows = Self.standardWindows(of: running, includeMinimized: true)
+            let windows = Self.windowsOnThisDesktop(of: running)
                 .filter { window in !current.windows.contains { CFEqual($0, window) } }
             guard !windows.isEmpty else { continue }
             let titles = windows.map { Self.title(of: $0) ?? "" }
             for pair in WorkspacePolicy.matchWindows(saved: waiting.map { saved[$0] }, titles: titles) {
                 let window = windows[pair.window]
-                AXUIElementSetAttributeValue(window, kAXMinimizedAttribute as CFString, kCFBooleanFalse)
                 Self.move(window, to: WorkspacePolicy.fitted(saved[waiting[pair.saved]].frame, screens: screens))
                 current.placed[app.bundleID, default: []].insert(waiting[pair.saved])
                 current.windows.append(window)

@@ -92,6 +92,12 @@ final class NotificationHub: ObservableObject {
     private static let historyLimit = 200
     private let database = NotificationCenterDatabase()
     private var loop: Task<Void, Never>?
+    /// Reads Notification Center's store the moment it changes, instead of
+    /// waiting for the next poll (which stays as a slow backup).
+    private var databaseWatcher: FileChangeWatcher?
+    /// What you cleared (by app, sender and text), so a banner still on
+    /// screen doesn't bring it straight back.
+    private var clearedKeys: [String: Date] = [:]
     private var alertTask: Task<Void, Never>?
     private var undoTask: Task<Void, Never>?
     private var saveTask: Task<Void, Never>?
@@ -137,17 +143,26 @@ final class NotificationHub: ObservableObject {
     private func configure() {
         loop?.cancel()
         loop = nil
+        databaseWatcher = nil
         guard enabled else {
             centerState = .off
             dismissAlert()
             return
         }
+        if Defaults[.notificationReadCenterHistory], let store = NotificationCenterDatabase.locate() {
+            databaseWatcher = FileChangeWatcher(urls: [store, URL(fileURLWithPath: store.path + "-wal")]) { [weak self] in
+                guard let self, !EnergyState.isPaused(.notificationDatabase) else { return }
+                Task { await self.pollNotificationCenter() }
+            }
+        }
         loop = Task { [weak self] in
             while !Task.isCancelled {
                 guard let self else { return }
-                // Paced by the Optimizer; skipped while the Mac is idle.
+                // Paced by the Optimizer; skipped while the Mac is idle. With the
+                // store watched, this is only a backup.
                 if !EnergyState.isPaused(.notificationDatabase) { await self.pollNotificationCenter() }
-                try? await Task.sleep(for: .seconds(EnergyState.isPaused(.notificationDatabase) ? 5 : EnergyState.interval(.notificationDatabase)))
+                let interval = EnergyState.interval(.notificationDatabase) * (self.databaseWatcher == nil ? 1 : 4)
+                try? await Task.sleep(for: .seconds(EnergyState.isPaused(.notificationDatabase) ? 5 : interval))
             }
         }
     }
@@ -287,6 +302,8 @@ final class NotificationHub: ObservableObject {
                 && !(item.source != .whatsapp && items.contains { NotchNotificationPolicy.isSameWhatsAppMessage(item, $0) })
                 // Yesterday's message handed over again by an app catching up, dated now.
                 && !items.contains { NotchNotificationPolicy.isRepeat(item, of: $0) }
+                // A banner (or Notification Center card) of something you already cleared.
+                && !(item.source == .banner && clearedKeys[NotchNotificationPolicy.announcementKey(item)] != nil)
         }
         guard !new.isEmpty else { return }
         // And the other way round: the linked account's copy replaces the Mac
@@ -344,7 +361,16 @@ final class NotificationHub: ObservableObject {
         if let banner = item.liveBannerID {
             Task { await CommunicationsManager.shared.dismissNotification(id: banner) }
         }
+        remember(cleared: [item])
         replaceItems(items.filter { $0.id != item.id })
+    }
+
+    /// Cleared notifications stay cleared for a day, even if their banner is
+    /// still on screen (or in Notification Center) and is read again.
+    private func remember(cleared: [NotchNotification]) {
+        let now = Date()
+        clearedKeys = clearedKeys.filter { now.timeIntervalSince($0.value) < 86_400 }
+        for item in cleared { clearedKeys[NotchNotificationPolicy.announcementKey(item)] = now }
     }
 
     /// Clears what is on screen (one app when filtered) and offers Undo.
@@ -352,6 +378,7 @@ final class NotificationHub: ObservableObject {
         let removed = visibleItems
         guard !removed.isEmpty else { return }
         let removedIDs = Set(removed.map(\.id))
+        remember(cleared: removed)
         replaceItems(items.filter { !removedIDs.contains($0.id) })
         if filter == nil { CommunicationsManager.shared.clearHistory() }
         offerUndo(removed)
@@ -362,6 +389,7 @@ final class NotificationHub: ObservableObject {
     func clearConversation(of item: NotchNotification, offeringUndo: Bool) {
         let removed = items.filter { NotchNotificationPolicy.isSameConversation(item, $0) }
         guard !removed.isEmpty else { return }
+        remember(cleared: removed + [item])
         replaceItems(items.filter { !NotchNotificationPolicy.isSameConversation(item, $0) })
         if offeringUndo { offerUndo(removed) }
     }
@@ -371,12 +399,16 @@ final class NotificationHub: ObservableObject {
     func clearConversation(answeredIn route: NotchNotification.ReplyRoute) {
         guard Defaults[.notificationClearOnReply], let key = NotchNotificationPolicy.chatKey(route) else { return }
         let remaining = items.filter { NotchNotificationPolicy.chatKey($0.reply) != key }
-        if remaining.count != items.count { replaceItems(remaining) }
+        if remaining.count != items.count {
+            remember(cleared: items.filter { NotchNotificationPolicy.chatKey($0.reply) == key })
+            replaceItems(remaining)
+        }
     }
 
     func clearGroup(_ key: String) {
         let removed = items.filter { $0.groupKey == key }
         guard !removed.isEmpty else { return }
+        remember(cleared: removed)
         replaceItems(items.filter { $0.groupKey != key })
         offerUndo(removed)
     }
@@ -385,6 +417,7 @@ final class NotificationHub: ObservableObject {
         guard let snapshot = undoSnapshot else { return }
         undoTask?.cancel()
         withAnimation(.snappy) { undoSnapshot = nil }
+        for item in snapshot { clearedKeys[NotchNotificationPolicy.announcementKey(item)] = nil }
         replaceItems(snapshot + items)
     }
 

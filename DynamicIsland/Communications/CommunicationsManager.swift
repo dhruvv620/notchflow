@@ -91,6 +91,8 @@ final class CommunicationsManager: ObservableObject {
         accessibilityPermission.requestAuthorizationPrompt()
         refreshAccess()
     }
+    private var windowWatcher: NotificationCenterWindowWatcher?
+
     private func configure() {
         generation += 1
         loop?.cancel(); loop = nil
@@ -102,6 +104,16 @@ final class CommunicationsManager: ObservableObject {
             alertTask?.cancel()
             Task { await notificationBridge.stop(); await callBridge.stop() }
             return
+        }
+        // A banner is read the moment Notification Center shows it; the scan
+        // below is a slower backup (and catches banners that change in place).
+        if windowWatcher == nil {
+            windowWatcher = NotificationCenterWindowWatcher { [weak self] in
+                guard let self, !EnergyState.isPaused(.bannerScan) else { return }
+                Task { await self.refresh() }
+            }
+        } else {
+            windowWatcher?.attach()
         }
         loop = Task { [weak self] in
             while !Task.isCancelled {
