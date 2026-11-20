@@ -222,7 +222,7 @@ final class SpotifyConnection: ObservableObject {
 
     /// Starts a track through Spotify: on the device already playing, else
     /// on this Mac's Spotify app, without touching its window.
-    func play(trackURI: String) async -> PlayResult {
+    func play(trackURI: String, albumURI: String? = nil) async -> PlayResult {
         guard canControlPlayback else { return .failed(nil) }
         do {
             var listRequest = URLRequest(url: SpotifyAPIPolicy.devicesURL, timeoutInterval: 10)
@@ -238,7 +238,7 @@ final class SpotifyConnection: ObservableObject {
             request.httpMethod = "PUT"
             request.setValue("Bearer \(try await validToken())", forHTTPHeaderField: "Authorization")
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            request.httpBody = SpotifyAPIPolicy.playBody(trackURI: trackURI)
+            request.httpBody = SpotifyAPIPolicy.playBody(trackURI: trackURI, albumURI: albumURI)
             let (data, response) = try await URLSession.shared.data(for: request)
             let status = (response as? HTTPURLResponse)?.statusCode ?? 0
             if (200..<300).contains(status) {

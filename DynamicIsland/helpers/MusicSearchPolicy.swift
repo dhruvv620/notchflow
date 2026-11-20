@@ -37,6 +37,8 @@ struct MusicSearchResult: Identifiable, Equatable, Sendable {
     let storeURL: URL?
     /// The exact Spotify track, when the result came from Spotify's search.
     var spotifyURI: String? = nil
+    /// The track's album on Spotify, to play the song inside it.
+    var spotifyAlbumURI: String? = nil
 }
 
 /// Searching songs (Apple's public catalog, no account needed) and handing
@@ -138,8 +140,10 @@ enum MusicSearchPolicy {
     }
 
     /// Plays a track in the Spotify app, in the background.
-    static func spotifyPlayScript(trackURI: String) -> String {
-        "tell application \"Spotify\" to play track \(appleScriptString(trackURI))"
+    static func spotifyPlayScript(trackURI: String, contextURI: String? = nil) -> String {
+        let play = "tell application \"Spotify\" to play track \(appleScriptString(trackURI))"
+        guard let contextURI else { return play }
+        return play + " in context \(appleScriptString(contextURI))"
     }
 
     static func appleScriptString(_ value: String) -> String {

@@ -59,7 +59,8 @@ final class MusicSearchService: ObservableObject {
                     guard !Task.isCancelled, let self else { return }
                     self.results = tracks.map { track in
                         MusicSearchResult(id: track.uri.hashValue, title: track.title, artist: track.artists, album: track.album,
-                                          artworkURL: track.artworkURL, storeURL: nil, spotifyURI: track.uri)
+                                          artworkURL: track.artworkURL, storeURL: nil, spotifyURI: track.uri,
+                                          spotifyAlbumURI: track.albumURI)
                     }
                     self.isSearching = false
                     if self.results.isEmpty { self.message = "No songs found on Spotify." }
@@ -121,7 +122,8 @@ final class MusicSearchService: ObservableObject {
                 var uri = result.spotifyURI
                 if uri == nil { uri = MusicSearchPolicy.spotifyTrackURI(from: await Self.link(for: result, on: "spotify")) }
                 if let uri {
-                    await playOnSpotify(uri, title: result.title)
+                    // Its album when Spotify's search found it, so Next plays the album's next track.
+                    await playOnSpotify(uri, album: result.spotifyURI == uri ? result.spotifyAlbumURI : nil, title: result.title)
                 } else if let url = MusicSearchPolicy.spotifySearchURL(title: result.title, artist: result.artist) {
                     Self.openInBackground(url)
                     message = SpotifyConnection.shared.isConnected
@@ -147,7 +149,7 @@ final class MusicSearchService: ObservableObject {
     /// isn't open anywhere is opened normally once (it always shows its
     /// window when it starts) and then plays. Without the connection, the
     /// Spotify app is told to play it.
-    private func playOnSpotify(_ uri: String, title: String) async {
+    private func playOnSpotify(_ uri: String, album: String?, title: String) async {
         let spotifyID = "com.spotify.client"
         let connection = SpotifyConnection.shared
         var note: String?
@@ -166,7 +168,7 @@ final class MusicSearchService: ObservableObject {
         }
 
         // Spotify already open here or on another device: start it there, nothing comes forward.
-        if connection.canControlPlayback, played(await connection.play(trackURI: uri)) { return }
+        if connection.canControlPlayback, played(await connection.play(trackURI: uri, albumURI: album)) { return }
 
         if NSRunningApplication.runningApplications(withBundleIdentifier: spotifyID).isEmpty {
             guard let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: spotifyID) else {
@@ -179,7 +181,7 @@ final class MusicSearchService: ObservableObject {
                 // This Mac's Spotify shows up as a device a few seconds after it opens.
                 for _ in 0..<12 {
                     try? await Task.sleep(for: .seconds(1))
-                    let result = await connection.play(trackURI: uri)
+                    let result = await connection.play(trackURI: uri, albumURI: album)
                     if played(result) { return }
                     if case .failed = result { break }
                 }
@@ -189,7 +191,7 @@ final class MusicSearchService: ObservableObject {
         }
 
         do {
-            try await AppleScriptHelper.executeVoid(MusicSearchPolicy.spotifyPlayScript(trackURI: uri))
+            try await AppleScriptHelper.executeVoid(MusicSearchPolicy.spotifyPlayScript(trackURI: uri, contextURI: album))
             message = ["Playing \(title) on Spotify.", note].compactMap { $0 }.joined(separator: " ")
         } catch {
             // Found, but macOS didn't let NotchFlow tell Spotify to play.

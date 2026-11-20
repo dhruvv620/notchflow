@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 ### Fixed
+- **Next works after playing a searched Spotify song**: a song picked in the notch played on its own, with nothing after it, so Next did nothing. It now plays inside its album, as in Spotify, so Next and Previous move through the album.
 - **Window setups start apps you had quit**: opening a setup after quitting Chrome (or any app in it) now starts it again and puts its windows back, instead of waiting until you opened it yourself. The setup now follows the opening for up to half a minute: an app that didn't start is asked again, a browser that starts without its windows gets them opened (or reopened, when NotchFlow isn't allowed to control it), and each window is placed the moment it appears, however long the app takes.
 - **Spotify plays without coming to the front**: with Spotify connected, a song picked in the notch is started through Spotify itself, on the device already playing or this Mac's Spotify app, so Spotify's window never moves (no more flash). When Spotify isn't open anywhere, it opens normally once and then plays. Already connected? Click Reconnect in Settings > Music and Agree once, to allow starting songs.
 - **Hand cursor on search results**: hovering a song in the Music tab's search shows a pointing hand instead of the text cursor.

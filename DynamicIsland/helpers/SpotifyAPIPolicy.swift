@@ -10,6 +10,8 @@ struct SpotifyTrack: Equatable, Sendable {
     let artists: String
     let album: String
     let artworkURL: URL?
+    /// The album's URI, so the song plays inside its album (Next goes on to the album's next track).
+    var albumURI: String? = nil
 }
 
 /// Spotify's Web API for the Music tab's search: "Log in with Spotify"
@@ -144,8 +146,9 @@ enum SpotifyAPIPolicy {
             let album = item["album"] as? [String: Any]
             // Images come largest first; take a small one.
             let images = (album?["images"] as? [[String: Any]] ?? []).compactMap { $0["url"] as? String }
+            let albumURI = (album?["uri"] as? String).flatMap { $0.hasPrefix("spotify:album:") ? $0 : nil }
             return SpotifyTrack(uri: uri, title: title, artists: artists, album: album?["name"] as? String ?? "",
-                                artworkURL: (images.last ?? images.first).flatMap(URL.init(string:)))
+                                artworkURL: (images.last ?? images.first).flatMap(URL.init(string:)), albumURI: albumURI)
         }
     }
 
@@ -192,8 +195,16 @@ enum SpotifyAPIPolicy {
         return components?.url
     }
 
-    static func playBody(trackURI: String) -> Data {
-        (try? JSONSerialization.data(withJSONObject: ["uris": [trackURI]])) ?? Data()
+    /// Starts the track inside its album when the album is known, so Next
+    /// and Previous move through the album as in Spotify; else the track alone.
+    static func playBody(trackURI: String, albumURI: String? = nil) -> Data {
+        let body: [String: Any]
+        if let albumURI {
+            body = ["context_uri": albumURI, "offset": ["uri": trackURI]]
+        } else {
+            body = ["uris": [trackURI]]
+        }
+        return (try? JSONSerialization.data(withJSONObject: body, options: [.sortedKeys])) ?? Data()
     }
 
     /// The code (or error) from the browser's request to the callback:

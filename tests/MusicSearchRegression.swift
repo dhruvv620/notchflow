@@ -53,6 +53,8 @@ struct MusicSearchRegression {
         try require(P.platformURL("spotify", in: Data("{}".utf8)) == nil, "Empty answer")
         try require(P.spotifyPlayScript(trackURI: "spotify:track:4uLU6hMCjMI75M1A2tKUQC")
                     == #"tell application "Spotify" to play track "spotify:track:4uLU6hMCjMI75M1A2tKUQC""#, "Spotify script")
+        try require(P.spotifyPlayScript(trackURI: "spotify:track:T", contextURI: "spotify:album:A")
+                    == #"tell application "Spotify" to play track "spotify:track:T" in context "spotify:album:A""#, "Spotify script in album")
         print("Music search: OK")
     }
 }
