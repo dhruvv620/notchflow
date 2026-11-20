@@ -10,6 +10,9 @@
 #   2. Packages NotchFlow.dmg (drag to Applications) and NotchFlow.zip (installer and updates).
 #   3. Signs the update with your private update key, which stays in your login Keychain.
 #   4. Publishes a GitHub release with the DMG, the zip, install.sh and appcast.xml.
+#      Its notes are what's under "Unreleased" in CHANGELOG.md, which becomes this
+#      version's dated section (a new, empty Unreleased starts above it). Friends
+#      see the same notes in the update window.
 #      The app's Check for Updates reads that appcast.xml, so everyone who has
 #      NotchFlow is offered the new version.
 #   5. Installs the released copy on this Mac, replacing a development build.
@@ -133,9 +136,24 @@ if [ "$CURRENT_KEY" != "$PUBLIC_KEY" ]; then
     git commit -q -m "Use this Mac's update signing key for NotchFlow releases"
 fi
 
+# --- What's new -------------------------------------------------------------------
+# The Unreleased section of CHANGELOG.md becomes this version's section, so the
+# next release lists only what came after it.
+step "Release notes for v$VERSION (from CHANGELOG.md)"
+PENDING="$(/bin/bash tools/changelog.sh pending)"
+if [ -z "$PENDING" ] && ! /usr/bin/grep -q "^## \[$VERSION\]" CHANGELOG.md; then
+    printf 'Nothing is listed under "## [Unreleased]" in CHANGELOG.md, so the notes will say\n'
+    printf '"Improvements and fixes." Add lines there and run this again for real notes.\n'
+else
+    printf '%s\n' "${PENDING:-$(/bin/bash tools/changelog.sh notes "$VERSION")}"
+fi
+/bin/bash tools/changelog.sh roll "$VERSION" "$(/bin/date '+%Y-%m-%d')"
+
 if [ "$(/usr/bin/tr -d '[:space:]' < VERSION)" != "$VERSION" ]; then
     printf '%s\n' "$VERSION" > VERSION
-    git add VERSION
+fi
+if [ -n "$(git status --porcelain VERSION CHANGELOG.md)" ]; then
+    git add VERSION CHANGELOG.md
     git commit -q -m "Release v$VERSION"
 fi
 # Push those commits now: if a later step fails, git pull still works.
@@ -191,13 +209,15 @@ step "Signing the update"
 SIGNATURE="$("$SPARKLE_BIN/sign_update" "$OUT/NotchFlow.zip")"
 [[ "$SIGNATURE" == *edSignature=* && "$SIGNATURE" == *length=* ]] || fail "sign_update did not return a signature: $SIGNATURE"
 
-# Release notes: the Unreleased section of the changelog.
+# Release notes: this version's section of the changelog (moved there above).
 NOTES="$OUT/notes.md"
-/usr/bin/awk '/^## \[Unreleased\]/{found=1; next} /^## \[/{if (found) exit} found' CHANGELOG.md > "$NOTES"
+/bin/bash "$SOURCE_DIR/tools/changelog.sh" notes "$VERSION" > "$NOTES"
 if [ -z "$(/usr/bin/tr -d '[:space:]' < "$NOTES")" ]; then
-    printf 'NotchFlow %s\n' "$VERSION" > "$NOTES"
+    printf 'Improvements and fixes.\n' > "$NOTES"
 fi
-ESCAPED_NOTES="$(/usr/bin/sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' "$NOTES")"
+# The update window shows HTML: headings, bold titles and bullet points.
+HTML_NOTES="$(/bin/bash "$SOURCE_DIR/tools/changelog.sh" html "$VERSION")"
+[ -n "$HTML_NOTES" ] || HTML_NOTES="<p>Improvements and fixes.</p>"
 PUB_DATE="$(LC_ALL=C /bin/date -u '+%a, %d %b %Y %H:%M:%S +0000')"
 
 /bin/cat > "$OUT/appcast.xml" <<APPCAST
@@ -211,7 +231,7 @@ PUB_DATE="$(LC_ALL=C /bin/date -u '+%a, %d %b %Y %H:%M:%S +0000')"
             <sparkle:version>$BUILD_NUMBER</sparkle:version>
             <sparkle:shortVersionString>$VERSION</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>$MIN_SYSTEM</sparkle:minimumSystemVersion>
-            <description><![CDATA[<pre style="white-space: pre-wrap; font: 12px -apple-system, sans-serif;">$ESCAPED_NOTES</pre>]]></description>
+            <description><![CDATA[<div style="font: 13px -apple-system, sans-serif;">$HTML_NOTES</div>]]></description>
             <enclosure url="https://github.com/$REPO/releases/download/v$VERSION/NotchFlow.zip" type="application/octet-stream" $SIGNATURE/>
         </item>
     </channel>

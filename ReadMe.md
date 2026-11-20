@@ -80,10 +80,10 @@ One time:
 2. Have an Apple Development certificate (Xcode > Settings > Accounts > Manage Certificates). Check with `security find-identity -v -p codesigning`.
 
 Every release:
-1. Commit and push your changes, and describe them in the Unreleased section of [CHANGELOG.md](CHANGELOG.md).
+1. Commit and push your changes, and describe them under `## [Unreleased]` in [CHANGELOG.md](CHANGELOG.md) (Added, Changed, Fixed). `bash tools/changelog.sh pending` shows what the next release will list.
 2. Run `bash Release.command` (or `bash Release.command 1.2.0` to pick the version; otherwise it uses `VERSION` or the next patch).
 
-It builds and signs NotchFlow, makes `NotchFlow.dmg` and `NotchFlow.zip`, signs the update with a key kept in your login Keychain (created on the first release; back it up as it tells you), publishes a GitHub release with `appcast.xml` (which everyone's Check for Updates reads), and installs the released copy on your Mac.
+It builds and signs NotchFlow, makes `NotchFlow.dmg` and `NotchFlow.zip`, signs the update with a key kept in your login Keychain (created on the first release; back it up as it tells you), publishes a GitHub release with `appcast.xml` (which everyone's Check for Updates reads), and installs the released copy on your Mac. The Unreleased notes become that version's dated section of the changelog (a fresh, empty Unreleased starts above it), and they are the release's notes on GitHub and in the update window your friends see.
 
 ## Documentation
 
