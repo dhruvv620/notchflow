@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Glance uses your own browser and real windows**:
+  - **Web pages** now open in your browser, signed in as you. In Chrome Beta, Chrome, Edge, Brave and Vivaldi they're borderless windows with just the page; in Safari they're normal Safari windows. They move onto the board when it opens and wait just off screen in between, so they're instant next time. Choose the browser, or NotchFlow's own pages, in Settings > Glance > Open web pages in.
+  - **App panels** use the app's real window, moved onto the board and back when Glance closes. No screen recording is needed (live pictures are now an option). A window on another desktop says so and tells you how to keep that app on all desktops.
+  - **Click to use**: clicking a panel or a window on the board keeps it open so you can use it; let go of the key and it stays. Tap the key or press Esc to close. Hover shows the name, and ↗ opens it in its app.
+  - **Adding is smoother**: Add and Edit Layout are always in the bar at the top. The launcher searches your open browser tabs (pick one to add it, signed in) as well as popular sites, apps (their real windows, no permission prompt) and widgets. A new panel lands where your pointer was, ready to drag and resize.
 - **Several terminals in the notch, and a ping when a command finishes**: the Terminal tab (Settings > Tabs & Features > Terminal) now has tabs: + opens another terminal, each keeps running on its own, × closes one. When a command that ran 10 seconds or more (you choose) finishes while you're looking elsewhere, the notch tells you ("npm finished · Terminal 2 · after 2m 13s") and that tab gets a green dot; a spinner shows on tabs with something running. Editors, ssh and agents you quit yourself don't count. The arrow opens the folder you're in, in your terminal app: iTerm2, Terminal, Ghostty, Warp, WezTerm, Alacritty, kitty or Hyper (Settings > Terminal > Open in).
 - **Glance, closer to Peek**:
   - **Opening it**: the default is now Hold to peek, tap to keep open. Record Key (Settings > Glance) takes any single key (Left Shift, fn, right Command…) or a shortcut.

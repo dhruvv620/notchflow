@@ -164,11 +164,19 @@ struct GlanceBoardView: View {
             } else {
                 Button {
                     glance.startEditing()
+                    glance.launcherDisplay = displayKey
                 } label: {
-                    Label("Edit", systemImage: "slider.horizontal.3").font(.system(size: 11, weight: .semibold))
+                    Label("Add", systemImage: "plus").font(.system(size: 11, weight: .semibold))
                 }
                 .buttonStyle(.borderless)
-                .help("Arrange and add panels")
+                .help("Add a web page, an app, a widget or a file")
+                Button {
+                    glance.startEditing()
+                } label: {
+                    Label("Edit Layout", systemImage: "slider.horizontal.3").font(.system(size: 11, weight: .semibold))
+                }
+                .buttonStyle(.borderless)
+                .help("Move and resize panels (the board stays open)")
                 if glance.isPinned {
                     Button {
                         glance.hide()
@@ -198,7 +206,10 @@ struct GlancePanelCard: View {
 
     private static let shape = RoundedRectangle(cornerRadius: 18, style: .continuous)
     private var instance: String { GlanceManager.shared.instanceKey(panel, display: displayKey) }
-    private var isPage: Bool { panel.kind == .web || panel.kind == .html }
+    /// A real window (your browser's page, an app's own window) sits on this panel.
+    private var isReal: Bool { GlanceRealWindows.usesRealWindow(panel) }
+    /// NotchFlow's own built-in page (back, forward, reload, hide parts apply).
+    private var isPage: Bool { (panel.kind == .web || panel.kind == .html) && !isReal }
 
     var body: some View {
         content
@@ -225,14 +236,14 @@ struct GlancePanelCard: View {
             Text(panel.title.isEmpty ? panel.kind.defaultTitle : panel.title)
                 .font(.system(size: 10, weight: .semibold))
                 .lineLimit(1)
-            if panel.kind == .web {
+            if panel.kind == .web && isPage {
                 barButton("chevron.left", help: "Back") { GlanceWebPanels.shared.goBack(instance) }
                 barButton("chevron.right", help: "Forward") { GlanceWebPanels.shared.goForward(instance) }
             }
             if isPage {
                 barButton("arrow.clockwise", help: "Reload") { GlanceWebPanels.shared.reload(instance) }
             }
-            if panel.kind == .web {
+            if panel.kind == .web && isPage {
                 barButton("eye.slash", help: "Hide part of the page: click it (Esc cancels)") {
                     GlanceManager.shared.pin()
                     GlanceWebPanels.shared.startPickingElement(instance)
@@ -265,7 +276,7 @@ struct GlancePanelCard: View {
         if isPage {
             Button("Reload") { GlanceWebPanels.shared.reload(instance) }
         }
-        if panel.kind == .web {
+        if panel.kind == .web && isPage {
             Button("Hide Part of the Page…") {
                 GlanceManager.shared.pin()
                 GlanceWebPanels.shared.startPickingElement(instance)
@@ -298,6 +309,7 @@ struct GlancePanelCard: View {
     @ViewBuilder
     private var content: some View {
         switch panel.kind {
+        case .web where isReal, .window where isReal: GlanceRealWindowPlaceholder(panel: panel)
         case .web, .html: GlanceWebPanelView(panel: panel, instance: instance)
         case .pdf: GlancePDFPanelView(panel: panel)
         case .window: GlanceLiveWindowPanel(panel: panel, instance: instance, displayKey: displayKey)
@@ -1176,5 +1188,50 @@ struct GlanceWeatherPanel: View {
         parser.dateFormat = "yyyy-MM-dd"
         guard let date = parser.date(from: isoDate) else { return "" }
         return date.formatted(.dateTime.weekday(.abbreviated))
+    }
+}
+
+// MARK: - Real windows
+
+/// What's under a real window's spot: the site or app, and why its window
+/// isn't there if it isn't (opening, on another desktop…). Seen while the
+/// window moves in, and while arranging.
+struct GlanceRealWindowPlaceholder: View {
+    let panel: GlancePanel
+    @ObservedObject private var real = GlanceRealWindows.shared
+
+    private var icon: NSImage? {
+        let bundleID = panel.kind == .web ? GlanceRealWindows.browser?.bundleID : panel.windowApp
+        guard let bundleID, let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else { return nil }
+        return NSWorkspace.shared.icon(forFile: url.path)
+    }
+
+    private var subtitle: String {
+        if let problem = real.problems[panel.id] { return problem }
+        if real.opening.contains(panel.id) { return "Opening in \(GlanceRealWindows.browser?.name ?? "your browser")…" }
+        if panel.kind == .web { return GlancePolicy.webURL(panel.address)?.host ?? panel.address }
+        return panel.windowTitle.isEmpty ? "Its main window" : panel.windowTitle
+    }
+
+    var body: some View {
+        VStack(spacing: 10) {
+            if let icon {
+                Image(nsImage: icon).resizable().frame(width: 44, height: 44)
+            } else {
+                Image(systemName: panel.kind.symbol).font(.system(size: 30)).foregroundStyle(.secondary)
+            }
+            Text(panel.title.isEmpty ? panel.kind.defaultTitle : panel.title)
+                .font(.system(size: 13, weight: .semibold))
+            Text(subtitle)
+                .font(.system(size: 11))
+                .foregroundStyle(real.problems[panel.id] == nil ? Color.secondary : Color.orange)
+                .multilineTextAlignment(.center)
+                .lineLimit(3)
+                .padding(.horizontal, 16)
+            if real.opening.contains(panel.id) {
+                ProgressView().controlSize(.small)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }

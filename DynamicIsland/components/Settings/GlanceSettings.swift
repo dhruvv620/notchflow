@@ -15,6 +15,12 @@ struct GlanceSettings: View {
     @Default(.glanceTrigger) private var trigger
     @Default(.glanceMode) private var mode
     @Default(.glanceBackdrop) private var backdrop
+    @Default(.glanceBrowser) private var browser
+    @Default(.glanceLivePicture) private var livePicture
+
+    private var installedBrowsers: [GlancePolicy.Browser] {
+        GlancePolicy.browsers.filter { NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0.bundleID) != nil }
+    }
     @State private var selectedPanel: UUID?
     @State private var newClock = GlanceClocks.common[0].zone
     @State private var windowChoices: [GlanceLiveWindows.Choice] = []
@@ -85,6 +91,15 @@ struct GlanceSettings: View {
                     panelSection(panel)
                 }
                 Section {
+                    Picker("Open web pages in", selection: $browser) {
+                        Text("Automatic (\(GlanceRealWindows.browser?.name ?? "built-in"))").tag("auto")
+                        ForEach(installedBrowsers, id: \.bundleID) { browser in
+                            Text(browser.name).tag(browser.bundleID)
+                        }
+                        Text("NotchFlow's own pages").tag("builtIn")
+                    }
+                    .settingsHighlight(id: "glance-Open web pages in")
+                    Toggle("App windows as live pictures (uses Screen Recording)", isOn: $livePicture)
                     Defaults.Toggle(key: .glanceHideAds) {
                         Text("Hide ads and cookie banners")
                     }
@@ -95,7 +110,7 @@ struct GlanceSettings: View {
                 } header: {
                     Text("Web pages")
                 } footer: {
-                    Text("Web pages stay loaded so the board appears at once. They keep their own sign-ins, separate from Safari and Chrome, on this Mac only. On battery they can be unloaded when the board closes, and load again next time.")
+                    Text("In your browser, web pages are its own windows, signed in as you: Chrome, Chrome Beta, Edge, Brave and Vivaldi show just the page; Safari shows a normal window. They move onto the board when it opens and wait just off screen in between. App windows are the apps' real windows, moved onto the board and back, so no screen recording is needed. A window on another desktop can't be moved here; set its app to All Desktops (right-click its Dock icon › Options). NotchFlow's own pages keep their own sign-ins and can hide ads and cookie banners.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

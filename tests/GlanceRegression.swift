@@ -207,6 +207,43 @@ struct GlanceRegression {
         try require(report?.temperature == 27.4 && report?.unit == "°C" && report?.days.count == 2 && report?.days[1].code == 61, "Report")
         try require(P.weatherSymbol(code: 0, isDay: false) == "moon.stars.fill" && P.weatherSymbol(code: 63) == "cloud.rain.fill"
                     && P.weatherDescription(code: 95) == "Thunderstorm", "Weather codes")
+        // Adding near the pointer
+        let near = P.adding(.calendar, to: GlanceBoard(name: "N"), near: (x: 20, y: 12))
+        try require(near.panels[0].frame == R(x: 8, y: 0, width: 16, height: 16), "Near the pointer, kept inside: \(near.panels[0].frame)")
+        var crowded = GlanceBoard(name: "C")
+        crowded.panels = [GlancePanel(kind: .reminders, title: "R", frame: R(x: 0, y: 0, width: 12, height: 16))]
+        let besideIt = P.adding(.stocks, to: crowded, near: (x: 4, y: 8))
+        try require(besideIt.panels[1].isShown && besideIt.panels[1].frame.x >= 12 && noOverlaps(besideIt),
+                    "Pointing at a taken spot: the closest clear one: \(besideIt.panels[1].frame)")
+
+        // Browsers
+        let installed: Set<String> = ["com.google.Chrome.beta", "com.apple.Safari"]
+        try require(P.browser(setting: "auto", installed: installed)?.name == "Chrome Beta", "Auto: Chrome Beta first")
+        try require(P.browser(setting: "com.apple.Safari", installed: installed)?.name == "Safari", "Chosen Safari")
+        try require(P.browser(setting: "com.brave.Browser", installed: installed)?.name == "Chrome Beta", "Chosen but missing: the first installed")
+        try require(P.browser(setting: "builtIn", installed: installed) == nil && P.browser(setting: "auto", installed: []) == nil, "Built-in")
+        let mail = URL(string: "https://mail.google.com/mail/u/0/")!
+        try require(P.appWindowArguments(url: mail) == ["--app=https://mail.google.com/mail/u/0/"], "App window")
+        try require(P.safariWindowScript(url: URL(string: "https://x.com/a?b=\"c\"")!).contains(#"make new document with properties {URL:"https://x.com/a?b=%22c%22"}"#)
+                    || P.safariWindowScript(url: URL(string: "https://x.com/a?b=\"c\"")!).contains("make new document"), "Safari script")
+        let chromeTabs = P.openTabsScript(P.browsers[0])
+        try require(chromeTabs.contains(#"tell application id "com.google.Chrome.beta""#) && chromeTabs.contains("title of t")
+                    && P.openTabsScript(P.browsers.last!).contains("name of t"), "Tabs scripts")
+        let tabs = P.openTabs(from: "Inbox (3) - Gmail\thttps://mail.google.com/mail/u/0/\nSettings\tchrome://settings\n\thttps://github.com\nInbox again\thttps://mail.google.com/mail/u/0/\n")
+        try require(tabs.map(\.title) == ["Inbox (3) - Gmail", "github.com"] && tabs[1].url == "https://github.com", "Open tabs: \(tabs)")
+
+        // Where a panel is on screen (a 1512 x 982 main display; the board area starts at 28,52)
+        let display = CGRect(x: 0, y: 0, width: 1512, height: 982)
+        let area = CGRect(x: 28, y: 52, width: 1456, height: 902)
+        let spot = P.screenRect(for: R(x: 0, y: 0, width: 12, height: 8), area: area, gap: 18, display: display, mainDisplayHeight: 982)
+        try require(abs(spot.minX - 37) < 0.01 && abs(spot.minY - 61) < 0.01 && abs(spot.width - 710) < 0.01 && abs(spot.height - 433) < 0.01,
+                    "Screen rect: \(spot)")
+        let second = P.screenRect(for: R(x: 0, y: 0, width: 24, height: 16), area: area, gap: 18,
+                                  display: CGRect(x: 1512, y: 200, width: 1920, height: 1080), mainDisplayHeight: 982)
+        try require(abs(second.minX - (1512 + 37)) < 0.01 && abs(second.minY - (982 - 1280 + 61)) < 0.01, "Second display: \(second)")
+        try require(P.parkingOrigin(displays: [CGRect(x: 0, y: 0, width: 1512, height: 982), CGRect(x: 1512, y: -200, width: 1920, height: 1080)])
+                    == CGPoint(x: 3431, y: 981), "Parking spot")
+
         print("Glance: OK")
     }
 }

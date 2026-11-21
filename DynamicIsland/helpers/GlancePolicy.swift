@@ -248,10 +248,17 @@ enum GlancePolicy {
     // MARK: Editing
 
     /// Adds a panel where there's room (hidden when the board is full).
-    static func adding(_ kind: GlancePanelKind, title: String? = nil, address: String = "", to board: GlanceBoard) -> GlanceBoard {
+    static func adding(_ kind: GlancePanelKind, title: String? = nil, address: String = "", to board: GlanceBoard,
+                       near cell: (x: Int, y: Int)? = nil) -> GlanceBoard {
         var board = board
         let size = kind.defaultSize
-        let spot = freeSpot(width: size.width, height: size.height, on: board)
+        var spot: GlanceRect?
+        if let cell {
+            // Centred on where you pointed, or the clear spot closest to it.
+            let wanted = clamped(GlanceRect(x: cell.x - size.width / 2, y: cell.y - size.height / 2, width: size.width, height: size.height))
+            spot = isFree(wanted, on: board) ? wanted : nearestFreeSpot(to: wanted, on: board, ignoring: nil, within: max(columns, rows))
+        }
+        spot = spot ?? freeSpot(width: size.width, height: size.height, on: board)
         var panel = GlancePanel(kind: kind, title: title ?? kind.defaultTitle, address: address, isShown: spot != nil,
                                 frame: spot ?? GlanceRect(x: 0, y: 0, width: size.width, height: size.height))
         if kind == .clocks { panel.timeZones = defaultTimeZones }
@@ -582,6 +589,92 @@ enum GlancePolicy {
         let points = ((quote?["close"] as? [Any]) ?? []).compactMap { ($0 as? NSNumber)?.doubleValue }
         return StockQuote(symbol: symbol, name: name, price: price, previousClose: previous,
                           currency: meta["currency"] as? String, points: points)
+    }
+
+    // MARK: Pages in your own browser
+
+    /// A browser Glance can show pages in, signed in as you: Chromium
+    /// browsers open a page as a borderless "app" window; Safari as a normal window.
+    struct Browser: Equatable, Sendable {
+        let name: String
+        let bundleID: String
+        let isChromium: Bool
+    }
+
+    static let browsers: [Browser] = [
+        Browser(name: "Chrome Beta", bundleID: "com.google.Chrome.beta", isChromium: true),
+        Browser(name: "Chrome", bundleID: "com.google.Chrome", isChromium: true),
+        Browser(name: "Chrome Canary", bundleID: "com.google.Chrome.canary", isChromium: true),
+        Browser(name: "Microsoft Edge", bundleID: "com.microsoft.edgemac", isChromium: true),
+        Browser(name: "Brave", bundleID: "com.brave.Browser", isChromium: true),
+        Browser(name: "Vivaldi", bundleID: "com.vivaldi.Vivaldi", isChromium: true),
+        Browser(name: "Safari", bundleID: "com.apple.Safari", isChromium: false),
+    ]
+
+    /// The browser for web pages: "builtIn" (NotchFlow's own pages), a
+    /// browser's bundle id, or "auto" (the first installed, Chrome Beta first).
+    static func browser(setting: String, installed: Set<String>) -> Browser? {
+        if setting == "builtIn" { return nil }
+        if let chosen = browsers.first(where: { $0.bundleID == setting }), installed.contains(chosen.bundleID) { return chosen }
+        return browsers.first { installed.contains($0.bundleID) }
+    }
+
+    /// Arguments that open a page as an app window in a Chromium browser (your profile, no tabs or address bar).
+    static func appWindowArguments(url: URL) -> [String] {
+        ["--app=" + url.absoluteString]
+    }
+
+    /// AppleScript that opens a page in a new Safari window.
+    static func safariWindowScript(url: URL) -> String {
+        let escaped = url.absoluteString.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
+        return "tell application id \"com.apple.Safari\" to make new document with properties {URL:\"\(escaped)\"}"
+    }
+
+    /// AppleScript listing a browser's open tabs as "title<TAB>url" lines.
+    static func openTabsScript(_ browser: Browser) -> String {
+        let titleProperty = browser.isChromium ? "title" : "name"
+        return """
+        set out to ""
+        tell application id "\(browser.bundleID)"
+            repeat with w in windows
+                repeat with t in tabs of w
+                    set out to out & (\(titleProperty) of t) & tab & (URL of t) & linefeed
+                end repeat
+            end repeat
+        end tell
+        return out
+        """
+    }
+
+    /// The open tabs from that script's answer (web pages only, no repeats).
+    static func openTabs(from text: String) -> [(title: String, url: String)] {
+        var seen = Set<String>()
+        return text.split(whereSeparator: \.isNewline).compactMap { line -> (title: String, url: String)? in
+            let parts = line.split(separator: "\t", maxSplits: 1, omittingEmptySubsequences: false).map(String.init)
+            guard parts.count == 2, let url = webURL(parts[1]), seen.insert(url.absoluteString).inserted else { return nil }
+            let title = parts[0].trimmingCharacters(in: .whitespaces)
+            return (title.isEmpty ? (url.host ?? parts[1]) : title, parts[1])
+        }
+    }
+
+    /// Where a panel is on a display, in Accessibility coordinates (top left
+    /// of the main display is 0,0, y grows down): where a real window goes.
+    /// `area` is the board's panel area within the display (top-left origin).
+    static func screenRect(for frame: GlanceRect, area: CGRect, gap: Double, display: CGRect, mainDisplayHeight: Double) -> CGRect {
+        let cellWidth = area.width / Double(columns)
+        let cellHeight = area.height / Double(rows)
+        let x = area.minX + Double(frame.x) * cellWidth + gap / 2
+        let y = area.minY + Double(frame.y) * cellHeight + gap / 2
+        return CGRect(x: display.minX + x, y: mainDisplayHeight - display.maxY + y,
+                      width: Double(frame.width) * cellWidth - gap, height: Double(frame.height) * cellHeight - gap)
+    }
+
+    /// Where a browser window waits between glances: just past the bottom
+    /// right corner of the displays (macOS keeps a sliver on screen), in
+    /// Accessibility coordinates. `displays` are in Accessibility coordinates too.
+    static func parkingOrigin(displays: [CGRect]) -> CGPoint {
+        guard let maxX = displays.map(\.maxX).max(), let maxY = displays.map(\.maxY).max() else { return CGPoint(x: 10_000, y: 10_000) }
+        return CGPoint(x: maxX - 1, y: maxY - 1)
     }
 
     // MARK: Live windows

@@ -2,6 +2,7 @@
 // Copyright (C) 2026 dhruvv620
 
 import AppKit
+import Defaults
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -50,20 +51,33 @@ struct GlanceLauncher: View {
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(Color.white.opacity(0.12)))
         .shadow(color: .black.opacity(0.4), radius: 30, y: 12)
+        .onAppear { pointerCell = glance.pointerCell(onDisplay: displayKey) }
     }
 
     /// Adds a panel (set up by `configure`) and closes the launcher.
     private func add(_ kind: GlancePanelKind, _ title: String?, _ configure: @escaping (inout GlancePanel) -> Void) {
+        // Where the pointer was when you opened the launcher.
+        let near = pointerCell
+        var addedID: UUID?
         glance.updateBoard(boardID) { board in
             if kind.isBuiltIn, let existing = board.panels.first(where: { $0.kind == kind }) {
                 return GlancePolicy.setting(existing.id, shown: true, on: board)
             }
-            var board = GlancePolicy.adding(kind, title: title, to: board)
-            if let index = board.panels.indices.last { configure(&board.panels[index]) }
+            var board = GlancePolicy.adding(kind, title: title, to: board, near: near)
+            if let index = board.panels.indices.last {
+                configure(&board.panels[index])
+                addedID = board.panels[index].id
+            }
             return board
+        }
+        // A web page opens in your browser now, off screen, so it's ready.
+        if let addedID, let panel = glance.boards.first(where: { $0.id == boardID })?.panels.first(where: { $0.id == addedID }) {
+            GlanceRealWindows.shared.prepare(panel)
         }
         glance.launcherDisplay = nil
     }
+
+    @State private var pointerCell: (x: Int, y: Int)?
 }
 
 typealias GlanceAdd = (GlancePanelKind, String?, @escaping (inout GlancePanel) -> Void) -> Void
@@ -72,8 +86,11 @@ typealias GlanceAdd = (GlancePanelKind, String?, @escaping (inout GlancePanel) -
 
 private struct GlanceLauncherWeb: View {
     let add: GlanceAdd
-    @State private var address = ""
+    @State private var query = ""
     @State private var phoneLayout = false
+    @State private var tabs: [(title: String, url: String)] = []
+    @State private var tabsNote: String?
+    @FocusState private var focused: Bool
 
     private static let suggestions: [(name: String, address: String)] = [
         ("Gmail", "mail.google.com"), ("Google Calendar", "calendar.google.com"), ("X", "x.com"),
@@ -81,45 +98,120 @@ private struct GlanceLauncherWeb: View {
         ("ChatGPT", "chatgpt.com"), ("Claude", "claude.ai"), ("Linear", "linear.app"), ("Cricbuzz", "cricbuzz.com"),
     ]
 
+    private var browserName: String { GlanceRealWindows.browser?.name ?? "NotchFlow" }
+
+    private var matchingTabs: [(title: String, url: String)] {
+        let text = query.trimmingCharacters(in: .whitespaces).lowercased()
+        guard !text.isEmpty else { return tabs }
+        return tabs.filter { $0.title.lowercased().contains(text) || $0.url.lowercased().contains(text) }
+    }
+
+    private var matchingSuggestions: [(name: String, address: String)] {
+        let text = query.trimmingCharacters(in: .whitespaces).lowercased()
+        guard !text.isEmpty else { return Self.suggestions }
+        return Self.suggestions.filter { $0.name.lowercased().contains(text) || $0.address.contains(text) }
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("A web page, kept loaded so it's there the moment you glance. It keeps its own sign-in.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 12) {
             HStack {
-                TextField("Address, like mail.google.com", text: $address)
-                    .textFieldStyle(.roundedBorder)
+                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                TextField("Search your open tabs, or type an address", text: $query)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 14))
+                    .focused($focused)
                     .onSubmit(addTyped)
-                Button("Add", action: addTyped)
-                    .buttonStyle(.borderedProminent)
-                    .disabled(GlancePolicy.webURL(address) == nil)
-            }
-            Toggle("Phone layout (fits small panels)", isOn: $phoneLayout)
-            Text("Popular").font(.caption).foregroundStyle(.secondary)
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 120), spacing: 8)], alignment: .leading, spacing: 8) {
-                ForEach(Self.suggestions, id: \.address) { site in
-                    Button {
-                        addSite(name: site.name, address: site.address)
-                    } label: {
-                        Label(site.name, systemImage: "globe")
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 10).padding(.vertical, 7)
-                            .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 8))
-                    }
-                    .buttonStyle(.plain)
+                if GlancePolicy.webURL(query) != nil {
+                    Button("Add", action: addTyped).buttonStyle(.borderedProminent).controlSize(.small)
                 }
             }
-            Spacer(minLength: 0)
+            .padding(10)
+            .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 10))
+
+            Text(GlanceRealWindows.browser == nil
+                 ? "Pages open in NotchFlow's own browser (sign in once). Choose your browser in Settings › Glance to use your sign-ins."
+                 : "Pages open in \(browserName), signed in as you, without tabs or an address bar.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    if !matchingTabs.isEmpty {
+                        Text("Open in \(browserName)").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                        ForEach(Array(matchingTabs.prefix(30).enumerated()), id: \.offset) { _, tab in
+                            row(title: tab.title, detail: URL(string: tab.url)?.host ?? tab.url) {
+                                addPage(name: tab.title, address: tab.url)
+                            }
+                        }
+                    } else if let tabsNote {
+                        Text(tabsNote).font(.caption).foregroundStyle(.secondary)
+                    }
+                    if !matchingSuggestions.isEmpty {
+                        Text("Popular").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 120), spacing: 8)], alignment: .leading, spacing: 8) {
+                            ForEach(matchingSuggestions, id: \.address) { site in
+                                Button {
+                                    addPage(name: site.name, address: site.address)
+                                } label: {
+                                    Label(site.name, systemImage: "globe")
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .padding(.horizontal, 10).padding(.vertical, 7)
+                                        .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 8))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                    if GlanceRealWindows.browser == nil {
+                        Toggle("Phone layout (fits small panels)", isOn: $phoneLayout)
+                    }
+                }
+            }
         }
         .padding(16)
+        .onAppear { focused = true }
+        .task { await loadTabs() }
+    }
+
+    private func row(title: String, detail: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack {
+                Image(systemName: "globe").foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(title).font(.system(size: 12, weight: .medium)).lineLimit(1)
+                    Text(detail).font(.system(size: 10)).foregroundStyle(.secondary).lineLimit(1)
+                }
+                Spacer()
+                Image(systemName: "plus.circle").foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 10).padding(.vertical, 6)
+            .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 8))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// Your browser's open tabs (asks the browser; macOS asks you once to allow it).
+    private func loadTabs() async {
+        guard let browser = GlanceRealWindows.browser,
+              NSRunningApplication.runningApplications(withBundleIdentifier: browser.bundleID).first != nil else {
+            tabsNote = nil
+            return
+        }
+        do {
+            let answer = try await AppleScriptHelper.execute(GlancePolicy.openTabsScript(browser))
+            tabs = GlancePolicy.openTabs(from: answer?.stringValue ?? "")
+        } catch {
+            tabsNote = "Allow NotchFlow to control \(browser.name) (System Settings › Privacy & Security › Automation) to pick from your open tabs."
+        }
     }
 
     private func addTyped() {
-        guard let url = GlancePolicy.webURL(address) else { return }
-        addSite(name: url.host?.replacingOccurrences(of: "www.", with: "") ?? "Web page", address: address)
+        guard let url = GlancePolicy.webURL(query) else { return }
+        addPage(name: url.host?.replacingOccurrences(of: "www.", with: "") ?? "Web page", address: query)
     }
 
-    private func addSite(name: String, address: String) {
+    private func addPage(name: String, address: String) {
         let mobile = phoneLayout
         add(.web, name) { panel in
             panel.address = address
@@ -233,9 +325,11 @@ private struct GlanceLauncherApps: View {
             .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
+    @Default(.glanceLivePicture) private var livePicture
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            if !allowed {
+            if livePicture && !allowed {
                 HStack(alignment: .top, spacing: 10) {
                     Image(systemName: "record.circle").foregroundStyle(.orange).font(.title3)
                     VStack(alignment: .leading, spacing: 6) {
@@ -299,7 +393,7 @@ private struct GlanceLauncherApps: View {
                 Text(app.name).font(.headline)
             }
             if windows.isEmpty {
-                Text(allowed ? "\(app.name) has no window open right now. Add it anyway, and its main window shows whenever it's open."
+                Text(!livePicture || allowed ? "\(app.name) has no window open right now. Add it anyway, and its main window shows whenever it's open."
                      : "Allow Screen Recording above to see \(app.name)'s windows.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -333,7 +427,7 @@ private struct GlanceLauncherApps: View {
                             }
                             .buttonStyle(.plain)
                             .task {
-                                if thumbnails[choice.id] == nil, let image = await GlanceLiveWindows.shared.thumbnail(for: choice) {
+                                if livePicture, thumbnails[choice.id] == nil, let image = await GlanceLiveWindows.shared.thumbnail(for: choice) {
                                     thumbnails[choice.id] = image
                                 }
                             }
@@ -346,7 +440,14 @@ private struct GlanceLauncherApps: View {
 
     private func loadChoices() async {
         allowed = CGPreflightScreenCaptureAccess()
-        choices = await GlanceLiveWindows.shared.choices()
+        if livePicture && allowed {
+            choices = await GlanceLiveWindows.shared.choices()
+        } else {
+            // The real windows are used: their titles come from Accessibility, no screen recording.
+            choices = GlanceRealWindows.appWindows().map {
+                GlanceLiveWindows.Choice(bundleID: $0.bundleID, appName: $0.appName, title: $0.title)
+            }
+        }
     }
 }
 

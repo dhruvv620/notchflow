@@ -27,6 +27,10 @@ extension Defaults.Keys {
     static let glanceTrigger = Key<String>("glanceTrigger", default: "shortcut")
     /// Every display shows the selected board (instead of a board per display).
     static let glanceSameOnAllDisplays = Key<Bool>("glanceSameOnAllDisplays", default: false)
+    /// Where web pages open: "auto" (your browser, Chrome Beta first), a browser's bundle id, or "builtIn".
+    static let glanceBrowser = Key<String>("glanceBrowser", default: "auto")
+    /// App window panels as live pictures (screen recording) instead of the real window.
+    static let glanceLivePicture = Key<Bool>("glanceLivePicture", default: false)
     /// The screen behind the panels: "clear", "dim" or "blur".
     static let glanceBackdrop = Key<String>("glanceBackdrop", default: "dim")
 }
@@ -53,6 +57,8 @@ final class GlanceManager: ObservableObject {
     @Published var launcherDisplay: String?
     /// A real app window was moved into its panel to be used there.
     private var isInteracting = false
+    /// A click on the board kept it open (the release of the key that's held doesn't close it).
+    private var keptOpenByClick = false
 
     private var windows: [String: GlanceWindow] = [:]
     private var pointerDisplay: String?
@@ -223,6 +229,14 @@ final class GlanceManager: ObservableObject {
             recordKey(event)
             return
         }
+        // Clicking a panel (or a real window on the board) while peeking keeps the board open, to use it.
+        if event.type == .leftMouseDown, isShowing, !isPinned, mode == .holdOrTap {
+            let onBoard = event.window is GlanceWindow
+            if onBoard || GlanceRealWindows.shared.contains(screenPoint: NSEvent.mouseLocation) {
+                isPinned = true
+                keptOpenByClick = true
+            }
+        }
         let trigger = self.trigger
         guard Defaults[.enableGlance], trigger != .shortcut else { return }
         gesture.mode = mode
@@ -241,7 +255,13 @@ final class GlanceManager: ObservableObject {
                 DispatchQueue.main.asyncAfter(deadline: .now() + GlancePolicy.ModifierGesture.holdDelay + 0.02, execute: check)
             } else {
                 holdCheck?.cancel()
-                apply(gesture.triggerUp(at: Date(), showing: isShowing))
+                let action = gesture.triggerUp(at: Date(), showing: isShowing)
+                if keptOpenByClick {
+                    // This hold's release: you clicked to use the board, it stays.
+                    keptOpenByClick = false
+                    if action == .hide { return }
+                }
+                apply(action)
             }
         default:
             // Another key, another modifier or a click while the trigger is down.
@@ -346,6 +366,7 @@ final class GlanceManager: ObservableObject {
         // Windows of displays that were unplugged.
         for key in windows.keys where !keys.contains(key) { windows[key] = nil }
         isShowing = true
+        presentRealWindows()
         GlanceLiveWindows.shared.resume()
         GlanceStocks.shared.startRefreshing(GlanceManager.shared.boardsOnScreen)
         GlanceWeather.shared.refresh(boardsOnScreen)
@@ -357,6 +378,23 @@ final class GlanceManager: ObservableObject {
     func instanceKey(_ panel: GlancePanel, display: String) -> String {
         guard Defaults[.glanceSameOnAllDisplays], !display.isEmpty, display != pointerDisplay else { return panel.id.uuidString }
         return panel.id.uuidString + "|" + display
+    }
+
+    /// Real windows (your browser's pages, apps' own windows) move into their
+    /// spots and come above the board, which steps down to the normal window
+    /// level so they can.
+    private func presentRealWindows() {
+        let screens = NSScreen.screens
+        var layout: [(board: GlanceBoard, screen: NSScreen)] = []
+        for screen in screens {
+            let key = Self.key(for: screen)
+            guard let board = board(onDisplay: key) else { continue }
+            layout.append((board, screen))
+        }
+        let hasReal = layout.contains { $0.board.panels.contains { $0.isShown && GlanceRealWindows.usesRealWindow($0) } }
+        guard hasReal else { return }
+        for window in windows.values { window.level = .normal }
+        GlanceRealWindows.shared.present(layout)
     }
 
     /// Loads what the boards on screen show (web pages).
@@ -379,9 +417,16 @@ final class GlanceManager: ObservableObject {
         isPinned = false
         isEditing = false
         launcherDisplay = nil
+        keptOpenByClick = false
         if isInteracting {
             isInteracting = false
             GlanceLiveWindows.shared.restoreMoved()
+        }
+        let hadRealWindows = GlanceRealWindows.shared.isPresenting
+        GlanceRealWindows.shared.dismiss()
+        if hadRealWindows, !wasPinned, let previousApp, previousApp.bundleIdentifier != Bundle.main.bundleIdentifier {
+            // Real windows were brought forward; you go back to the app you were in.
+            previousApp.activate()
         }
         releaseWatch?.invalidate()
         releaseWatch = nil
@@ -461,11 +506,25 @@ final class GlanceManager: ObservableObject {
     func startEditing() {
         if !isShowing { show(pinned: true) } else { pin() }
         isEditing = true
+        // Real windows step aside so the panels can be arranged.
+        GlanceRealWindows.shared.stepAside()
+        for window in windows.values { window.level = GlanceWindow.boardLevel }
     }
 
     func stopEditing() {
         isEditing = false
         launcherDisplay = nil
+        presentRealWindows()
+    }
+
+    /// The cell of a board under the pointer, on a display (for placing a new panel there).
+    func pointerCell(onDisplay key: String) -> (x: Int, y: Int)? {
+        guard let screen = NSScreen.screens.first(where: { Self.key(for: $0) == key }) else { return nil }
+        let pointer = NSEvent.mouseLocation
+        guard screen.frame.contains(pointer) else { return nil }
+        let area = GlanceLayout.boardArea(screen.frame.size)
+        let local = CGPoint(x: pointer.x - screen.frame.minX, y: screen.frame.maxY - pointer.y)
+        return GlancePolicy.cell(atFractionX: Double((local.x - area.minX) / area.width), y: Double((local.y - area.minY) / area.height))
     }
 
     /// Clicking an App window panel: the real window moves into the panel,
@@ -561,6 +620,7 @@ final class GlanceManager: ObservableObject {
 
     private func persist() {
         Defaults[.glanceBoards] = GlancePolicy.encodeBoards(boards)
+        GlanceRealWindows.shared.keepOnly(Set(boards.flatMap(\.panels).filter { $0.kind == .web }.map(\.id)))
     }
 }
 
