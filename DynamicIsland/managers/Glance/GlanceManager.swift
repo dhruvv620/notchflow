@@ -21,8 +21,8 @@ extension Defaults.Keys {
     static let glancePDFPages = Key<[String: Int]>("glancePDFPages", default: [:])
     /// The board each display shows, by display id (a display without one shows the selected board when the pointer is on it).
     static let glanceDisplayBoards = Key<[String: String]>("glanceDisplayBoards", default: [:])
-    /// "hold" (show while held) or "toggle" (press to show, press again to hide).
-    static let glanceMode = Key<String>("glanceMode", default: "hold")
+    /// "holdOrTap" (hold to peek, tap to keep open), "hold" or "toggle".
+    static let glanceMode = Key<String>("glanceMode", default: "holdOrTap")
     /// What opens it: "shortcut", or a modifier key on its own ("fn", "shift", "rightCommand"…).
     static let glanceTrigger = Key<String>("glanceTrigger", default: "shortcut")
     /// The screen behind the panels: "clear", "dim" or "blur".
@@ -136,14 +136,22 @@ final class GlanceManager: ObservableObject {
 
     // MARK: Opening it
 
-    private var mode: GlancePolicy.Mode { GlancePolicy.Mode(rawValue: Defaults[.glanceMode]) ?? .hold }
+    private var mode: GlancePolicy.Mode { GlancePolicy.Mode(rawValue: Defaults[.glanceMode]) ?? .holdOrTap }
     private var trigger: GlancePolicy.Trigger { GlancePolicy.Trigger(rawValue: Defaults[.glanceTrigger]) ?? .shortcut }
+    /// The shortcut went down while the board was kept open: that press closed it, its release does nothing.
+    private var shortcutClosedIt = false
 
     private func shortcutDown() {
-        guard Defaults[.enableGlance], trigger == .shortcut else { return }
+        guard Defaults[.enableGlance], trigger == .shortcut, !isRecordingKey else { return }
+        shortcutClosedIt = false
         switch mode {
-        case .hold:
-            guard !isShowing else { return }
+        case .hold, .holdOrTap:
+            if isShowing {
+                if isPinned { hide(); shortcutClosedIt = true }
+                return
+            }
+            gesture.mode = mode
+            gesture.triggerDown(at: Date())
             show(pinned: false)
             watchShortcutRelease()
         case .toggle:
@@ -152,8 +160,13 @@ final class GlanceManager: ObservableObject {
     }
 
     private func shortcutUp() {
-        guard trigger == .shortcut, mode == .hold, isShowing, !isPinned else { return }
-        hide()
+        guard trigger == .shortcut, mode != .toggle else { return }
+        if shortcutClosedIt {
+            shortcutClosedIt = false
+            return
+        }
+        guard isShowing, !isPinned else { return }
+        apply(gesture.triggerUp(at: Date(), showing: isShowing))
     }
 
     /// In case the key-up of the shortcut is missed: letting go of its
@@ -165,13 +178,13 @@ final class GlanceManager: ObservableObject {
         releaseWatch = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { timer in
             Task { @MainActor in
                 let manager = GlanceManager.shared
-                guard manager.isShowing, !manager.isPinned, manager.mode == .hold else {
+                guard manager.isShowing, !manager.isPinned, manager.mode != .toggle, manager.gesture.downAt != nil else {
                     timer.invalidate()
                     return
                 }
                 if !NSEvent.modifierFlags.contains(needed) {
                     timer.invalidate()
-                    manager.hide()
+                    manager.apply(manager.gesture.triggerUp(at: Date(), showing: manager.isShowing))
                 }
             }
         }
@@ -198,13 +211,17 @@ final class GlanceManager: ObservableObject {
             hide()
             return
         }
+        if isRecordingKey {
+            recordKey(event)
+            return
+        }
         let trigger = self.trigger
         guard Defaults[.enableGlance], trigger != .shortcut else { return }
         gesture.mode = mode
         switch event.type {
         case .flagsChanged where trigger.keyCodes.contains(event.keyCode):
             if GlancePolicy.isModifierDown(keyCode: event.keyCode, flags: event.modifierFlags.rawValue) {
-                gesture.triggerDown(at: Date())
+                gesture.triggerDown(at: Date(), pinned: isShowing && isPinned)
                 holdCheck?.cancel()
                 let check = DispatchWorkItem {
                     MainActor.assumeIsolated {
@@ -230,6 +247,55 @@ final class GlanceManager: ObservableObject {
         case .show: show(pinned: false)
         case .hide: hide()
         case .toggle: if isShowing { hide() } else { show(pinned: true) }
+        case .pin: if isShowing { pin() } else { show(pinned: true) }
+        }
+    }
+
+    // MARK: Recording the key
+
+    /// Settings › Glance › Record: the next key pressed becomes what opens
+    /// Glance: a modifier on its own (Left Shift, fn, Right Command…) or a
+    /// key with modifiers (a shortcut).
+    @Published private(set) var isRecordingKey = false
+    private var recordingModifier: UInt16?
+
+    func startRecordingKey() {
+        isRecordingKey = true
+        recordingModifier = nil
+    }
+
+    func cancelRecordingKey() {
+        isRecordingKey = false
+        recordingModifier = nil
+    }
+
+    private func recordKey(_ event: NSEvent) {
+        switch event.type {
+        case .flagsChanged:
+            if GlancePolicy.isModifierDown(keyCode: event.keyCode, flags: event.modifierFlags.rawValue) {
+                recordingModifier = event.keyCode
+            } else if recordingModifier == event.keyCode, let trigger = GlancePolicy.Trigger.forKeyCode(event.keyCode) {
+                // Pressed and released on its own.
+                Defaults[.glanceTrigger] = trigger.rawValue
+                cancelRecordingKey()
+            }
+        case .keyDown:
+            if event.keyCode == 53 {
+                cancelRecordingKey()
+                return
+            }
+            let modifiers = event.modifierFlags.intersection([.command, .option, .control, .shift])
+            guard !modifiers.isEmpty || (122...135).contains(Int(event.keyCode)) || [105, 107, 113, 106, 64, 79, 80, 90].contains(Int(event.keyCode)),
+                  let shortcut = KeyboardShortcuts.Shortcut(event: event) else {
+                // A plain letter would open Glance while typing; wait for a key with modifiers.
+                recordingModifier = nil
+                return
+            }
+            KeyboardShortcuts.setShortcut(shortcut, for: .glanceHold)
+            Defaults[.glanceTrigger] = GlancePolicy.Trigger.shortcut.rawValue
+            cancelRecordingKey()
+        default:
+            break
         }
     }
 

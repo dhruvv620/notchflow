@@ -30,9 +30,23 @@ struct GlanceSettings: View {
                 }
                 .settingsHighlight(id: "glance-Use Glance")
                 if enableGlance {
-                    Picker("Opens with", selection: $trigger) {
-                        ForEach(GlancePolicy.Trigger.allCases, id: \.rawValue) { option in
-                            Text(option.title).tag(option.rawValue)
+                    HStack {
+                        Text("Opens with")
+                        Spacer()
+                        if glance.isRecordingKey {
+                            Text("Press a key: Left Shift, fn, Right ⌘… or a shortcut. Esc cancels.")
+                                .font(.caption)
+                                .foregroundStyle(.orange)
+                            Button("Cancel") { glance.cancelRecordingKey() }
+                        } else {
+                            Picker("", selection: $trigger) {
+                                ForEach(GlancePolicy.Trigger.allCases, id: \.rawValue) { option in
+                                    Text(option.title).tag(option.rawValue)
+                                }
+                            }
+                            .labelsHidden()
+                            .fixedSize()
+                            Button("Record Key…") { glance.startRecordingKey() }
                         }
                     }
                     .settingsHighlight(id: "glance-Hold to glance")
@@ -93,9 +107,15 @@ struct GlanceSettings: View {
     private var triggerHelp: String {
         let key = GlancePolicy.Trigger(rawValue: trigger) ?? .shortcut
         let name = key == .shortcut ? "the shortcut" : key.title.replacingOccurrences(of: " (either)", with: "")
-        var text = mode == GlancePolicy.Mode.hold.rawValue
-            ? "Hold \(name) to see your boards over everything; you can point at and click panels while holding it. Let go and they're gone."
-            : "Press \(name) to show your boards, press it again (or Esc) to hide them."
+        var text: String
+        switch GlancePolicy.Mode(rawValue: mode) ?? .holdOrTap {
+        case .holdOrTap:
+            text = "Hold \(name) to peek at your boards (point at and click panels while holding), let go and they're gone. Tap it instead to keep them open; tap again or Esc to close."
+        case .hold:
+            text = "Hold \(name) to see your boards over everything; you can point at and click panels while holding it. Let go and they're gone."
+        case .toggle:
+            text = "Press \(name) to show your boards, press it again (or Esc) to hide them."
+        }
         if key != .shortcut {
             text += " On its own only: \(name) with another key (typing a capital, a shortcut) never opens Glance."
         }
