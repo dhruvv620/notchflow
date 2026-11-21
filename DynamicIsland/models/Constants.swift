@@ -989,6 +989,12 @@ extension Defaults.Keys {
     
     // MARK: Terminal Feature
     static let enableTerminalFeature = Key<Bool>("enableTerminalFeature", default: false)
+    /// Tell me when a command in the notch's terminal finishes (when I wasn't watching).
+    static let terminalNotifyWhenDone = Key<Bool>("terminalNotifyWhenDone", default: true)
+    /// …if it ran at least this many seconds.
+    static let terminalNotifyAfterSeconds = Key<Int>("terminalNotifyAfterSeconds", default: 10)
+    /// The terminal app "Open in" uses (bundle id).
+    static let terminalExternalApp = Key<String>("terminalExternalApp", default: "com.googlecode.iterm2")
     static let terminalShellPath = Key<String>("terminalShellPath", default: "/bin/zsh")
     static let terminalFontFamily = Key<String>("terminalFontFamily", default: "")
     static let terminalFontSize = Key<Double>("terminalFontSize", default: 12.0)

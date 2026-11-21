@@ -123,18 +123,35 @@ struct NotchTerminalView: View {
     var body: some View {
         VStack(spacing: 0) {
             if enableTerminalFeature {
-                // Terminal header bar
-                HStack {
-                    Image(systemName: "apple.terminal")
-                        .foregroundStyle(terminalForegroundColor)
-                        .font(.system(size: 11))
+                // Terminal tabs: one per shell, + for another
+                HStack(spacing: 6) {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 4) {
+                            ForEach(Array(terminalManager.sessions.enumerated()), id: \.element.id) { index, session in
+                                sessionTab(session, index: index)
+                            }
+                        }
+                    }
 
-                    Text(terminalManager.terminalTitle)
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(terminalForegroundColor)
-                        .lineLimit(1)
+                    Button {
+                        terminalManager.newSession()
+                    } label: {
+                        Image(systemName: "plus")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(terminalForegroundColor)
+                    }
+                    .buttonStyle(.plain)
+                    .help("New terminal")
 
-                    Spacer()
+                    Button {
+                        terminalManager.openInExternalApp()
+                    } label: {
+                        Image(systemName: "arrow.up.forward.app")
+                            .font(.system(size: 10))
+                            .foregroundStyle(terminalForegroundColor)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Open this folder in \(terminalManager.externalAppName)")
 
                     // Restart button
                     Button {
@@ -145,7 +162,7 @@ struct NotchTerminalView: View {
                             .foregroundStyle(terminalForegroundColor)
                     }
                     .buttonStyle(.plain)
-                    .help("Restart shell")
+                    .help("Restart this shell")
                 }
                 .padding(.horizontal, 12)
                 .padding(.top, 6)
@@ -189,11 +206,45 @@ struct NotchTerminalView: View {
         }
         .onDisappear {
             updateSuppression(for: false)
+            terminalManager.isTabVisible = false
         }
         .onAppear {
+            terminalManager.isTabVisible = true
             terminalManager.refreshTerminalAppearanceIfNeeded()
             terminalManager.focusTerminalIfPossible()
         }
+    }
+
+    /// One terminal's tab: its title, a green dot when a command finished
+    /// there while you were elsewhere, × to close it.
+    private func sessionTab(_ session: TerminalManager.Session, index: Int) -> some View {
+        let isSelected = session.id == terminalManager.selectedID
+        return HStack(spacing: 5) {
+            if session.hasFinished {
+                Circle().fill(Color.green).frame(width: 6, height: 6)
+            } else if session.commandStart != nil {
+                ProgressView().controlSize(.mini).scaleEffect(0.7).frame(width: 8, height: 8)
+            }
+            Text(TerminalCommandPolicy.tabTitle(session.title, index: index))
+                .font(.system(size: 10.5, weight: isSelected ? .semibold : .regular))
+                .lineLimit(1)
+            if terminalManager.sessions.count > 1 {
+                Button {
+                    terminalManager.close(session.id)
+                } label: {
+                    Image(systemName: "xmark").font(.system(size: 7, weight: .bold))
+                }
+                .buttonStyle(.plain)
+                .opacity(isSelected ? 0.8 : 0.4)
+                .help("Close this terminal")
+            }
+        }
+        .foregroundStyle(terminalForegroundColor.opacity(isSelected ? 1 : 0.65))
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
+        .background(Color.white.opacity(isSelected ? 0.14 : 0.04), in: Capsule())
+        .contentShape(Capsule())
+        .onTapGesture { terminalManager.select(session.id) }
     }
 
     private func updateSuppression(for hovering: Bool) {

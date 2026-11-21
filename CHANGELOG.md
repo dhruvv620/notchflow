@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Several terminals in the notch, and a ping when a command finishes**: the Terminal tab (Settings > Tabs & Features > Terminal) now has tabs: + opens another terminal, each keeps running on its own, × closes one. When a command that ran 10 seconds or more (you choose) finishes while you're looking elsewhere, the notch tells you ("npm finished · Terminal 2 · after 2m 13s") and that tab gets a green dot; a spinner shows on tabs with something running. Editors, ssh and agents you quit yourself don't count. The arrow opens the folder you're in, in your terminal app: iTerm2, Terminal, Ghostty, Warp, WezTerm, Alacritty, kitty or Hyper (Settings > Terminal > Open in).
 - **Glance, closer to Peek**:
   - **Opening it**: the default is now Hold to peek, tap to keep open. Record Key (Settings > Glance) takes any single key (Left Shift, fn, right Command…) or a shortcut.
   - **Arrange on the board itself**: Edit (or right-click > Edit Layout) lets you drag panels anywhere on a finer grid, see where they'll land, drop one on another to swap, resize from any edge or corner, take one off with ×, and pick a ready-made arrangement. Settings uses the same editor.

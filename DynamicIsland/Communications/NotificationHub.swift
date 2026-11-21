@@ -270,6 +270,26 @@ final class NotificationHub: ObservableObject {
     }
 
     /// Called by the WhatsApp integration for each incoming message.
+    /// A notification from NotchFlow itself (a terminal command finished),
+    /// shown and announced like any other.
+    func post(id: String, appName: String, title: String, body: String) {
+        guard enabled else { return }
+        let item = NotchNotification(
+            id: id,
+            source: .notificationCenter,
+            bundleIdentifier: Bundle.main.bundleIdentifier,
+            appName: appName,
+            title: title,
+            subtitle: "",
+            body: body,
+            date: Date(),
+            threadID: nil,
+            reply: .none,
+            liveBannerID: nil
+        )
+        add([item], announce: true)
+    }
+
     /// `account`: which WhatsApp it came in on, when two are linked.
     func ingestWhatsApp(_ message: WhatsAppMessage, chatName: String, isGroup: Bool, account: String? = nil) {
         guard enabled, !message.isFromMe else { return }

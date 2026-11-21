@@ -125,6 +125,12 @@ printf '\nChecking Glance...\n'
     "$SOURCE_DIR/tests/GlanceRegression.swift" -o "$BUILD_ROOT/GlanceRegression"
 "$BUILD_ROOT/GlanceRegression"
 
+printf '\nChecking terminal command notifications...\n'
+/usr/bin/xcrun swiftc -swift-version 5 -parse-as-library \
+    "$SOURCE_DIR/DynamicIsland/helpers/TerminalCommandPolicy.swift" \
+    "$SOURCE_DIR/tests/TerminalCommandRegression.swift" -o "$BUILD_ROOT/TerminalCommandRegression"
+"$BUILD_ROOT/TerminalCommandRegression"
+
 printf '\nChecking the window stash...\n'
 /usr/bin/xcrun swiftc -swift-version 5 -parse-as-library \
     "$SOURCE_DIR/DynamicIsland/helpers/WindowStashPolicy.swift" \

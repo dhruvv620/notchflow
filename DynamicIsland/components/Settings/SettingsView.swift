@@ -985,6 +985,8 @@ struct SettingsView: View {
             SettingsSearchEntry(tab: .whatsapp, title: "Mute groups", keywords: ["whatsapp", "groups", "mute", "mention"], highlightID: SettingsTab.whatsapp.highlightID(for: "Mute groups")),
             SettingsSearchEntry(tab: .whatsapp, title: "Mark as read when I open a conversation", keywords: ["whatsapp", "read receipts", "blue ticks"], highlightID: SettingsTab.whatsapp.highlightID(for: "Mark as read when I open a conversation")),
             SettingsSearchEntry(tab: .whatsapp, title: "Another account", keywords: ["whatsapp", "second account", "personal", "business", "two accounts", "multiple"], highlightID: SettingsTab.whatsapp.highlightID(for: "Another account")),
+            SettingsSearchEntry(tab: .terminal, title: "Tell me when a command finishes", keywords: ["terminal", "notify", "notification", "command", "finished", "done", "build"], highlightID: SettingsTab.terminal.highlightID(for: "Tell me when a command finishes")),
+            SettingsSearchEntry(tab: .terminal, title: "Open in", keywords: ["terminal", "iterm", "iterm2", "ghostty", "warp", "open in", "external"], highlightID: SettingsTab.terminal.highlightID(for: "Open in")),
             SettingsSearchEntry(tab: .terminal, title: "Shell path", keywords: ["shell", "zsh", "bash", "terminal"], highlightID: SettingsTab.terminal.highlightID(for: "Shell path")),
             SettingsSearchEntry(tab: .terminal, title: "Font size", keywords: ["terminal", "font", "text size"], highlightID: SettingsTab.terminal.highlightID(for: "Font size")),
             SettingsSearchEntry(tab: .terminal, title: "Terminal opacity", keywords: ["terminal", "opacity", "transparency", "blur", "background"], highlightID: SettingsTab.terminal.highlightID(for: "Terminal opacity")),
@@ -7683,9 +7685,17 @@ struct TerminalSettings: View {
     @Default(.terminalBackgroundColor) var terminalBackgroundColor
     @Default(.terminalForegroundColor) var terminalForegroundColor
     @Default(.terminalCursorColor) var terminalCursorColor
+    @Default(.terminalNotifyWhenDone) var terminalNotifyWhenDone
+    @Default(.terminalNotifyAfterSeconds) var terminalNotifyAfterSeconds
+    @Default(.terminalExternalApp) var terminalExternalApp
 
     private func highlightID(_ title: String) -> String {
         SettingsTab.terminal.highlightID(for: title)
+    }
+
+    /// Terminal apps installed on this Mac.
+    private var installedTerminalApps: [(name: String, bundleID: String)] {
+        TerminalCommandPolicy.externalApps.filter { NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0.bundleID) != nil }
     }
 
     private var formattedMaxHeight: String {
@@ -7739,6 +7749,35 @@ struct TerminalSettings: View {
                 Text("Adds a Guake-style dropdown terminal tab. The terminal session persists across notch open/close cycles.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+
+            if enableTerminalFeature {
+                Section {
+                    Defaults.Toggle(key: .terminalNotifyWhenDone) {
+                        Text("Tell me when a command finishes")
+                    }
+                    .settingsHighlight(id: highlightID("Tell me when a command finishes"))
+                    if terminalNotifyWhenDone {
+                        Stepper(value: $terminalNotifyAfterSeconds, in: 0...600, step: 5) {
+                            Text(terminalNotifyAfterSeconds == 0 ? "For every command" : "If it ran at least \(terminalNotifyAfterSeconds) seconds")
+                        }
+                    }
+                    Picker("Open in", selection: $terminalExternalApp) {
+                        ForEach(installedTerminalApps, id: \.bundleID) { app in
+                            Text(app.name).tag(app.bundleID)
+                        }
+                        if !installedTerminalApps.contains(where: { $0.bundleID == terminalExternalApp }) {
+                            Text("Terminal").tag(terminalExternalApp)
+                        }
+                    }
+                    .settingsHighlight(id: highlightID("Open in"))
+                } header: {
+                    Text("Tabs and notifications")
+                } footer: {
+                    Text("Click + at the top of the terminal for another one; each keeps running in its own tab. When a command finishes while you're looking elsewhere, the notch tells you (with Notifications turned on) and its tab gets a green dot. Editors, ssh and agents you quit yourself don't count. The arrow opens the folder you're in, in the app chosen here (iTerm2, Terminal, Ghostty…).")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             if enableTerminalFeature {

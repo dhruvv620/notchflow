@@ -134,11 +134,39 @@ final class TerminalScrollKnobView: NSView {
 class TerminalManager: ObservableObject {
     static let shared = TerminalManager()
 
-    /// Whether a shell process is currently running.
-    @Published var isProcessRunning: Bool = false
+    /// One shell in the terminal tab; several run side by side, as tabs.
+    final class Session: Identifiable {
+        let id = UUID()
+        var view: LocalProcessTerminalView?
+        var title = "Terminal"
+        var isRunning = false
+        /// The folder the shell reported it's in (when it reports it).
+        var directory: String?
+        /// The command running now (the terminal's foreground program), and since when.
+        var command: String?
+        var commandStart: Date?
+        /// A command finished here while you weren't looking.
+        var hasFinished = false
+    }
 
-    /// The current terminal title reported by the shell.
-    @Published var terminalTitle: String = "Terminal"
+    /// The terminals, in tab order.
+    @Published private(set) var sessions: [Session] = [Session()]
+    @Published private(set) var selectedID = UUID()
+
+    private var selected: Session { sessions.first { $0.id == selectedID } ?? sessions[0] }
+
+    /// Whether the selected terminal's shell is running.
+    var isProcessRunning: Bool { selected.isRunning }
+
+    /// The selected terminal's title, as its shell set it.
+    var terminalTitle: String { selected.title }
+
+    /// Whether the terminal tab is on screen (set by the tab).
+    var isTabVisible = false
+
+    /// Receives every session's terminal events (title, folder, exit), alive as long as the app.
+    private let sessionDelegate = TerminalSessionDelegate()
+    private var commandWatch: Timer?
 
     /// Stable container returned to SwiftUI — never deallocated.
     /// Uses `StableTerminalContainerView` to prevent zero-frame transients
@@ -151,8 +179,11 @@ class TerminalManager: ObservableObject {
         return v
     }()
 
-    /// The actual terminal view (child of `containerView`).
-    private(set) var terminalView: LocalProcessTerminalView?
+    /// The selected terminal's view (child of `containerView` while it's shown).
+    var terminalView: LocalProcessTerminalView? { selected.view }
+
+    /// Every terminal's view, for settings that apply to all of them.
+    private var allViews: [LocalProcessTerminalView] { sessions.compactMap(\.view) }
 
     /// SwiftTerm's built-in scroller (kept as the data source for our custom knob).
     private weak var terminalScroller: NSScroller?
@@ -199,18 +230,29 @@ class TerminalManager: ObservableObject {
         return v
     }()
 
-    private init() {}
+    private init() {
+        selectedID = sessions[0].id
+    }
 
     // MARK: - Lifecycle
 
-    /// Ensures the terminal view exists inside the container and returns the container.
+    /// Ensures the selected terminal's view is in the container (creating it
+    /// the first time). Other terminals' views are taken out but keep running.
     /// Call this from the `NSViewRepresentable` wrapper.
-    func ensureTerminalView(delegate: LocalProcessTerminalViewDelegate) {
-        if let existing = terminalView, existing.superview === containerView {
-            // Already mounted — just re-wire the delegate in case the coordinator changed.
-            existing.processDelegate = delegate
+    func ensureTerminalView(delegate _: LocalProcessTerminalViewDelegate) {
+        let session = selected
+        if let existing = session.view, existing.superview === containerView {
+            existing.processDelegate = sessionDelegate
             // Re-apply opacity/translucency after hide/show cycles (e.g. shortcut toggle).
             refreshTerminalOpacityAndTranslucency(for: existing)
+            return
+        }
+        for other in sessions where other !== session { other.view?.removeFromSuperview() }
+
+        if let existing = session.view {
+            existing.processDelegate = sessionDelegate
+            mount(existing)
+            styleTerminalScroller(for: existing)
             return
         }
 
@@ -222,17 +264,19 @@ class TerminalManager: ObservableObject {
             ? containerView.bounds
             : CGRect(x: 0, y: 0, width: 400, height: 300)
 
-        // Replace only the terminal view - keep the blur underlay between restarts.
-        terminalView?.removeFromSuperview()
-
         let view = LocalProcessTerminalView(frame: initialFrame)
         view.autoresizingMask = [.width, .height]
 
         // Apply all settings from Defaults
         applyAllSettings(to: view)
 
-        view.processDelegate = delegate
+        view.processDelegate = sessionDelegate
+        session.view = view
+        mount(view)
+    }
 
+    /// Puts a terminal view in the container, over the blur and gutter tint, sized to it.
+    private func mount(_ view: LocalProcessTerminalView) {
         if terminalBackgroundEffectView.superview == nil {
             containerView.addSubview(terminalBackgroundEffectView)
         }
@@ -245,7 +289,6 @@ class TerminalManager: ObservableObject {
         }
         updateGutterTintColor()
         containerView.addSubview(view)
-        terminalView = view
 
         // Keep the custom scroll knob above the terminal (re-add to bring to front).
         scrollKnobView.removeFromSuperview()
@@ -286,7 +329,8 @@ class TerminalManager: ObservableObject {
 
     /// Starts the shell process if not already running.
     func startShellProcess() {
-        guard let view = terminalView, !isProcessRunning else { return }
+        let session = selected
+        guard let view = session.view, !session.isRunning else { return }
 
         let shell = Defaults[.terminalShellPath]
         let execName = "-" + (shell as NSString).lastPathComponent  // login shell convention
@@ -297,12 +341,24 @@ class TerminalManager: ObservableObject {
             environment: buildEnvironment(),
             execName: execName
         )
-        isProcessRunning = true
+        session.isRunning = true
+        objectWillChange.send()
+        startCommandWatch()
     }
 
-    /// Called when the shell process terminates.
+    /// Called when a terminal's shell process ends.
+    func processDidTerminate(source: TerminalView, exitCode: Int32?) {
+        guard let session = sessions.first(where: { $0.view === source }) else { return }
+        session.isRunning = false
+        session.commandStart = nil
+        session.command = nil
+        objectWillChange.send()
+    }
+
+    /// The selected terminal's shell ended.
     func processDidTerminate(exitCode: Int32?) {
-        isProcessRunning = false
+        selected.isRunning = false
+        objectWillChange.send()
     }
 
     /// Restarts the shell by tearing down the old terminal and creating a fresh one.
@@ -313,18 +369,157 @@ class TerminalManager: ObservableObject {
     /// and change `@Published` state.  SwiftUI's `updateNSView` will fire,
     /// see the nil terminal, and call `ensureTerminalView` to mount a new one.
     func restartShell() {
+        let session = selected
         // Terminate the running process gracefully
-        terminalView?.terminate()
+        session.view?.terminate()
         // Remove old terminal from container
-        terminalView?.removeFromSuperview()
-        terminalView = nil
-        isProcessRunning = false
-        terminalTitle = "Terminal"
+        session.view?.removeFromSuperview()
+        session.view = nil
+        session.isRunning = false
+        session.title = "Terminal"
+        session.command = nil
+        session.commandStart = nil
+        objectWillChange.send()
     }
 
-    /// Updates the terminal title from the shell escape sequence.
+    /// Updates the selected terminal's title from the shell escape sequence.
     func updateTitle(_ title: String) {
-        terminalTitle = title
+        selected.title = title
+        objectWillChange.send()
+    }
+
+    func updateTitle(_ title: String, for source: TerminalView) {
+        guard let session = sessions.first(where: { $0.view === source }) else { return }
+        session.title = title
+        objectWillChange.send()
+    }
+
+    func updateDirectory(_ directory: String?, for source: TerminalView) {
+        guard let session = sessions.first(where: { $0.view === source }) else { return }
+        session.directory = directory.flatMap { URL(string: $0)?.path ?? $0 }
+    }
+
+    // MARK: - Several terminals
+
+    /// A new terminal tab, selected (its shell starts when it's shown).
+    func newSession() {
+        let session = Session()
+        sessions.append(session)
+        select(session.id)
+    }
+
+    func select(_ id: UUID) {
+        guard let session = sessions.first(where: { $0.id == id }) else { return }
+        session.hasFinished = false
+        selectedID = id
+        objectWillChange.send()
+        DispatchQueue.main.async { [weak self] in self?.focusTerminalIfPossible() }
+    }
+
+    /// Ends a terminal and its shell; the last one is replaced by a fresh one.
+    func close(_ id: UUID) {
+        guard let index = sessions.firstIndex(where: { $0.id == id }) else { return }
+        let session = sessions[index]
+        session.view?.terminate()
+        session.view?.removeFromSuperview()
+        session.view = nil
+        sessions.remove(at: index)
+        if sessions.isEmpty { sessions = [Session()] }
+        if selectedID == id { select(sessions[min(index, sessions.count - 1)].id) } else { objectWillChange.send() }
+    }
+
+    /// Opens the folder you're in, in your terminal app (iTerm2, Terminal…).
+    func openInExternalApp() {
+        let session = selected
+        let directory = session.directory ?? Self.currentDirectory(of: session.view?.process?.shellPid) ?? NSHomeDirectory()
+        var bundleID = Defaults[.terminalExternalApp]
+        if NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) == nil { bundleID = "com.apple.Terminal" }
+        if let script = TerminalCommandPolicy.openScript(bundleID: bundleID, directory: directory) {
+            Task { try? await AppleScriptHelper.executeVoid(script) }
+        } else if let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) {
+            NSWorkspace.shared.open([URL(fileURLWithPath: directory)], withApplicationAt: app,
+                                    configuration: NSWorkspace.OpenConfiguration(), completionHandler: nil)
+        }
+    }
+
+    /// The name of the terminal app "Open in" uses.
+    var externalAppName: String {
+        let bundleID = Defaults[.terminalExternalApp]
+        return TerminalCommandPolicy.externalApps.first { $0.bundleID == bundleID }?.name ?? "Terminal"
+    }
+
+    // MARK: - Command finished
+
+    /// Every second while a shell runs: which program is in the foreground
+    /// of each terminal. When it goes back to the shell, the command finished.
+    private func startCommandWatch() {
+        guard commandWatch == nil else { return }
+        commandWatch = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
+            Task { @MainActor in TerminalManager.shared.checkCommands() }
+        }
+    }
+
+    private func checkCommands() {
+        guard sessions.contains(where: \.isRunning) else {
+            commandWatch?.invalidate()
+            commandWatch = nil
+            return
+        }
+        for (index, session) in sessions.enumerated() where session.isRunning {
+            guard let process = session.view?.process else { continue }
+            let shell = process.shellPid
+            let foreground = tcgetpgrp(process.childfd)
+            if foreground > 0, foreground != shell {
+                if session.commandStart == nil {
+                    session.commandStart = Date()
+                    session.command = Self.processName(foreground) ?? "Command"
+                }
+            } else if let start = session.commandStart {
+                let duration = Date().timeIntervalSince(start)
+                let command = session.command ?? ""
+                session.commandStart = nil
+                session.command = nil
+                let watching = isTabVisible && session.id == selectedID && NSApp.isActive
+                guard TerminalCommandPolicy.shouldNotify(command: command, duration: duration,
+                                                         threshold: Double(Defaults[.terminalNotifyAfterSeconds]),
+                                                         isWatching: watching, enabled: Defaults[.terminalNotifyWhenDone]) else { continue }
+                let label = TerminalCommandPolicy.tabTitle(session.title, index: index)
+                let message = TerminalCommandPolicy.message(command: command, duration: duration, session: label)
+                NotificationHub.shared.post(id: "terminal-\(session.id.uuidString)-\(Int(start.timeIntervalSince1970))",
+                                            appName: "Terminal", title: message.title, body: message.body)
+                if session.id != selectedID || !isTabVisible {
+                    session.hasFinished = true
+                    objectWillChange.send()
+                }
+            }
+        }
+    }
+
+    /// A process's name (what `ps` calls it).
+    private static func processName(_ pid: pid_t) -> String? {
+        var info = kinfo_proc()
+        var size = MemoryLayout<kinfo_proc>.stride
+        var mib: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_PID, pid]
+        guard sysctl(&mib, 4, &info, &size, nil, 0) == 0, size > 0 else { return nil }
+        let name = withUnsafeBytes(of: &info.kp_proc.p_comm) { bytes in
+            String(decoding: bytes.prefix { $0 != 0 }, as: UTF8.self)
+        }
+        return name.isEmpty ? nil : name
+    }
+
+    /// The folder a shell is in (asks `lsof`; quick).
+    private static func currentDirectory(of pid: pid_t?) -> String? {
+        guard let pid, pid > 0 else { return nil }
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/sbin/lsof")
+        process.arguments = ["-a", "-p", String(pid), "-d", "cwd", "-Fn"]
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+        guard (try? process.run()) != nil else { return nil }
+        process.waitUntilExit()
+        let output = String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+        return output.split(separator: "\n").first { $0.hasPrefix("n") }.map { String($0.dropFirst()) }
     }
 
     // MARK: - Font Resolution
@@ -497,71 +692,81 @@ class TerminalManager: ObservableObject {
 
     /// Updates font size on the live terminal view.
     func applyFontSize(_ size: Double) {
-        guard let view = terminalView else { return }
-        let fontFamily = Defaults[.terminalFontFamily]
-        view.font = resolveFont(family: fontFamily, size: CGFloat(size))
+        for view in allViews {
+            let fontFamily = Defaults[.terminalFontFamily]
+            view.font = resolveFont(family: fontFamily, size: CGFloat(size))
+        }
     }
 
     /// Updates font family on the live terminal view.
     func applyFontFamily(_ family: String) {
-        guard let view = terminalView else { return }
-        let fontSize = CGFloat(Defaults[.terminalFontSize])
-        view.font = resolveFont(family: family, size: fontSize)
+        for view in allViews {
+            let fontSize = CGFloat(Defaults[.terminalFontSize])
+            view.font = resolveFont(family: family, size: fontSize)
+        }
     }
 
     /// Updates background opacity on the live terminal view (glyphs stay fully opaque).
     func applyOpacity(_ opacity: Double) {
-        guard let view = terminalView else { return }
-        view.layer?.opacity = 1
-        view.nativeBackgroundColor = resolvedTerminalBackgroundNSColor(opacitySlider: CGFloat(opacity))
-        refreshTerminalOpacityAndTranslucency(for: view)
+        for view in allViews {
+            view.layer?.opacity = 1
+            view.nativeBackgroundColor = resolvedTerminalBackgroundNSColor(opacitySlider: CGFloat(opacity))
+            refreshTerminalOpacityAndTranslucency(for: view)
+        }
     }
 
     /// Updates cursor style on the live terminal view.
     func applyCursorStyle(_ style: TerminalCursorStyleOption) {
-        guard let view = terminalView else { return }
-        view.getTerminal().setCursorStyle(style.swiftTermStyle)
-        view.setNeedsDisplay(view.bounds)
+        for view in allViews {
+            view.getTerminal().setCursorStyle(style.swiftTermStyle)
+            view.setNeedsDisplay(view.bounds)
+        }
     }
 
     /// Updates scrollback buffer size on the live terminal view.
     func applyScrollback(_ lines: Int) {
-        guard let view = terminalView else { return }
-        view.getTerminal().buffer.changeHistorySize(lines)
-        view.getTerminal().options.scrollback = lines
+        for view in allViews {
+            view.getTerminal().buffer.changeHistorySize(lines)
+            view.getTerminal().options.scrollback = lines
+        }
     }
 
     /// Updates option-as-meta on the live terminal view.
     func applyOptionAsMeta(_ enabled: Bool) {
-        guard let view = terminalView else { return }
-        view.optionAsMetaKey = enabled
+        for view in allViews {
+            view.optionAsMetaKey = enabled
+        }
     }
 
     /// Updates mouse reporting on the live terminal view.
     func applyMouseReporting(_ enabled: Bool) {
-        guard let view = terminalView else { return }
-        view.allowMouseReporting = enabled
+        for view in allViews {
+            view.allowMouseReporting = enabled
+        }
     }
 
     /// Updates bold-as-bright on the live terminal view.
     func applyBoldAsBright(_ enabled: Bool) {
-        guard let view = terminalView else { return }
-        view.useBrightColors = enabled
+        for view in allViews {
+            view.useBrightColors = enabled
+        }
     }
 
     /// Updates background color on the live terminal view.
     func applyBackgroundColor(_ color: SwiftUI.Color) {
-        guard let view = terminalView else { return }
-        view.layer?.opacity = 1
-        view.nativeBackgroundColor = resolvedTerminalBackgroundNSColor(baseColor: NSColor(color))
-        refreshTerminalOpacityAndTranslucency(for: view)
+        for view in allViews {
+            view.layer?.opacity = 1
+            view.nativeBackgroundColor = resolvedTerminalBackgroundNSColor(baseColor: NSColor(color))
+            refreshTerminalOpacityAndTranslucency(for: view)
+        }
     }
 
     /// Updates foreground color on the live terminal view.
     func applyForegroundColor(_ color: SwiftUI.Color) {
-        guard let view = terminalView else { return }
-        view.nativeForegroundColor = NSColor(color)
-        synchronizeTerminalTranslucencyPresentation(to: view)
+        for view in allViews {
+            view.nativeForegroundColor = NSColor(color)
+            synchronizeTerminalTranslucencyPresentation(to: view)
+        }
     }
 
     /// Called by UI lifecycle hooks after tab re-appearance to keep opacity stable.
@@ -618,8 +823,9 @@ class TerminalManager: ObservableObject {
 
     /// Updates cursor color on the live terminal view.
     func applyCursorColor(_ color: SwiftUI.Color) {
-        guard let view = terminalView else { return }
-        view.caretColor = NSColor(color)
+        for view in allViews {
+            view.caretColor = NSColor(color)
+        }
     }
 
     // MARK: - Environment
@@ -632,6 +838,27 @@ class TerminalManager: ObservableObject {
         // Remove TERM_PROGRAM if set by a parent terminal
         env.removeValue(forKey: "TERM_PROGRAM")
         return env.map { "\($0.key)=\($0.value)" }
+    }
+}
+
+// MARK: - Session events
+
+/// Every terminal's events (title, folder, exit) go to the manager, by the
+/// terminal they came from; kept by the manager so they keep arriving while
+/// the notch is closed.
+final class TerminalSessionDelegate: NSObject, LocalProcessTerminalViewDelegate {
+    func sizeChanged(source: LocalProcessTerminalView, newCols: Int, newRows: Int) {}
+
+    func setTerminalTitle(source: LocalProcessTerminalView, title: String) {
+        Task { @MainActor in TerminalManager.shared.updateTitle(title, for: source) }
+    }
+
+    func hostCurrentDirectoryUpdate(source: TerminalView, directory: String?) {
+        Task { @MainActor in TerminalManager.shared.updateDirectory(directory, for: source) }
+    }
+
+    func processTerminated(source: TerminalView, exitCode: Int32?) {
+        Task { @MainActor in TerminalManager.shared.processDidTerminate(source: source, exitCode: exitCode) }
     }
 }
 
