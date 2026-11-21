@@ -19,6 +19,8 @@ extension Defaults.Keys {
     static let glanceUnloadOnBattery = Key<Bool>("glanceUnloadOnBattery", default: true)
     /// The page each PDF panel was left on, by panel id.
     static let glancePDFPages = Key<[String: Int]>("glancePDFPages", default: [:])
+    /// The board each display shows, by display id (a display without one shows the selected board when the pointer is on it).
+    static let glanceDisplayBoards = Key<[String: String]>("glanceDisplayBoards", default: [:])
 }
 
 /// Glance: hold the shortcut and a board of your panels (web pages, PDFs,
@@ -33,8 +35,13 @@ final class GlanceManager: ObservableObject {
     @Published private(set) var activeBoardID: UUID
     @Published private(set) var isShowing = false
     @Published private(set) var isPinned = false
+    /// While showing: the board on each display.
+    @Published private(set) var shownBoards: [String: UUID] = [:]
+    /// The board you gave each display (Settings › Glance › Displays).
+    @Published private(set) var displayBoards: [String: UUID] = [:]
 
-    private var window: GlanceWindow?
+    private var windows: [String: GlanceWindow] = [:]
+    private var pointerDisplay: String?
     private var pressedAt: Date?
     private var previousApp: NSRunningApplication?
     private var started = false
@@ -45,10 +52,54 @@ final class GlanceManager: ObservableObject {
         if boards.isEmpty { boards = [GlancePolicy.starterBoard()] }
         self.boards = boards
         activeBoardID = boards.first { $0.id.uuidString == Defaults[.glanceActiveBoard] }?.id ?? boards[0].id
+        displayBoards = Defaults[.glanceDisplayBoards].compactMapValues(UUID.init(uuidString:))
     }
 
     var activeBoard: GlanceBoard {
         boards.first { $0.id == activeBoardID } ?? boards[0]
+    }
+
+    /// The board shown on a display right now (nil: that display shows none
+    /// this time, so its window draws nothing and keeps no web page or window).
+    func board(onDisplay key: String) -> GlanceBoard? {
+        guard let id = shownBoards[key] else { return nil }
+        return boards.first { $0.id == id }
+    }
+
+    /// The boards on screen (or about to be).
+    var boardsOnScreen: [GlanceBoard] {
+        let ids = Set(shownBoards.values)
+        return ids.isEmpty ? [activeBoard] : boards.filter { ids.contains($0.id) }
+    }
+
+    // MARK: Displays
+
+    /// A display's lasting id (stays the same across restarts and reconnecting).
+    static func key(for screen: NSScreen) -> String {
+        guard let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber else {
+            return screen.localizedName
+        }
+        let id = CGDirectDisplayID(number.uint32Value)
+        if let uuid = CGDisplayCreateUUIDFromDisplayID(id)?.takeRetainedValue(), let text = CFUUIDCreateString(nil, uuid) {
+            return text as String
+        }
+        return String(id)
+    }
+
+    /// Gives a display its own board (nil: the selected board, when the pointer is on it).
+    func setBoard(_ id: UUID?, forDisplay key: String) {
+        displayBoards[key] = id
+        Defaults[.glanceDisplayBoards] = displayBoards.mapValues(\.uuidString)
+    }
+
+    /// Switching boards on the board itself: with one display, the selected
+    /// board changes; with several, that display's board does.
+    func switchBoard(_ id: UUID, onDisplay key: String) {
+        if NSScreen.screens.count > 1 { setBoard(id, forDisplay: key) } else { selectBoard(id) }
+        if isShowing {
+            shownBoards[key] = id
+            prepareContent()
+        }
     }
 
     func start() {
@@ -68,7 +119,7 @@ final class GlanceManager: ObservableObject {
         if Defaults[.enableGlance] {
             DispatchQueue.main.asyncAfter(deadline: .now() + 8) { [weak self] in
                 guard let self else { return }
-                GlanceWebPanels.shared.preload(self.activeBoard)
+                GlanceWebPanels.shared.prepare([self.activeBoard] + self.boards.filter { Set(self.displayBoards.values).contains($0.id) })
             }
         }
     }
@@ -98,53 +149,78 @@ final class GlanceManager: ObservableObject {
 
     // MARK: Showing
 
-    /// Shows the board on the screen with the pointer.
+    /// Shows the boards: the display with the pointer, and every other
+    /// display you gave a board of its own.
     func show(pinned: Bool) {
         guard !isShowing else {
             if pinned { pin() }
             return
         }
-        let screen = NSScreen.screens.first { NSMouseInRect(NSEvent.mouseLocation, $0.frame, false) } ?? NSScreen.main
-        guard let screen else { return }
+        let screens = NSScreen.screens
+        guard !screens.isEmpty else { return }
+        let pointerScreen = screens.first { NSMouseInRect(NSEvent.mouseLocation, $0.frame, false) } ?? NSScreen.main ?? screens[0]
+        let keys = screens.map(Self.key(for:))
+        pointerDisplay = Self.key(for: pointerScreen)
+        shownBoards = GlancePolicy.boardsToShow(displays: keys, pointer: pointerDisplay, assignments: displayBoards,
+                                                selected: activeBoardID, boards: Set(boards.map(\.id)))
         previousApp = NSWorkspace.shared.frontmostApplication
-        GlanceWebPanels.shared.prepare(activeBoard)
+        prepareContent()
 
-        let window = self.window ?? makeWindow()
-        self.window = window
-        window.setFrame(screen.frame, display: false)
-        window.alphaValue = 0
-        window.orderFrontRegardless()
-        isShowing = true
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.12
-            window.animator().alphaValue = 1
+        for (screen, key) in zip(screens, keys) {
+            guard shownBoards[key] != nil else {
+                windows[key]?.orderOut(nil)
+                continue
+            }
+            let window = windows[key] ?? makeWindow(displayKey: key)
+            windows[key] = window
+            window.setFrame(screen.frame, display: false)
+            window.alphaValue = 0
+            window.orderFrontRegardless()
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.12
+                window.animator().alphaValue = 1
+            }
         }
+        // Windows of displays that were unplugged.
+        for key in windows.keys where !keys.contains(key) { windows[key] = nil }
+        isShowing = true
+        GlanceLiveWindows.shared.resume()
+        GlanceStocks.shared.startRefreshing(GlanceManager.shared.boardsOnScreen)
         if pinned { pin() }
+    }
+
+    /// Loads what the boards on screen show (web pages).
+    private func prepareContent() {
+        GlanceWebPanels.shared.prepare(boardsOnScreen)
     }
 
     /// Keeps the board open (and takes the keyboard, so Esc closes it and you can type in a page).
     func pin() {
-        guard isShowing, let window else { return }
+        guard isShowing, let window = pointerDisplay.flatMap({ windows[$0] }) ?? windows.values.first else { return }
         isPinned = true
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
     }
 
     func hide() {
-        guard isShowing, let window else { return }
+        guard isShowing else { return }
         let wasPinned = isPinned
         isShowing = false
         isPinned = false
         pressedAt = nil
-        NSAnimationContext.runAnimationGroup({ context in
-            context.duration = 0.1
-            window.animator().alphaValue = 0
-        }, completionHandler: {
-            Task { @MainActor in
-                guard !GlanceManager.shared.isShowing else { return }
-                window.orderOut(nil)
-            }
-        })
+        GlanceLiveWindows.shared.pauseAll()
+        GlanceStocks.shared.stopRefreshing()
+        for window in windows.values where window.isVisible {
+            NSAnimationContext.runAnimationGroup({ context in
+                context.duration = 0.1
+                window.animator().alphaValue = 0
+            }, completionHandler: {
+                Task { @MainActor in
+                    guard !GlanceManager.shared.isShowing else { return }
+                    window.orderOut(nil)
+                }
+            })
+        }
         if wasPinned, let previousApp, previousApp.bundleIdentifier != Bundle.main.bundleIdentifier {
             previousApp.activate()
         }
@@ -153,10 +229,10 @@ final class GlanceManager: ObservableObject {
         }
     }
 
-    private func makeWindow() -> GlanceWindow {
+    private func makeWindow(displayKey: String) -> GlanceWindow {
         let window = GlanceWindow()
         window.onEscape = { [weak self] in self?.hide() }
-        window.contentView = NSHostingView(rootView: GlanceBoardView())
+        window.contentView = NSHostingView(rootView: GlanceBoardView(displayKey: displayKey))
         return window
     }
 
@@ -166,7 +242,7 @@ final class GlanceManager: ObservableObject {
         guard boards.contains(where: { $0.id == id }) else { return }
         activeBoardID = id
         Defaults[.glanceActiveBoard] = id.uuidString
-        if isShowing { GlanceWebPanels.shared.prepare(activeBoard) }
+        if isShowing { prepareContent() }
     }
 
     /// Changes the board on screen (and in Settings).
@@ -174,7 +250,10 @@ final class GlanceManager: ObservableObject {
         guard let index = boards.firstIndex(where: { $0.id == activeBoardID }) else { return }
         boards[index] = change(boards[index])
         persist()
-        if isShowing { GlanceWebPanels.shared.prepare(activeBoard) }
+        if isShowing {
+            prepareContent()
+            GlanceStocks.shared.startRefreshing(boardsOnScreen)
+        }
     }
 
     func updatePanel(_ id: UUID, _ change: (inout GlancePanel) -> Void) {
@@ -210,7 +289,9 @@ final class GlanceManager: ObservableObject {
 
     func deleteActive() {
         guard boards.count > 1 else { return }
-        boards.removeAll { $0.id == activeBoardID }
+        let removed = activeBoardID
+        boards.removeAll { $0.id == removed }
+        for (key, id) in displayBoards where id == removed { setBoard(nil, forDisplay: key) }
         selectBoard(boards[0].id)
         persist()
     }

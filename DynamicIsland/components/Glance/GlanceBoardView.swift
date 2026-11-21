@@ -22,9 +22,19 @@ enum GlanceLayout {
 
 /// The board itself: your panels over a dimmed, blurred screen.
 struct GlanceBoardView: View {
+    /// The display this board is on.
+    let displayKey: String
     @ObservedObject private var glance = GlanceManager.shared
 
     var body: some View {
+        if let board = glance.board(onDisplay: displayKey) {
+            content(board)
+        } else {
+            Color.clear
+        }
+    }
+
+    private func content(_ board: GlanceBoard) -> some View {
         GeometryReader { geometry in
             let area = CGRect(x: 36, y: 72, width: max(200, geometry.size.width - 72), height: max(200, geometry.size.height - 108))
             ZStack(alignment: .topLeading) {
@@ -35,11 +45,11 @@ struct GlanceBoardView: View {
                     .contentShape(Rectangle())
                     .onTapGesture { glance.hide() }
 
-                header
+                header(board)
                     .frame(width: geometry.size.width)
                     .padding(.top, 34)
 
-                let shown = glance.activeBoard.panels.filter(\.isShown)
+                let shown = board.panels.filter(\.isShown)
                 if shown.isEmpty {
                     Text("Nothing on this board yet. Add panels in Settings › Glance.")
                         .font(.title3)
@@ -58,20 +68,20 @@ struct GlanceBoardView: View {
         .environment(\.colorScheme, .dark)
     }
 
-    private var header: some View {
+    private func header(_ board: GlanceBoard) -> some View {
         HStack(spacing: 12) {
             if glance.boards.count > 1 {
                 Menu {
-                    ForEach(glance.boards) { board in
-                        Button(board.name) { glance.selectBoard(board.id) }
+                    ForEach(glance.boards) { other in
+                        Button(other.name) { glance.switchBoard(other.id, onDisplay: displayKey) }
                     }
                 } label: {
-                    Label(glance.activeBoard.name, systemImage: "square.grid.2x2")
+                    Label(board.name, systemImage: "square.grid.2x2")
                 }
                 .menuStyle(.borderlessButton)
                 .fixedSize()
             } else {
-                Label(glance.activeBoard.name, systemImage: "square.grid.2x2")
+                Label(board.name, systemImage: "square.grid.2x2")
                     .font(.headline)
             }
             Text(glance.isPinned ? "Esc or the shortcut closes it" : "Let go to close · tap the shortcut to keep it open")
@@ -139,9 +149,11 @@ struct GlancePanelCard: View {
         switch panel.kind {
         case .web: GlanceWebPanelView(panel: panel)
         case .pdf: GlancePDFPanelView(panel: panel)
+        case .window: GlanceLiveWindowPanel(panel: panel)
         case .calendar: GlanceTodayPanel()
         case .reminders: GlanceRemindersPanel()
         case .clocks: GlanceClocksPanel(timeZones: panel.timeZones)
+        case .stocks: GlanceStocksPanel(symbols: panel.symbols)
         case .promises: GlancePromisesPanel()
         case .setups: GlanceSetupsPanel()
         case .stash: GlanceStashPanel()
@@ -525,5 +537,136 @@ struct GlanceWhatsAppPanel: View {
                 .padding(12)
             }
         }
+    }
+}
+
+// MARK: - Stocks
+
+/// Prices with today's change and a small chart of the day.
+struct GlanceStocksPanel: View {
+    let symbols: [String]
+    @ObservedObject private var stocks = GlanceStocks.shared
+
+    var body: some View {
+        if symbols.isEmpty {
+            PanelMessage(text: "Add symbols in Settings › Glance (AAPL, RELIANCE.NS, ^NSEI, BTC-USD).")
+        } else {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 10) {
+                    ForEach(symbols, id: \.self) { symbol in
+                        row(symbol)
+                    }
+                }
+                .padding(12)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func row(_ symbol: String) -> some View {
+        if let quote = stocks.quotes[symbol] {
+            let up = (quote.change ?? 0) >= 0
+            HStack(spacing: 10) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(quote.symbol).font(.system(size: 13, weight: .semibold))
+                    Text(quote.name).font(.system(size: 10)).foregroundStyle(.secondary).lineLimit(1)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                GlanceSparkline(points: quote.points, color: up ? .green : .red)
+                    .frame(width: 64, height: 24)
+                VStack(alignment: .trailing, spacing: 1) {
+                    Text(Self.price(quote.price, currency: quote.currency))
+                        .font(.system(size: 13, weight: .semibold).monospacedDigit())
+                    if let percent = quote.changePercent {
+                        Text(String(format: "%@%.2f%%", up ? "+" : "", percent))
+                            .font(.system(size: 11, weight: .medium).monospacedDigit())
+                            .foregroundStyle(up ? Color.green : Color.red)
+                    }
+                }
+            }
+        } else {
+            HStack {
+                Text(symbol).font(.system(size: 13, weight: .semibold))
+                Spacer()
+                Text(stocks.failed.contains(symbol) ? "Not found" : "…")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private static func price(_ value: Double, currency: String?) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = currency == nil ? .decimal : .currency
+        if let currency { formatter.currencyCode = currency }
+        formatter.maximumFractionDigits = value < 10 ? 4 : 2
+        formatter.minimumFractionDigits = 2
+        return formatter.string(from: NSNumber(value: value)) ?? String(format: "%.2f", value)
+    }
+}
+
+/// A day's prices as a line.
+struct GlanceSparkline: View {
+    let points: [Double]
+    let color: Color
+
+    var body: some View {
+        GeometryReader { geometry in
+            if points.count > 1, let low = points.min(), let high = points.max() {
+                let span = max(high - low, 0.000001)
+                Path { path in
+                    for (index, value) in points.enumerated() {
+                        let x = geometry.size.width * CGFloat(index) / CGFloat(points.count - 1)
+                        let y = geometry.size.height * (1 - CGFloat((value - low) / span))
+                        if index == 0 { path.move(to: CGPoint(x: x, y: y)) } else { path.addLine(to: CGPoint(x: x, y: y)) }
+                    }
+                }
+                .stroke(color, style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
+            }
+        }
+    }
+}
+
+// MARK: - Live window
+
+/// Another app's window, live; click it to go to that window.
+struct GlanceLiveWindowPanel: View {
+    let panel: GlancePanel
+    @ObservedObject private var live = GlanceLiveWindows.shared
+
+    var body: some View {
+        ZStack {
+            GlanceLiveWindowLayer(panel: panel)
+            if let problem = live.problems[panel.id] {
+                PanelMessage(text: problem)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(.regularMaterial)
+            }
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            GlanceManager.shared.hide()
+            GlanceLiveWindows.shared.bringForward(panel)
+        }
+        .help("Click to go to this window")
+    }
+}
+
+private struct GlanceLiveWindowLayer: NSViewRepresentable {
+    let panel: GlancePanel
+
+    func makeNSView(context: Context) -> NSView {
+        // A layer-hosting view: the layer first, then wantsLayer.
+        let view = NSView()
+        let layer = CALayer()
+        layer.contentsGravity = .resizeAspect
+        view.layer = layer
+        view.wantsLayer = true
+        GlanceLiveWindows.shared.register(panel, layer: layer)
+        return view
+    }
+
+    func updateNSView(_ view: NSView, context: Context) {
+        if let layer = view.layer { GlanceLiveWindows.shared.register(panel, layer: layer) }
     }
 }

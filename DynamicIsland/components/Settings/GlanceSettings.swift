@@ -14,6 +14,8 @@ struct GlanceSettings: View {
     @Default(.enableGlance) private var enableGlance
     @State private var selectedPanel: UUID?
     @State private var newClock = GlanceClocks.common[0].zone
+    @State private var windowChoices: [GlanceLiveWindows.Choice] = []
+    @State private var symbolsText = ""
 
     private var board: GlanceBoard { glance.activeBoard }
 
@@ -41,6 +43,7 @@ struct GlanceSettings: View {
 
             if enableGlance {
                 layoutSection
+                displaysSection
                 panelsSection
                 if let id = selectedPanel, let panel = board.panels.first(where: { $0.id == id }) {
                     panelSection(panel)
@@ -62,6 +65,7 @@ struct GlanceSettings: View {
                 }
             }
         }
+        .onChange(of: selectedPanel) { _, _ in symbolsText = "" }
     }
 
     // MARK: Layouts
@@ -113,6 +117,32 @@ struct GlanceSettings: View {
         }
     }
 
+    // MARK: Displays
+
+    private var displaysSection: some View {
+        Section {
+            ForEach(NSScreen.screens, id: \.self) { screen in
+                let key = GlanceManager.key(for: screen)
+                Picker(selection: Binding(get: { glance.displayBoards[key] },
+                                          set: { glance.setBoard($0, forDisplay: key) })) {
+                    Text("Selected layout").tag(UUID?.none)
+                    ForEach(glance.boards) { board in
+                        Text(board.name).tag(UUID?.some(board.id))
+                    }
+                } label: {
+                    Label(screen.localizedName, systemImage: screen == NSScreen.screens.first ? "laptopcomputer" : "display")
+                }
+            }
+        } header: {
+            Text("Displays")
+        } footer: {
+            Text("Give each display its own layout. When Glance opens, the display with the pointer shows its layout, and every other display with a layout of its own shows that one too. \"Selected layout\" shows the layout picked above, on the display with the pointer only.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .settingsHighlight(id: "glance-Displays")
+    }
+
     // MARK: Panels
 
     private var panelsSection: some View {
@@ -146,6 +176,15 @@ struct GlanceSettings: View {
                     selectedPanel = glance.activeBoard.panels.last?.id
                 }
                 Button("Add PDF…") { addPDF() }
+                Menu("Add App Window") {
+                    if windowChoices.isEmpty {
+                        Text("No windows found. Allow Screen Recording for NotchFlow, then try again.")
+                    }
+                    ForEach(windowChoices) { choice in
+                        Button(choice.title.isEmpty ? choice.appName : "\(choice.appName) · \(choice.title)") { addWindow(choice) }
+                    }
+                }
+                .fixedSize()
                 Spacer()
             }
             Text("A panel switched on goes where there's room; when the board is full, make room by resizing or switching another off.")
@@ -155,6 +194,20 @@ struct GlanceSettings: View {
             Text("Panels")
         }
         .settingsHighlight(id: "glance-Panels")
+        .task { windowChoices = await GlanceLiveWindows.shared.choices() }
+    }
+
+    private func addWindow(_ choice: GlanceLiveWindows.Choice) {
+        if !CGPreflightScreenCaptureAccess() { _ = CGRequestScreenCaptureAccess() }
+        glance.updateActive { board in
+            var board = GlancePolicy.adding(.window, title: choice.appName, to: board)
+            if let index = board.panels.indices.last {
+                board.panels[index].windowApp = choice.bundleID
+                board.panels[index].windowTitle = choice.title
+            }
+            return board
+        }
+        selectedPanel = glance.activeBoard.panels.last?.id
     }
 
     private func setBuiltIn(_ kind: GlancePanelKind, shown: Bool) {
@@ -172,6 +225,13 @@ struct GlanceSettings: View {
         guard panel.runModal() == .OK, let url = panel.url else { return }
         glance.updateActive { GlancePolicy.adding(.pdf, title: url.deletingPathExtension().lastPathComponent, address: url.path, to: $0) }
         selectedPanel = glance.activeBoard.panels.last?.id
+    }
+
+    private func saveSymbols(_ panel: GlancePanel) {
+        guard !symbolsText.isEmpty else { return }
+        let symbols = GlancePolicy.symbols(from: symbolsText)
+        glance.updatePanel(panel.id) { $0.symbols = symbols }
+        symbolsText = ""
     }
 
     // MARK: The selected panel
@@ -229,6 +289,40 @@ struct GlanceSettings: View {
                     Button("Add") {
                         glance.updatePanel(panel.id) { if !$0.timeZones.contains(newClock) { $0.timeZones.append(newClock) } }
                     }
+                }
+            case .stocks:
+                TextField("Symbols", text: Binding(get: { symbolsText.isEmpty ? panel.symbols.joined(separator: ", ") : symbolsText },
+                                                   set: { symbolsText = $0 }),
+                          prompt: Text("AAPL, RELIANCE.NS, ^NSEI, BTC-USD"))
+                    .onSubmit { saveSymbols(panel) }
+                HStack {
+                    Text("Yahoo Finance symbols: Indian stocks end in .NS (NSE) or .BO (BSE), indexes start with ^ (^NSEI, ^BSESN, ^GSPC), crypto ends in -USD. Prices refresh every minute while the board is open.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Save") { saveSymbols(panel) }
+                }
+            case .window:
+                Picker("Window", selection: Binding(get: { windowChoices.first { $0.bundleID == panel.windowApp && $0.title == panel.windowTitle } },
+                                                    set: { choice in
+                                                        guard let choice else { return }
+                                                        glance.updatePanel(panel.id) {
+                                                            $0.windowApp = choice.bundleID
+                                                            $0.windowTitle = choice.title
+                                                            if $0.title.isEmpty || $0.title == GlancePanelKind.window.defaultTitle { $0.title = choice.appName }
+                                                        }
+                                                    })) {
+                    Text(panel.windowApp.isEmpty ? "Choose a window" : "\(panel.title) (not open now)").tag(GlanceLiveWindows.Choice?.none)
+                    ForEach(windowChoices) { choice in
+                        Text(choice.title.isEmpty ? choice.appName : "\(choice.appName) · \(choice.title)").tag(GlanceLiveWindows.Choice?.some(choice))
+                    }
+                }
+                HStack {
+                    Text("The window shows live while the board is open (Screen Recording must be allowed). If its title changes, the closest match from the same app is shown. Click it on the board to go to it.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Refresh List") { Task { windowChoices = await GlanceLiveWindows.shared.choices() } }
                 }
             default:
                 EmptyView()

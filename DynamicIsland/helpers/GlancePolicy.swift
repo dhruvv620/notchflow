@@ -5,18 +5,21 @@ import Foundation
 
 /// What a Glance panel shows.
 enum GlancePanelKind: String, Codable, CaseIterable, Sendable {
-    case web, pdf, calendar, reminders, clocks, promises, setups, stash, whatsapp
+    case web, pdf, window, calendar, reminders, clocks, stocks, promises, setups, stash, whatsapp
 
-    /// Built-in panels exist once on a board; web pages and PDFs as many times as you add them.
-    var isBuiltIn: Bool { self != .web && self != .pdf }
+    /// Built-in panels exist once on a board; web pages, PDFs and app
+    /// windows as many times as you add them.
+    var isBuiltIn: Bool { self != .web && self != .pdf && self != .window }
 
     var defaultTitle: String {
         switch self {
         case .web: return "Web page"
         case .pdf: return "PDF"
+        case .window: return "App window"
         case .calendar: return "Today"
         case .reminders: return "Reminders"
         case .clocks: return "World clocks"
+        case .stocks: return "Stocks"
         case .promises: return "Promises"
         case .setups: return "Window setups"
         case .stash: return "Window stash"
@@ -28,9 +31,11 @@ enum GlancePanelKind: String, Codable, CaseIterable, Sendable {
         switch self {
         case .web: return "globe"
         case .pdf: return "doc.richtext"
+        case .window: return "macwindow"
         case .calendar: return "calendar"
         case .reminders: return "checklist"
         case .clocks: return "clock"
+        case .stocks: return "chart.line.uptrend.xyaxis"
         case .promises: return "hand.raised"
         case .setups: return "rectangle.3.group"
         case .stash: return "tray.full"
@@ -41,7 +46,7 @@ enum GlancePanelKind: String, Codable, CaseIterable, Sendable {
     /// Size in grid cells when added.
     var defaultSize: (width: Int, height: Int) {
         switch self {
-        case .web, .pdf: return (3, 2)
+        case .web, .pdf, .window: return (3, 2)
         case .clocks, .stash: return (2, 1)
         default: return (2, 2)
         }
@@ -72,9 +77,52 @@ struct GlancePanel: Codable, Identifiable, Equatable, Sendable {
     var mobileLayout = false
     /// World clocks: time zone identifiers ("Asia/Kolkata").
     var timeZones: [String] = []
+    /// Stocks: ticker symbols ("AAPL", "RELIANCE.NS").
+    var symbols: [String] = []
+    /// App window: the app (bundle id) and the window's title when picked.
+    var windowApp = ""
+    var windowTitle = ""
     /// Off: kept in the list but not on the board.
     var isShown = true
     var frame: GlanceRect
+
+    init(id: UUID = UUID(), kind: GlancePanelKind, title: String, address: String = "", refreshMinutes: Int = 5,
+         mobileLayout: Bool = false, timeZones: [String] = [], symbols: [String] = [], windowApp: String = "",
+         windowTitle: String = "", isShown: Bool = true, frame: GlanceRect) {
+        self.id = id
+        self.kind = kind
+        self.title = title
+        self.address = address
+        self.refreshMinutes = refreshMinutes
+        self.mobileLayout = mobileLayout
+        self.timeZones = timeZones
+        self.symbols = symbols
+        self.windowApp = windowApp
+        self.windowTitle = windowTitle
+        self.isShown = isShown
+        self.frame = frame
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, kind, title, address, refreshMinutes, mobileLayout, timeZones, symbols, windowApp, windowTitle, isShown, frame
+    }
+
+    /// Reads boards saved by any version: options added later take their defaults.
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        id = try values.decode(UUID.self, forKey: .id)
+        kind = try values.decode(GlancePanelKind.self, forKey: .kind)
+        title = try values.decodeIfPresent(String.self, forKey: .title) ?? kind.defaultTitle
+        address = try values.decodeIfPresent(String.self, forKey: .address) ?? ""
+        refreshMinutes = try values.decodeIfPresent(Int.self, forKey: .refreshMinutes) ?? 5
+        mobileLayout = try values.decodeIfPresent(Bool.self, forKey: .mobileLayout) ?? false
+        timeZones = try values.decodeIfPresent([String].self, forKey: .timeZones) ?? []
+        symbols = try values.decodeIfPresent([String].self, forKey: .symbols) ?? []
+        windowApp = try values.decodeIfPresent(String.self, forKey: .windowApp) ?? ""
+        windowTitle = try values.decodeIfPresent(String.self, forKey: .windowTitle) ?? ""
+        isShown = try values.decodeIfPresent(Bool.self, forKey: .isShown) ?? true
+        frame = try values.decode(GlanceRect.self, forKey: .frame)
+    }
 }
 
 /// One layout you can switch to ("Work", "Morning").
@@ -140,6 +188,7 @@ enum GlancePolicy {
         var panel = GlancePanel(kind: kind, title: title ?? kind.defaultTitle, address: address, isShown: spot != nil,
                                 frame: spot ?? GlanceRect(x: 0, y: 0, width: size.width, height: size.height))
         if kind == .clocks { panel.timeZones = defaultTimeZones }
+        if kind == .stocks { panel.symbols = defaultSymbols }
         board.panels.append(panel)
         return board
     }
@@ -276,8 +325,20 @@ enum GlancePolicy {
         return copy
     }
 
+    /// Saved boards; a panel of a kind this version doesn't know is skipped, not the whole board.
     static func decodeBoards(_ data: Data) -> [GlanceBoard] {
-        (try? JSONDecoder().decode([GlanceBoard].self, from: data)) ?? []
+        if let boards = try? JSONDecoder().decode([GlanceBoard].self, from: data) { return boards }
+        guard let raw = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else { return [] }
+        return raw.compactMap { object in
+            var object = object
+            let panels = (object["panels"] as? [[String: Any]]) ?? []
+            object["panels"] = panels.filter { panel in
+                guard let piece = try? JSONSerialization.data(withJSONObject: panel) else { return false }
+                return (try? JSONDecoder().decode(GlancePanel.self, from: piece)) != nil
+            }
+            guard let cleaned = try? JSONSerialization.data(withJSONObject: object) else { return nil }
+            return try? JSONDecoder().decode(GlanceBoard.self, from: cleaned)
+        }
     }
 
     static func encodeBoards(_ boards: [GlanceBoard]) -> Data {
@@ -327,6 +388,111 @@ enum GlancePolicy {
                       "action": ["type": "css-display-none", "selector": cookieBannerSelectors.joined(separator: ", ")]])
         let data = (try? JSONSerialization.data(withJSONObject: rules, options: [.sortedKeys])) ?? Data("[]".utf8)
         return String(decoding: data, as: UTF8.self)
+    }
+
+    // MARK: Displays
+
+    /// Which board each display shows when Glance opens: the display with
+    /// the pointer shows the board you gave it (else the selected one);
+    /// other displays only when you gave them a board, and not one already
+    /// showing (a web page or window can be in only one place).
+    static func boardsToShow(displays: [String], pointer: String?, assignments: [String: UUID],
+                             selected: UUID, boards: Set<UUID>) -> [String: UUID] {
+        func valid(_ id: UUID?) -> UUID? { id.flatMap { boards.contains($0) ? $0 : nil } }
+        var result: [String: UUID] = [:]
+        var used = Set<UUID>()
+        if let pointer, displays.contains(pointer) {
+            let id = valid(assignments[pointer]) ?? selected
+            result[pointer] = id
+            used.insert(id)
+        }
+        for display in displays where display != pointer {
+            if let id = valid(assignments[display]), used.insert(id).inserted { result[display] = id }
+        }
+        return result
+    }
+
+    // MARK: Stocks
+
+    struct StockQuote: Equatable, Sendable {
+        let symbol: String
+        let name: String
+        let price: Double
+        let previousClose: Double?
+        let currency: String?
+        /// Today's prices, oldest first, for the little chart.
+        let points: [Double]
+
+        var change: Double? { previousClose.map { price - $0 } }
+        var changePercent: Double? {
+            guard let previousClose, previousClose != 0 else { return nil }
+            return (price - previousClose) / previousClose * 100
+        }
+    }
+
+    static let defaultSymbols = ["AAPL", "^NSEI", "BTC-USD"]
+
+    /// Symbols typed in a list ("aapl, reliance.ns  TSLA").
+    static func symbols(from text: String) -> [String] {
+        var seen = Set<String>()
+        return text.split(whereSeparator: { $0 == "," || $0 == " " || $0 == "\n" })
+            .map { $0.trimmingCharacters(in: .whitespaces).uppercased() }
+            .filter { !$0.isEmpty && $0.count <= 20 && $0.allSatisfy { $0.isLetter || $0.isNumber || ".^=-_".contains($0) } }
+            .filter { seen.insert($0).inserted }
+    }
+
+    /// Yahoo Finance's public chart data for today (no account; NSE stocks end in .NS, BSE in .BO).
+    static func stockURL(_ symbol: String) -> URL? {
+        guard let clean = symbols(from: symbol).first,
+              let encoded = clean.addingPercentEncoding(withAllowedCharacters: .alphanumerics.union(CharacterSet(charactersIn: ".-_"))) else { return nil }
+        return URL(string: "https://query1.finance.yahoo.com/v8/finance/chart/\(encoded)?range=1d&interval=15m")
+    }
+
+    static func quote(from data: Data) -> StockQuote? {
+        guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let chart = object["chart"] as? [String: Any],
+              let result = (chart["result"] as? [[String: Any]])?.first,
+              let meta = result["meta"] as? [String: Any],
+              let symbol = meta["symbol"] as? String,
+              let price = (meta["regularMarketPrice"] as? NSNumber)?.doubleValue else { return nil }
+        let previous = (meta["chartPreviousClose"] as? NSNumber)?.doubleValue ?? (meta["previousClose"] as? NSNumber)?.doubleValue
+        let name = (meta["shortName"] as? String) ?? (meta["longName"] as? String) ?? symbol
+        let quote = ((result["indicators"] as? [String: Any])?["quote"] as? [[String: Any]])?.first
+        let points = ((quote?["close"] as? [Any]) ?? []).compactMap { ($0 as? NSNumber)?.doubleValue }
+        return StockQuote(symbol: symbol, name: name, price: price, previousClose: previous,
+                          currency: meta["currency"] as? String, points: points)
+    }
+
+    // MARK: Live windows
+
+    struct WindowCandidate: Equatable, Sendable {
+        let bundleID: String
+        let title: String
+        let area: Double
+    }
+
+    /// The window an App window panel shows: the one with the title you
+    /// picked, else the one whose title shares most of its words (a
+    /// browser's title follows its page, counts change), else that app's
+    /// biggest window.
+    static func pickWindow(_ candidates: [WindowCandidate], app: String, title: String) -> Int? {
+        let mine = candidates.indices.filter { candidates[$0].bundleID == app && candidates[$0].area >= 10_000 }
+        guard !mine.isEmpty else { return nil }
+        if !title.isEmpty {
+            if let exact = mine.first(where: { candidates[$0].title == title }) { return exact }
+            let wanted = words(title)
+            let scored = mine.map { index -> (Int, Double) in
+                let found = words(candidates[index].title)
+                let union = wanted.union(found)
+                return (index, union.isEmpty ? 0 : Double(wanted.intersection(found).count) / Double(union.count))
+            }
+            if let best = scored.max(by: { $0.1 < $1.1 }), best.1 >= 0.5 { return best.0 }
+        }
+        return mine.max { candidates[$0].area < candidates[$1].area }
+    }
+
+    private static func words(_ text: String) -> Set<String> {
+        Set(text.lowercased().split { !$0.isLetter }.map(String.init).filter { $0.count >= 2 })
     }
 
     // MARK: Hold or tap

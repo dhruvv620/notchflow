@@ -32,16 +32,11 @@ final class GlanceWebPanels {
     private static let mobileUserAgent =
         "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1"
 
-    /// Loads the board's pages that aren't loaded yet, without showing them.
-    func preload(_ board: GlanceBoard) {
-        prepare(board)
-    }
-
-    /// Before the board shows: every shown web panel has its page, due
+    /// Before the boards show: every shown web panel has its page, due
     /// reloads happen, and pages of panels no longer on any board are dropped.
-    func prepare(_ board: GlanceBoard) {
+    func prepare(_ boards: [GlanceBoard]) {
         compileRulesIfNeeded()
-        let webPanels = board.panels.filter { $0.isShown && $0.kind == .web }
+        let webPanels = boards.flatMap(\.panels).filter { $0.isShown && $0.kind == .web }
         for panel in webPanels { _ = view(for: panel) }
         let keep = Set(GlanceManager.shared.boards.flatMap(\.panels).filter { $0.kind == .web }.map(\.id))
         for id in pages.keys where !keep.contains(id) { pages[id] = nil }

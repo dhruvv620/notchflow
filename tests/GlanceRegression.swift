@@ -110,6 +110,53 @@ struct GlanceRegression {
         try require(parsed?.count == P.blockedHosts.count + 1 && rules.contains(#"doubleclick\\.net"#)
                     && rules.contains("css-display-none") && rules.contains("#onetrust-banner-sdk"), "Content rules")
 
+        // Boards saved before a panel option existed still load
+        let old = #"[{"id":"7E57D0D0-0000-4000-8000-000000000001","name":"Old","panels":[{"id":"7E57D0D0-0000-4000-8000-000000000002","kind":"web","title":"Mail","address":"mail.google.com","refreshMinutes":5,"mobileLayout":false,"timeZones":[],"isShown":true,"frame":{"x":0,"y":0,"width":3,"height":2}},{"id":"7E57D0D0-0000-4000-8000-000000000003","kind":"hologram","title":"?","frame":{"x":3,"y":0,"width":1,"height":1}}]}]"#
+        let loaded = P.decodeBoards(Data(old.utf8))
+        try require(loaded.count == 1 && loaded[0].panels.count == 1 && loaded[0].panels[0].title == "Mail"
+                    && loaded[0].panels[0].symbols.isEmpty && loaded[0].panels[0].windowApp.isEmpty, "Old boards load: \(loaded)")
+
+        // New kinds
+        try require(GlancePanelKind.window.isBuiltIn == false && GlancePanelKind.stocks.isBuiltIn, "Kinds")
+        let stocksBoard = P.adding(.stocks, to: GlanceBoard(name: "S"))
+        try require(stocksBoard.panels[0].symbols == P.defaultSymbols, "Stocks get symbols")
+
+        // Displays: the pointer's display shows its board; others only their own, never the same one twice
+        let b1 = UUID(), b2 = UUID(), b3 = UUID()
+        let all: Set<UUID> = [b1, b2, b3]
+        try require(P.boardsToShow(displays: ["A", "B"], pointer: "A", assignments: [:], selected: b1, boards: all) == ["A": b1],
+                    "Nothing assigned: just the pointer's display")
+        try require(P.boardsToShow(displays: ["A", "B"], pointer: "A", assignments: ["B": b2], selected: b1, boards: all) == ["A": b1, "B": b2],
+                    "Each display its board")
+        try require(P.boardsToShow(displays: ["A", "B"], pointer: "B", assignments: ["A": b3, "B": b2], selected: b1, boards: all) == ["B": b2, "A": b3],
+                    "Pointer on the other display")
+        try require(P.boardsToShow(displays: ["A", "B"], pointer: "A", assignments: ["B": b1], selected: b1, boards: all) == ["A": b1],
+                    "Same board not twice")
+        try require(P.boardsToShow(displays: ["A"], pointer: "A", assignments: ["A": UUID()], selected: b1, boards: all) == ["A": b1],
+                    "A deleted board falls back to the selected one")
+
+        // Stocks
+        try require(P.symbols(from: "aapl, reliance.ns  TSLA,aapl ^NSEI bad$") == ["AAPL", "RELIANCE.NS", "TSLA", "^NSEI"], "Symbols")
+        try require(P.stockURL("reliance.ns")?.absoluteString == "https://query1.finance.yahoo.com/v8/finance/chart/RELIANCE.NS?range=1d&interval=15m"
+                    && P.stockURL("^NSEI")?.absoluteString.contains("chart/%5ENSEI?") == true && P.stockURL("$$") == nil, "Stock URLs")
+        let chart = #"{"chart":{"result":[{"meta":{"currency":"INR","symbol":"RELIANCE.NS","shortName":"RELIANCE INDUSTRIES","regularMarketPrice":2950.5,"chartPreviousClose":2900.0},"indicators":{"quote":[{"close":[2905.0,null,2930.25,2950.5]}]}}],"error":null}}"#
+        let quote = P.quote(from: Data(chart.utf8))
+        try require(quote?.symbol == "RELIANCE.NS" && quote?.name == "RELIANCE INDUSTRIES" && quote?.currency == "INR"
+                    && quote?.points == [2905.0, 2930.25, 2950.5] && abs((quote?.changePercent ?? 0) - 1.7413793) < 0.0001
+                    && quote?.change == 50.5, "Quote: \(String(describing: quote))")
+        try require(P.quote(from: Data(#"{"chart":{"result":null,"error":{"code":"Not Found"}}}"#.utf8)) == nil, "Unknown symbol")
+
+        // Live windows
+        let windows = [P.WindowCandidate(bundleID: "com.google.Chrome", title: "Inbox (3) - Gmail", area: 900_000),
+                       P.WindowCandidate(bundleID: "com.google.Chrome", title: "Grafana - Orders", area: 1_200_000),
+                       P.WindowCandidate(bundleID: "com.google.Chrome", title: "", area: 500),
+                       P.WindowCandidate(bundleID: "com.apple.Terminal", title: "zsh", area: 300_000)]
+        try require(P.pickWindow(windows, app: "com.google.Chrome", title: "Grafana - Orders") == 1, "Exact title")
+        try require(P.pickWindow(windows, app: "com.google.Chrome", title: "Inbox (5) - Gmail") == 0, "Title that changed a little")
+        try require(P.pickWindow(windows, app: "com.google.Chrome", title: "Something else") == 1, "Biggest window")
+        try require(P.pickWindow(windows, app: "com.apple.Terminal", title: "") == 3, "No title saved")
+        try require(P.pickWindow(windows, app: "com.tinyspeck.slackmacgap", title: "Slack") == nil, "App not open")
+
         // Hold or tap
         try require(P.isTap(heldFor: 0.1) && !P.isTap(heldFor: 0.6), "Tap or hold")
         print("Glance: OK")
