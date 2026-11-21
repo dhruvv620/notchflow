@@ -12,6 +12,9 @@ import UniformTypeIdentifiers
 struct GlanceSettings: View {
     @ObservedObject private var glance = GlanceManager.shared
     @Default(.enableGlance) private var enableGlance
+    @Default(.glanceTrigger) private var trigger
+    @Default(.glanceMode) private var mode
+    @Default(.glanceBackdrop) private var backdrop
     @State private var selectedPanel: UUID?
     @State private var newClock = GlanceClocks.common[0].zone
     @State private var windowChoices: [GlanceLiveWindows.Choice] = []
@@ -27,10 +30,29 @@ struct GlanceSettings: View {
                 }
                 .settingsHighlight(id: "glance-Use Glance")
                 if enableGlance {
-                    KeyboardShortcuts.Recorder("Hold to glance:", name: .glanceHold)
-                        .settingsHighlight(id: "glance-Hold to glance")
-                    HStack {
-                        Text("Hold the shortcut to see your board over everything, let go to hide it. Tap it instead to keep the board open; Esc, a click outside the panels, or the shortcut again closes it.")
+                    Picker("Opens with", selection: $trigger) {
+                        ForEach(GlancePolicy.Trigger.allCases, id: \.rawValue) { option in
+                            Text(option.title).tag(option.rawValue)
+                        }
+                    }
+                    .settingsHighlight(id: "glance-Hold to glance")
+                    if trigger == GlancePolicy.Trigger.shortcut.rawValue {
+                        KeyboardShortcuts.Recorder("Shortcut:", name: .glanceHold)
+                    }
+                    Picker("Behaviour", selection: $mode) {
+                        ForEach(GlancePolicy.Mode.allCases, id: \.rawValue) { option in
+                            Text(option.title).tag(option.rawValue)
+                        }
+                    }
+                    .pickerStyle(.radioGroup)
+                    Picker("Behind the panels", selection: $backdrop) {
+                        ForEach(GlancePolicy.Backdrop.allCases, id: \.rawValue) { option in
+                            Text(option.title).tag(option.rawValue)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    HStack(alignment: .top) {
+                        Text(triggerHelp)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         Spacer()
@@ -66,6 +88,24 @@ struct GlanceSettings: View {
             }
         }
         .onChange(of: selectedPanel) { _, _ in symbolsText = "" }
+    }
+
+    private var triggerHelp: String {
+        let key = GlancePolicy.Trigger(rawValue: trigger) ?? .shortcut
+        let name = key == .shortcut ? "the shortcut" : key.title.replacingOccurrences(of: " (either)", with: "")
+        var text = mode == GlancePolicy.Mode.hold.rawValue
+            ? "Hold \(name) to see your boards over everything; you can point at and click panels while holding it. Let go and they're gone."
+            : "Press \(name) to show your boards, press it again (or Esc) to hide them."
+        if key != .shortcut {
+            text += " On its own only: \(name) with another key (typing a capital, a shortcut) never opens Glance."
+        }
+        if key == .fn {
+            text += " Set System Settings › Keyboard › \"Press 🌐 key to\" to Do Nothing, so the emoji picker doesn't open too."
+        }
+        if key != .shortcut && !AXIsProcessTrusted() {
+            text += " NotchFlow needs Accessibility to notice the key."
+        }
+        return text
     }
 
     // MARK: Layouts

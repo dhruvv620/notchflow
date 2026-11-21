@@ -5,7 +5,7 @@ import Foundation
 
 /// What a Glance panel shows.
 enum GlancePanelKind: String, Codable, CaseIterable, Sendable {
-    case web, pdf, window, calendar, reminders, clocks, stocks, promises, setups, stash, whatsapp
+    case web, pdf, window, calendar, reminders, clocks, stocks, nowPlaying, promises, setups, stash, whatsapp
 
     /// Built-in panels exist once on a board; web pages, PDFs and app
     /// windows as many times as you add them.
@@ -20,6 +20,7 @@ enum GlancePanelKind: String, Codable, CaseIterable, Sendable {
         case .reminders: return "Reminders"
         case .clocks: return "World clocks"
         case .stocks: return "Stocks"
+        case .nowPlaying: return "Now playing"
         case .promises: return "Promises"
         case .setups: return "Window setups"
         case .stash: return "Window stash"
@@ -36,6 +37,7 @@ enum GlancePanelKind: String, Codable, CaseIterable, Sendable {
         case .reminders: return "checklist"
         case .clocks: return "clock"
         case .stocks: return "chart.line.uptrend.xyaxis"
+        case .nowPlaying: return "music.note"
         case .promises: return "hand.raised"
         case .setups: return "rectangle.3.group"
         case .stash: return "tray.full"
@@ -48,6 +50,7 @@ enum GlancePanelKind: String, Codable, CaseIterable, Sendable {
         switch self {
         case .web, .pdf, .window: return (3, 2)
         case .clocks, .stash: return (2, 1)
+        case .nowPlaying: return (2, 3)
         default: return (2, 2)
         }
     }
@@ -495,10 +498,113 @@ enum GlancePolicy {
         Set(text.lowercased().split { !$0.isLetter }.map(String.init).filter { $0.count >= 2 })
     }
 
-    // MARK: Hold or tap
+    // MARK: Opening it
 
-    /// Released this soon after pressing, the shortcut was a tap: the board stays open.
-    static let tapLimit: TimeInterval = 0.35
+    /// How the board opens: while you hold the key, or press once to show and once to hide.
+    enum Mode: String, CaseIterable, Sendable {
+        case hold, toggle
 
-    static func isTap(heldFor seconds: TimeInterval) -> Bool { seconds < tapLimit }
+        var title: String {
+            switch self {
+            case .hold: return "Hold to show, release to hide"
+            case .toggle: return "Press to show, press again to hide"
+            }
+        }
+    }
+
+    /// What opens it: the shortcut, or one modifier key on its own.
+    enum Trigger: String, CaseIterable, Sendable {
+        case shortcut, fn, shift, rightShift, rightCommand, rightOption, rightControl
+
+        var title: String {
+            switch self {
+            case .shortcut: return "Keyboard shortcut"
+            case .fn: return "fn (Globe) key"
+            case .shift: return "Shift (either)"
+            case .rightShift: return "Right Shift"
+            case .rightCommand: return "Right Command"
+            case .rightOption: return "Right Option"
+            case .rightControl: return "Right Control"
+            }
+        }
+
+        /// The keys (virtual key codes) that count as this trigger.
+        var keyCodes: Set<UInt16> {
+            switch self {
+            case .shortcut: return []
+            case .fn: return [63]
+            case .shift: return [56, 60]
+            case .rightShift: return [60]
+            case .rightCommand: return [54]
+            case .rightOption: return [61]
+            case .rightControl: return [62]
+            }
+        }
+    }
+
+    /// Whether the modifier key that just changed is now down, from the
+    /// event's flags (which tell left and right apart).
+    static func isModifierDown(keyCode: UInt16, flags: UInt) -> Bool {
+        let masks: [UInt16: UInt] = [56: 0x2, 60: 0x4, 55: 0x8, 54: 0x10, 58: 0x20, 61: 0x40, 59: 0x1, 62: 0x2000, 63: 0x800000]
+        guard let mask = masks[keyCode] else { return false }
+        return flags & mask != 0
+    }
+
+    /// A modifier key on its own, telling a hold or tap apart from typing:
+    /// Shift held for a capital letter never opens the board, because
+    /// another key comes before the hold time is up.
+    struct ModifierGesture: Sendable {
+        enum Action: Equatable, Sendable { case none, show, hide, toggle }
+
+        /// Held this long, on its own, it opens the board (hold mode).
+        static let holdDelay: TimeInterval = 0.22
+        /// Released within this, on its own, it was a tap (toggle mode).
+        static let tapLimit: TimeInterval = 0.4
+
+        var mode: Mode
+        private(set) var downAt: Date?
+        private(set) var interrupted = false
+
+        init(mode: Mode) { self.mode = mode }
+
+        mutating func triggerDown(at date: Date) {
+            downAt = date
+            interrupted = false
+        }
+
+        /// Another key or a click while the trigger is down: it's a shortcut or typing, not a glance.
+        mutating func otherInput(showing: Bool) {
+            if downAt != nil && !showing { interrupted = true }
+        }
+
+        /// Checked a moment after the trigger went down.
+        func holdElapsed(at date: Date, showing: Bool) -> Action {
+            guard mode == .hold, !showing, let downAt, !interrupted, date.timeIntervalSince(downAt) >= Self.holdDelay else { return .none }
+            return .show
+        }
+
+        mutating func triggerUp(at date: Date, showing: Bool) -> Action {
+            defer { downAt = nil; interrupted = false }
+            guard let downAt else { return .none }
+            switch mode {
+            case .hold:
+                return showing ? .hide : .none
+            case .toggle:
+                return !interrupted && date.timeIntervalSince(downAt) < Self.tapLimit ? .toggle : .none
+            }
+        }
+    }
+
+    /// How the screen behind the panels looks.
+    enum Backdrop: String, CaseIterable, Sendable {
+        case clear, dim, blur
+
+        var title: String {
+            switch self {
+            case .clear: return "Clear"
+            case .dim: return "Dimmed"
+            case .blur: return "Blurred"
+            }
+        }
+    }
 }

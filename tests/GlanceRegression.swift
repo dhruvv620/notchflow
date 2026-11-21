@@ -117,7 +117,7 @@ struct GlanceRegression {
                     && loaded[0].panels[0].symbols.isEmpty && loaded[0].panels[0].windowApp.isEmpty, "Old boards load: \(loaded)")
 
         // New kinds
-        try require(GlancePanelKind.window.isBuiltIn == false && GlancePanelKind.stocks.isBuiltIn, "Kinds")
+        try require(GlancePanelKind.window.isBuiltIn == false && GlancePanelKind.stocks.isBuiltIn && GlancePanelKind.nowPlaying.isBuiltIn, "Kinds")
         let stocksBoard = P.adding(.stocks, to: GlanceBoard(name: "S"))
         try require(stocksBoard.panels[0].symbols == P.defaultSymbols, "Stocks get symbols")
 
@@ -157,8 +157,36 @@ struct GlanceRegression {
         try require(P.pickWindow(windows, app: "com.apple.Terminal", title: "") == 3, "No title saved")
         try require(P.pickWindow(windows, app: "com.tinyspeck.slackmacgap", title: "Slack") == nil, "App not open")
 
-        // Hold or tap
-        try require(P.isTap(heldFor: 0.1) && !P.isTap(heldFor: 0.6), "Tap or hold")
+        // A modifier key on its own
+        let t0 = Date()
+        var hold = P.ModifierGesture(mode: .hold)
+        hold.triggerDown(at: t0)
+        try require(hold.holdElapsed(at: t0.addingTimeInterval(0.1), showing: false) == .none, "Not yet")
+        try require(hold.holdElapsed(at: t0.addingTimeInterval(0.25), showing: false) == .show, "Held: show")
+        try require(hold.triggerUp(at: t0.addingTimeInterval(2), showing: true) == .hide, "Released: hide")
+        hold.triggerDown(at: t0)
+        hold.otherInput(showing: false)   // Shift + a letter
+        try require(hold.holdElapsed(at: t0.addingTimeInterval(0.5), showing: false) == .none, "Typing a capital never opens it")
+        try require(hold.triggerUp(at: t0.addingTimeInterval(0.6), showing: false) == .none, "Nothing to hide")
+        hold.triggerDown(at: t0)
+        _ = hold.holdElapsed(at: t0.addingTimeInterval(0.3), showing: false)
+        hold.otherInput(showing: true)    // clicking a panel while holding
+        try require(hold.triggerUp(at: t0.addingTimeInterval(3), showing: true) == .hide, "Clicks while open don't stop the hide")
+
+        var toggle = P.ModifierGesture(mode: .toggle)
+        toggle.triggerDown(at: t0)
+        try require(toggle.holdElapsed(at: t0.addingTimeInterval(0.3), showing: false) == .none, "Toggle doesn't open on hold")
+        try require(toggle.triggerUp(at: t0.addingTimeInterval(0.15), showing: false) == .toggle, "Tap: toggle")
+        toggle.triggerDown(at: t0)
+        try require(toggle.triggerUp(at: t0.addingTimeInterval(0.9), showing: false) == .none, "Long press isn't a tap")
+        toggle.triggerDown(at: t0)
+        toggle.otherInput(showing: false)
+        try require(toggle.triggerUp(at: t0.addingTimeInterval(0.1), showing: false) == .none, "Shift + key isn't a tap")
+        // Right Shift down while left Shift is up, and the other way round; fn
+        try require(P.isModifierDown(keyCode: 60, flags: 0x20104) && !P.isModifierDown(keyCode: 60, flags: 0x20102)
+                    && P.isModifierDown(keyCode: 56, flags: 0x20102) && P.isModifierDown(keyCode: 63, flags: 0x800100)
+                    && !P.isModifierDown(keyCode: 63, flags: 0x100) && !P.isModifierDown(keyCode: 12, flags: 0xFFFFFF), "Modifier down")
+        try require(P.Trigger.shift.keyCodes == [56, 60] && P.Trigger.fn.keyCodes == [63] && P.Trigger.shortcut.keyCodes.isEmpty, "Key codes")
         print("Glance: OK")
     }
 }

@@ -21,6 +21,12 @@ extension Defaults.Keys {
     static let glancePDFPages = Key<[String: Int]>("glancePDFPages", default: [:])
     /// The board each display shows, by display id (a display without one shows the selected board when the pointer is on it).
     static let glanceDisplayBoards = Key<[String: String]>("glanceDisplayBoards", default: [:])
+    /// "hold" (show while held) or "toggle" (press to show, press again to hide).
+    static let glanceMode = Key<String>("glanceMode", default: "hold")
+    /// What opens it: "shortcut", or a modifier key on its own ("fn", "shift", "rightCommand"…).
+    static let glanceTrigger = Key<String>("glanceTrigger", default: "shortcut")
+    /// The screen behind the panels: "clear", "dim" or "blur".
+    static let glanceBackdrop = Key<String>("glanceBackdrop", default: "dim")
 }
 
 /// Glance: hold the shortcut and a board of your panels (web pages, PDFs,
@@ -42,7 +48,10 @@ final class GlanceManager: ObservableObject {
 
     private var windows: [String: GlanceWindow] = [:]
     private var pointerDisplay: String?
-    private var pressedAt: Date?
+    private var gesture = GlancePolicy.ModifierGesture(mode: .hold)
+    private var holdCheck: DispatchWorkItem?
+    private var releaseWatch: Timer?
+    private var monitors: [Any] = []
     private var previousApp: NSRunningApplication?
     private var started = false
     private var cancellables = Set<AnyCancellable>()
@@ -108,6 +117,7 @@ final class GlanceManager: ObservableObject {
         // Called on the main thread.
         KeyboardShortcuts.onKeyDown(for: .glanceHold) { [weak self] in MainActor.assumeIsolated { self?.shortcutDown() } }
         KeyboardShortcuts.onKeyUp(for: .glanceHold) { [weak self] in MainActor.assumeIsolated { self?.shortcutUp() } }
+        installModifierMonitors()
         Defaults.publisher(.enableGlance, options: [])
             .sink { [weak self] change in
                 Task { @MainActor in
@@ -124,26 +134,102 @@ final class GlanceManager: ObservableObject {
         }
     }
 
-    // MARK: Hold or tap
+    // MARK: Opening it
+
+    private var mode: GlancePolicy.Mode { GlancePolicy.Mode(rawValue: Defaults[.glanceMode]) ?? .hold }
+    private var trigger: GlancePolicy.Trigger { GlancePolicy.Trigger(rawValue: Defaults[.glanceTrigger]) ?? .shortcut }
 
     private func shortcutDown() {
-        guard Defaults[.enableGlance] else { return }
-        if isShowing {
-            // Open (tapped earlier): the shortcut again closes it.
-            if isPinned { hide() }
-            return
+        guard Defaults[.enableGlance], trigger == .shortcut else { return }
+        switch mode {
+        case .hold:
+            guard !isShowing else { return }
+            show(pinned: false)
+            watchShortcutRelease()
+        case .toggle:
+            if isShowing { hide() } else { show(pinned: true) }
         }
-        pressedAt = Date()
-        show(pinned: false)
     }
 
     private func shortcutUp() {
-        guard let pressedAt else { return }
-        self.pressedAt = nil
-        if GlancePolicy.isTap(heldFor: Date().timeIntervalSince(pressedAt)) {
-            pin()
-        } else {
+        guard trigger == .shortcut, mode == .hold, isShowing, !isPinned else { return }
+        hide()
+    }
+
+    /// In case the key-up of the shortcut is missed: letting go of its
+    /// modifiers hides the board too.
+    private func watchShortcutRelease() {
+        releaseWatch?.invalidate()
+        guard let needed = KeyboardShortcuts.getShortcut(for: .glanceHold)?.modifiers.intersection([.command, .option, .control, .shift]),
+              !needed.isEmpty else { return }
+        releaseWatch = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { timer in
+            Task { @MainActor in
+                let manager = GlanceManager.shared
+                guard manager.isShowing, !manager.isPinned, manager.mode == .hold else {
+                    timer.invalidate()
+                    return
+                }
+                if !NSEvent.modifierFlags.contains(needed) {
+                    timer.invalidate()
+                    manager.hide()
+                }
+            }
+        }
+    }
+
+    /// A modifier key on its own (fn, Shift, right Command…): watched
+    /// everywhere (Accessibility lets NotchFlow see key presses) to tell a
+    /// hold or a tap from typing.
+    private func installModifierMonitors() {
+        let handle: (NSEvent) -> Void = { event in
+            MainActor.assumeIsolated { GlanceManager.shared.handle(event) }
+        }
+        let types: NSEvent.EventTypeMask = [.flagsChanged, .keyDown, .leftMouseDown, .rightMouseDown]
+        if let global = NSEvent.addGlobalMonitorForEvents(matching: types, handler: handle) { monitors.append(global) }
+        if let local = NSEvent.addLocalMonitorForEvents(matching: types, handler: { event in
+            handle(event)
+            return event
+        }) { monitors.append(local) }
+    }
+
+    private func handle(_ event: NSEvent) {
+        // Esc closes the board from anywhere.
+        if event.type == .keyDown, event.keyCode == 53, isShowing {
             hide()
+            return
+        }
+        let trigger = self.trigger
+        guard Defaults[.enableGlance], trigger != .shortcut else { return }
+        gesture.mode = mode
+        switch event.type {
+        case .flagsChanged where trigger.keyCodes.contains(event.keyCode):
+            if GlancePolicy.isModifierDown(keyCode: event.keyCode, flags: event.modifierFlags.rawValue) {
+                gesture.triggerDown(at: Date())
+                holdCheck?.cancel()
+                let check = DispatchWorkItem {
+                    MainActor.assumeIsolated {
+                        let manager = GlanceManager.shared
+                        manager.apply(manager.gesture.holdElapsed(at: Date(), showing: manager.isShowing))
+                    }
+                }
+                holdCheck = check
+                DispatchQueue.main.asyncAfter(deadline: .now() + GlancePolicy.ModifierGesture.holdDelay + 0.02, execute: check)
+            } else {
+                holdCheck?.cancel()
+                apply(gesture.triggerUp(at: Date(), showing: isShowing))
+            }
+        default:
+            // Another key, another modifier or a click while the trigger is down.
+            gesture.otherInput(showing: isShowing)
+        }
+    }
+
+    private func apply(_ action: GlancePolicy.ModifierGesture.Action) {
+        switch action {
+        case .none: break
+        case .show: show(pinned: false)
+        case .hide: hide()
+        case .toggle: if isShowing { hide() } else { show(pinned: true) }
         }
     }
 
@@ -207,7 +293,8 @@ final class GlanceManager: ObservableObject {
         let wasPinned = isPinned
         isShowing = false
         isPinned = false
-        pressedAt = nil
+        releaseWatch?.invalidate()
+        releaseWatch = nil
         GlanceLiveWindows.shared.pauseAll()
         GlanceStocks.shared.stopRefreshing()
         for window in windows.values where window.isVisible {

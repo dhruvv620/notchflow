@@ -20,11 +20,14 @@ enum GlanceLayout {
     }
 }
 
-/// The board itself: your panels over a dimmed, blurred screen.
+/// The board itself: your panels, as glass cards, over the screen (clear,
+/// dimmed or blurred behind them).
 struct GlanceBoardView: View {
     /// The display this board is on.
     let displayKey: String
     @ObservedObject private var glance = GlanceManager.shared
+    @Default(.glanceBackdrop) private var backdrop
+    @Default(.glanceMode) private var mode
 
     var body: some View {
         if let board = glance.board(onDisplay: displayKey) {
@@ -36,112 +39,137 @@ struct GlanceBoardView: View {
 
     private func content(_ board: GlanceBoard) -> some View {
         GeometryReader { geometry in
-            let area = CGRect(x: 36, y: 72, width: max(200, geometry.size.width - 72), height: max(200, geometry.size.height - 108))
+            let area = CGRect(x: 28, y: 52, width: max(200, geometry.size.width - 56), height: max(200, geometry.size.height - 80))
             ZStack(alignment: .topLeading) {
-                Rectangle()
-                    .fill(.ultraThinMaterial)
-                    .overlay(Color.black.opacity(0.35))
+                backdropView
                     .ignoresSafeArea()
                     .contentShape(Rectangle())
                     .onTapGesture { glance.hide() }
-
-                header(board)
-                    .frame(width: geometry.size.width)
-                    .padding(.top, 34)
 
                 let shown = board.panels.filter(\.isShown)
                 if shown.isEmpty {
                     Text("Nothing on this board yet. Add panels in Settings › Glance.")
                         .font(.title3)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.white.opacity(0.7))
                         .frame(width: geometry.size.width, height: geometry.size.height)
                         .allowsHitTesting(false)
                 }
                 ForEach(shown) { panel in
-                    let rect = GlanceLayout.rect(for: panel.frame, in: area, gap: 16)
+                    let rect = GlanceLayout.rect(for: panel.frame, in: area, gap: 18)
                     GlancePanelCard(panel: panel)
                         .frame(width: rect.width, height: rect.height)
                         .offset(x: rect.minX, y: rect.minY)
                 }
+
+                header(board)
+                    .frame(width: geometry.size.width)
+                    .padding(.top, 12)
             }
         }
         .environment(\.colorScheme, .dark)
     }
 
+    @ViewBuilder
+    private var backdropView: some View {
+        switch GlancePolicy.Backdrop(rawValue: backdrop) ?? .dim {
+        case .clear:
+            // Almost invisible, but still catches a click outside the panels.
+            Color.black.opacity(0.02)
+        case .dim:
+            Color.black.opacity(0.32)
+        case .blur:
+            Rectangle().fill(.ultraThinMaterial).overlay(Color.black.opacity(0.18))
+        }
+    }
+
+    /// A small bar at the top: the layout (switch it with several), edit, close.
     private func header(_ board: GlanceBoard) -> some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 10) {
             if glance.boards.count > 1 {
                 Menu {
                     ForEach(glance.boards) { other in
                         Button(other.name) { glance.switchBoard(other.id, onDisplay: displayKey) }
                     }
                 } label: {
-                    Label(board.name, systemImage: "square.grid.2x2")
+                    Text(board.name).font(.system(size: 12, weight: .semibold))
                 }
                 .menuStyle(.borderlessButton)
                 .fixedSize()
-            } else {
-                Label(board.name, systemImage: "square.grid.2x2")
-                    .font(.headline)
             }
-            Text(glance.isPinned ? "Esc or the shortcut closes it" : "Let go to close · tap the shortcut to keep it open")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Spacer().frame(width: 12)
-            Button("Edit Layout") {
+            Button {
                 glance.hide()
                 SettingsWindowController.shared.showWindow()
+            } label: {
+                Image(systemName: "slider.horizontal.3").font(.system(size: 11, weight: .semibold))
             }
             .buttonStyle(.borderless)
+            .help("Edit the layout in Settings")
             if glance.isPinned {
                 Button {
                     glance.hide()
                 } label: {
-                    Image(systemName: "xmark.circle.fill").font(.title3)
+                    Image(systemName: "xmark").font(.system(size: 11, weight: .bold))
                 }
                 .buttonStyle(.borderless)
+                .help("Close (Esc)")
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 6)
-        .background(.regularMaterial, in: Capsule())
+        .padding(.horizontal, 12)
+        .padding(.vertical, 5)
+        .background(.ultraThinMaterial, in: Capsule())
+        .overlay(Capsule().strokeBorder(Color.white.opacity(0.1)))
+        .opacity(0.85)
         .frame(maxWidth: .infinity)
     }
 }
 
-/// One panel: a title bar and what it shows.
+/// One panel: a glass card with what it shows, edge to edge. Hovering shows
+/// its name (and Reload for a web page).
 struct GlancePanelCard: View {
     let panel: GlancePanel
+    @State private var hovering = false
+
+    private static let shape = RoundedRectangle(cornerRadius: 18, style: .continuous)
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 6) {
-                Image(systemName: panel.kind.symbol)
-                    .foregroundStyle(.secondary)
-                Text(panel.title.isEmpty ? panel.kind.defaultTitle : panel.title)
-                    .font(.system(size: 12, weight: .semibold))
-                    .lineLimit(1)
-                Spacer(minLength: 0)
-                if panel.kind == .web {
-                    Button {
-                        GlanceWebPanels.shared.reload(panel.id)
-                    } label: {
-                        Image(systemName: "arrow.clockwise").font(.system(size: 10, weight: .semibold))
-                    }
-                    .buttonStyle(.borderless)
-                    .help("Reload")
+        content
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .background {
+                ZStack {
+                    Self.shape.fill(.ultraThinMaterial)
+                    Self.shape.fill(Color.black.opacity(0.38))
                 }
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            Divider().opacity(0.4)
-            content
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .clipShape(Self.shape)
+            .overlay(Self.shape.strokeBorder(Color.white.opacity(0.1), lineWidth: 1))
+            .overlay(alignment: .topTrailing) {
+                if hovering { hoverBar }
+            }
+            .shadow(color: .black.opacity(0.35), radius: 22, y: 10)
+            .onHover { hovering = $0 }
+            .animation(.easeOut(duration: 0.15), value: hovering)
+    }
+
+    private var hoverBar: some View {
+        HStack(spacing: 6) {
+            Text(panel.title.isEmpty ? panel.kind.defaultTitle : panel.title)
+                .font(.system(size: 10, weight: .semibold))
+                .lineLimit(1)
+            if panel.kind == .web {
+                Button {
+                    GlanceWebPanels.shared.reload(panel.id)
+                } label: {
+                    Image(systemName: "arrow.clockwise").font(.system(size: 9, weight: .bold))
+                }
+                .buttonStyle(.borderless)
+                .help("Reload")
+            }
         }
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Color.white.opacity(0.08)))
-        .shadow(color: .black.opacity(0.3), radius: 18, y: 8)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(.ultraThinMaterial, in: Capsule())
+        .padding(8)
+        .transition(.opacity)
     }
 
     @ViewBuilder
@@ -154,6 +182,7 @@ struct GlancePanelCard: View {
         case .reminders: GlanceRemindersPanel()
         case .clocks: GlanceClocksPanel(timeZones: panel.timeZones)
         case .stocks: GlanceStocksPanel(symbols: panel.symbols)
+        case .nowPlaying: GlanceNowPlayingPanel()
         case .promises: GlancePromisesPanel()
         case .setups: GlanceSetupsPanel()
         case .stash: GlanceStashPanel()
@@ -244,43 +273,100 @@ private struct PanelMessage: View {
     }
 }
 
-/// Today's events from your calendars.
+/// Today as a timeline: hours down the side, events as blocks, a red line at now.
 struct GlanceTodayPanel: View {
     @State private var events: [EKEvent] = []
     @State private var allowed = true
     private static let store = EKEventStore()
+    private static let hourHeight: CGFloat = 46
 
     var body: some View {
         Group {
             if !allowed {
                 PanelMessage(text: "Allow Calendar access in Settings › Calendar & Todos.")
-            } else if events.isEmpty {
-                PanelMessage(text: "Nothing else today.")
             } else {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 8) {
-                        ForEach(events, id: \.self) { event in
-                            HStack(alignment: .top, spacing: 8) {
-                                RoundedRectangle(cornerRadius: 2)
-                                    .fill(Color(cgColor: event.calendar.cgColor))
-                                    .frame(width: 4, height: 30)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(event.title ?? "Event")
-                                        .font(.system(size: 13, weight: .medium))
-                                        .lineLimit(2)
-                                    Text(event.isAllDay ? "All day" : Self.time(event.startDate) + " – " + Self.time(event.endDate))
-                                        .font(.system(size: 11))
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                            .opacity(event.endDate < Date() ? 0.45 : 1)
-                        }
-                    }
-                    .padding(12)
-                }
+                timeline
             }
         }
         .onAppear(perform: load)
+    }
+
+    private var timeline: some View {
+        let allDay = events.filter(\.isAllDay)
+        let timed = events.filter { !$0.isAllDay }
+        return VStack(alignment: .leading, spacing: 6) {
+            if !allDay.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(allDay, id: \.self) { event in
+                        Text(event.title ?? "Event")
+                            .font(.system(size: 11, weight: .semibold))
+                            .lineLimit(1)
+                            .padding(.horizontal, 8).padding(.vertical, 3)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Color(cgColor: event.calendar.cgColor).opacity(0.35), in: RoundedRectangle(cornerRadius: 6))
+                    }
+                }
+                .padding(.horizontal, 10)
+                .padding(.top, 10)
+            }
+            ScrollViewReader { proxy in
+                ScrollView {
+                    ZStack(alignment: .topLeading) {
+                        VStack(spacing: 0) {
+                            ForEach(0..<24, id: \.self) { hour in
+                                HStack(alignment: .top, spacing: 8) {
+                                    Text(Self.hourLabel(hour))
+                                        .font(.system(size: 10, weight: .medium))
+                                        .foregroundStyle(.secondary)
+                                        .frame(width: 40, alignment: .trailing)
+                                    Rectangle().fill(Color.white.opacity(0.08)).frame(height: 1).padding(.top, 6)
+                                }
+                                .frame(height: Self.hourHeight, alignment: .top)
+                                .id(hour)
+                            }
+                        }
+                        GeometryReader { geometry in
+                            let left: CGFloat = 52
+                            let width = geometry.size.width - left - 8
+                            let columns = Self.columns(for: timed)
+                            ForEach(Array(timed.enumerated()), id: \.offset) { index, event in
+                                let column = columns[index]
+                                let y = Self.offset(of: event.startDate) + 6
+                                let height = max(22, Self.offset(of: event.endDate) - Self.offset(of: event.startDate) - 2)
+                                let columnWidth = width / CGFloat(column.count)
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(event.title ?? "Event").font(.system(size: 11, weight: .semibold)).lineLimit(height > 34 ? 2 : 1)
+                                    if height > 34 {
+                                        Text(event.startDate.formatted(date: .omitted, time: .shortened))
+                                            .font(.system(size: 10)).foregroundStyle(.secondary)
+                                    }
+                                }
+                                .padding(.horizontal, 7).padding(.vertical, 4)
+                                .frame(width: columnWidth - 3, height: height, alignment: .topLeading)
+                                .background(Color(cgColor: event.calendar.cgColor).opacity(0.3), in: RoundedRectangle(cornerRadius: 7))
+                                .overlay(alignment: .leading) {
+                                    RoundedRectangle(cornerRadius: 2).fill(Color(cgColor: event.calendar.cgColor)).frame(width: 3)
+                                }
+                                .opacity(event.endDate < Date() ? 0.5 : 1)
+                                .offset(x: left + CGFloat(column.index) * columnWidth, y: y)
+                            }
+                            TimelineView(.periodic(from: .now, by: 60)) { context in
+                                HStack(spacing: 0) {
+                                    Circle().fill(Color.red).frame(width: 7, height: 7)
+                                    Rectangle().fill(Color.red).frame(height: 1.5)
+                                }
+                                .offset(x: left - 4, y: Self.offset(of: context.date) + 6 - 3.5)
+                            }
+                        }
+                    }
+                    .frame(height: Self.hourHeight * 24)
+                    .padding(.trailing, 8)
+                }
+                .onAppear {
+                    proxy.scrollTo(max(0, Calendar.current.component(.hour, from: Date()) - 1), anchor: .top)
+                }
+            }
+        }
     }
 
     private func load() {
@@ -293,85 +379,158 @@ struct GlanceTodayPanel: View {
         events = Self.store.events(matching: predicate).sorted { $0.startDate < $1.startDate }
     }
 
-    private static func time(_ date: Date) -> String {
-        date.formatted(date: .omitted, time: .shortened)
+    private static func offset(of date: Date) -> CGFloat {
+        let start = Calendar.current.startOfDay(for: Date())
+        let hours = min(24, max(0, date.timeIntervalSince(start) / 3600))
+        return CGFloat(hours) * hourHeight
+    }
+
+    private static func hourLabel(_ hour: Int) -> String {
+        var components = DateComponents()
+        components.hour = hour
+        let date = Calendar.current.date(from: components) ?? Date()
+        return date.formatted(.dateTime.hour())
+    }
+
+    /// Side by side for events at the same time: each event's column and how many share its time.
+    private static func columns(for events: [EKEvent]) -> [(index: Int, count: Int)] {
+        var result = [(index: Int, count: Int)](repeating: (0, 1), count: events.count)
+        var columnEnds: [Date] = []
+        var group: [Int] = []
+        var groupEnd = Date.distantPast
+        func closeGroup() {
+            let width = max(1, columnEnds.count)
+            for member in group { result[member].count = width }
+            group = []
+            columnEnds = []
+        }
+        for (index, event) in events.enumerated() {
+            if event.startDate >= groupEnd { closeGroup() }
+            if let free = columnEnds.firstIndex(where: { $0 <= event.startDate }) {
+                columnEnds[free] = event.endDate
+                result[index].index = free
+            } else {
+                columnEnds.append(event.endDate)
+                result[index].index = columnEnds.count - 1
+            }
+            group.append(index)
+            groupEnd = max(groupEnd, event.endDate)
+        }
+        closeGroup()
+        return result
     }
 }
 
-/// Reminders still to do, soonest first; tick one off from here.
+/// Reminders to do, grouped by when (Today, Tomorrow, This week…); tick one off here.
 struct GlanceRemindersPanel: View {
     @ObservedObject private var reminders = RemindersManager.shared
 
-    private var open: [ReminderItem] {
-        reminders.reminders.filter { !$0.isCompleted }
+    private var groups: [(title: String, items: [ReminderItem])] {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let tomorrow = calendar.date(byAdding: .day, value: 1, to: today) ?? today
+        let dayAfter = calendar.date(byAdding: .day, value: 2, to: today) ?? today
+        let weekEnd = calendar.date(byAdding: .day, value: 7, to: today) ?? today
+        let open = reminders.reminders.filter { !$0.isCompleted }
             .sorted { ($0.dueDate ?? .distantFuture) < ($1.dueDate ?? .distantFuture) }
+        func items(_ test: (Date?) -> Bool) -> [ReminderItem] { open.filter { test($0.dueDate) } }
+        return [
+            ("Overdue", items { $0.map { $0 < today } ?? false }),
+            ("Today", items { $0.map { $0 >= today && $0 < tomorrow } ?? false }),
+            ("Tomorrow", items { $0.map { $0 >= tomorrow && $0 < dayAfter } ?? false }),
+            ("This week", items { $0.map { $0 >= dayAfter && $0 < weekEnd } ?? false }),
+            ("Later", items { $0.map { $0 >= weekEnd } ?? false }),
+            ("No date", items { $0 == nil }),
+        ].filter { !$0.1.isEmpty }
     }
 
     var body: some View {
         Group {
-            if open.isEmpty {
+            if groups.isEmpty {
                 PanelMessage(text: "No reminders to do.")
             } else {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 8) {
-                        ForEach(open.prefix(20)) { item in
-                            HStack(spacing: 8) {
-                                Button {
-                                    Task { await reminders.setCompleted(item, completed: true) }
-                                } label: {
-                                    Image(systemName: "circle").font(.system(size: 14))
-                                }
-                                .buttonStyle(.borderless)
-                                .disabled(!item.allowsChanges)
-                                VStack(alignment: .leading, spacing: 1) {
-                                    Text(item.title).font(.system(size: 13)).lineLimit(2)
-                                    if let due = item.dueDate {
-                                        Text(due.formatted(date: .abbreviated, time: item.hasDueTime ? .shortened : .omitted))
-                                            .font(.system(size: 11))
-                                            .foregroundStyle(due < Date() ? Color.red : .secondary)
+                    VStack(alignment: .leading, spacing: 12) {
+                        ForEach(groups, id: \.title) { group in
+                            VStack(alignment: .leading, spacing: 0) {
+                                Text(group.title)
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundStyle(group.title == "Overdue" ? Color.red.opacity(0.9) : .secondary)
+                                    .padding(.bottom, 4)
+                                ForEach(group.items.prefix(12)) { item in
+                                    row(item)
+                                    if item.id != group.items.prefix(12).last?.id {
+                                        Divider().opacity(0.3).padding(.leading, 26)
                                     }
                                 }
                             }
                         }
                     }
-                    .padding(12)
+                    .padding(14)
                 }
             }
         }
         .task { await reminders.refresh() }
     }
+
+    private func row(_ item: ReminderItem) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Button {
+                Task { await reminders.setCompleted(item, completed: true) }
+            } label: {
+                Image(systemName: "circle").font(.system(size: 15, weight: .regular)).foregroundStyle(.secondary)
+            }
+            .buttonStyle(.borderless)
+            .disabled(!item.allowsChanges)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(item.title).font(.system(size: 13, weight: .medium)).lineLimit(2)
+                if let due = item.dueDate, item.hasDueTime {
+                    Text(due.formatted(date: .omitted, time: .shortened)).font(.system(size: 11)).foregroundStyle(.secondary)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, 6)
+    }
 }
 
-/// The time here and in the cities you chose.
+/// The time here and in the cities you chose, large.
 struct GlanceClocksPanel: View {
     let timeZones: [String]
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
             ScrollView {
-                VStack(alignment: .leading, spacing: 10) {
-                    row(name: "Here", zone: .current, now: context.date)
+                VStack(spacing: 0) {
+                    row(name: "Local Time", zone: .current, now: context.date)
                     ForEach(timeZones, id: \.self) { identifier in
                         if let zone = TimeZone(identifier: identifier) {
+                            Divider().opacity(0.3)
                             row(name: GlanceClocks.cityName(identifier), zone: zone, now: context.date)
                         }
                     }
                 }
-                .padding(12)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
             }
         }
     }
 
     private func row(name: String, zone: TimeZone, now: Date) -> some View {
-        HStack(alignment: .firstTextBaseline) {
-            VStack(alignment: .leading, spacing: 1) {
-                Text(name).font(.system(size: 13, weight: .medium))
-                Text(GlanceClocks.dayDifference(zone, now: now)).font(.system(size: 10)).foregroundStyle(.secondary)
+        HStack(alignment: .center) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(name).font(.system(size: 15, weight: .semibold))
+                Text(GlanceClocks.zoneName(zone, now: now)).font(.system(size: 11)).foregroundStyle(.secondary)
             }
             Spacer()
-            Text(GlanceClocks.time(now, in: zone))
-                .font(.system(size: 20, weight: .semibold, design: .rounded).monospacedDigit())
+            HStack(alignment: .firstTextBaseline, spacing: 3) {
+                Text(GlanceClocks.clock(now, in: zone))
+                    .font(.system(size: 28, weight: .medium, design: .rounded).monospacedDigit())
+                Text(GlanceClocks.meridiem(now, in: zone))
+                    .font(.system(size: 13, weight: .medium))
+            }
         }
+        .padding(.vertical, 10)
     }
 }
 
@@ -388,6 +547,31 @@ enum GlanceClocks {
     static func cityName(_ identifier: String) -> String {
         if let known = common.first(where: { $0.zone == identifier }) { return known.name }
         return (identifier.split(separator: "/").last.map(String.init) ?? identifier).replacingOccurrences(of: "_", with: " ")
+    }
+
+    /// "9:41" (12-hour clocks) or "21:41".
+    static func clock(_ date: Date, in zone: TimeZone) -> String {
+        let formatter = DateFormatter()
+        formatter.timeZone = zone
+        formatter.setLocalizedDateFormatFromTemplate("jmm")
+        let text = formatter.string(from: date)
+        let marker = meridiem(date, in: zone)
+        return marker.isEmpty ? text : text.replacingOccurrences(of: marker, with: "").trimmingCharacters(in: .whitespaces)
+    }
+
+    /// "AM"/"PM" where the clock is 12-hour, else nothing.
+    static func meridiem(_ date: Date, in zone: TimeZone) -> String {
+        let formatter = DateFormatter()
+        formatter.timeZone = zone
+        formatter.setLocalizedDateFormatFromTemplate("jmm")
+        guard formatter.dateFormat.contains("a") else { return "" }
+        formatter.dateFormat = "a"
+        return formatter.string(from: date)
+    }
+
+    /// "Eastern Time", "UK Time".
+    static func zoneName(_ zone: TimeZone, now: Date) -> String {
+        zone.localizedName(for: .generic, locale: .current) ?? zone.identifier
     }
 
     static func time(_ date: Date, in zone: TimeZone) -> String {
@@ -668,5 +852,89 @@ private struct GlanceLiveWindowLayer: NSViewRepresentable {
 
     func updateNSView(_ view: NSView, context: Context) {
         if let layer = view.layer { GlanceLiveWindows.shared.register(panel, layer: layer) }
+    }
+}
+
+// MARK: - Now playing
+
+/// What's playing (Spotify, Apple Music, a browser…): artwork, progress and controls.
+struct GlanceNowPlayingPanel: View {
+    @ObservedObject private var music = MusicManager.shared
+
+    var body: some View {
+        if music.isPlayerIdle && !music.isPlaying && music.songDuration == 0 {
+            PanelMessage(text: "Nothing is playing.")
+        } else {
+            GeometryReader { geometry in
+                VStack(alignment: .leading, spacing: 10) {
+                    Image(nsImage: music.albumArt)
+                        .resizable()
+                        .aspectRatio(1, contentMode: .fit)
+                        .frame(maxWidth: .infinity, maxHeight: max(60, geometry.size.height - 150))
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .shadow(color: Color(nsColor: music.avgColor).opacity(0.5), radius: 16)
+                        .frame(maxWidth: .infinity)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(music.songTitle).font(.system(size: 14, weight: .semibold)).lineLimit(1)
+                        Text(music.artistName).font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(1)
+                    }
+                    TimelineView(.periodic(from: .now, by: 1)) { context in
+                        let elapsed = currentElapsed(at: context.date)
+                        VStack(spacing: 3) {
+                            ProgressView(value: music.songDuration > 0 ? min(elapsed / music.songDuration, 1) : 0)
+                                .progressViewStyle(.linear)
+                                .tint(.white)
+                            HStack {
+                                Text(Self.time(elapsed))
+                                Spacer()
+                                Text(Self.time(music.songDuration))
+                            }
+                            .font(.system(size: 9).monospacedDigit())
+                            .foregroundStyle(.secondary)
+                        }
+                    }
+                    HStack {
+                        control("shuffle", active: music.isShuffled) { music.toggleShuffle() }
+                        Spacer()
+                        control("backward.end.fill") { music.previousTrack() }
+                        Spacer()
+                        Button {
+                            music.togglePlay()
+                        } label: {
+                            Image(systemName: music.isPlaying ? "pause.fill" : "play.fill")
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundStyle(.black)
+                                .frame(width: 40, height: 40)
+                                .background(Color.white, in: Circle())
+                        }
+                        .buttonStyle(.plain)
+                        Spacer()
+                        control("forward.end.fill") { music.nextTrack() }
+                        Spacer()
+                        control("repeat", active: music.repeatMode != .off) { music.toggleRepeat() }
+                    }
+                }
+                .padding(14)
+            }
+        }
+    }
+
+    private func currentElapsed(at date: Date) -> TimeInterval {
+        guard music.isPlaying else { return music.elapsedTime }
+        return min(music.songDuration, music.elapsedTime + date.timeIntervalSince(music.timestampDate) * music.playbackRate)
+    }
+
+    private func control(_ symbol: String, active: Bool = false, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(active ? Color.accentColor : .white)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private static func time(_ seconds: TimeInterval) -> String {
+        let total = max(0, Int(seconds.isFinite ? seconds : 0))
+        return String(format: "%d:%02d", total / 60, total % 60)
     }
 }
