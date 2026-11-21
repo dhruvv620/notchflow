@@ -20,8 +20,16 @@ enum GlanceLayout {
     }
 
     /// The part of a display the panels go in (below the menu bar, with margins).
+    /// The panels start below the menu bar and the board's bar (top right).
     static func boardArea(_ size: CGSize) -> CGRect {
-        CGRect(x: 28, y: 52, width: max(200, size.width - 56), height: max(200, size.height - 80))
+        CGRect(x: 28, y: 76, width: max(200, size.width - 56), height: max(200, size.height - 104))
+    }
+
+    /// The board's bar sits just below the menu bar, at the top right (clear of the notch).
+    static func barTop(for screen: NSScreen?) -> CGFloat {
+        guard let screen else { return 40 }
+        let menuBar = screen.frame.maxY - screen.visibleFrame.maxY
+        return max(8, min(menuBar, 44) + 6)
     }
 
     static let gap: CGFloat = 18
@@ -93,8 +101,8 @@ struct GlanceBoardView: View {
                 .animation(.spring(response: 0.28, dampingFraction: 0.86), value: glance.isShowing)
 
                 header(board)
-                    .frame(width: geometry.size.width)
-                    .padding(.top, 12)
+                    .frame(width: geometry.size.width - 28, alignment: .trailing)
+                    .padding(.top, GlanceLayout.barTop(for: NSScreen.screens.first { GlanceManager.key(for: $0) == displayKey }))
 
                 if glance.launcherDisplay == displayKey {
                     Color.black.opacity(0.3)
@@ -192,7 +200,7 @@ struct GlanceBoardView: View {
         .padding(.vertical, 5)
         .background(.ultraThinMaterial, in: Capsule())
         .overlay(Capsule().strokeBorder(Color.white.opacity(0.1)))
-        .frame(maxWidth: .infinity)
+        .fixedSize()
     }
 }
 
