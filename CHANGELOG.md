@@ -13,6 +13,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 ### Fixed
+
+## [1.2.5] - 2026-11-20
+
+### Added
+
+### Changed
+
+### Fixed
 - **Window setups bring back windows on the desktop you're on**: a setup made on Desktop 2 now reopens a window you closed there (Chrome, iTerm, Terminal, Claude…) even when that app still has windows on Desktop 1, instead of doing nothing or saying it was left on another desktop. It uses the app's own New Window command, in the background, so the window opens on this desktop and is put back in its place; no extra permission is needed. A minimized window comes back instead of a new one opening, and windows already there are never doubled.
 - **Song radio for songs played from the notch**: a song picked in the notch's search played on its own, so Next did nothing. Now it starts with up to 20 songs like it lined up after it, as Spotify's song radio and Autoplay do, so Next and Previous keep going. Spotify doesn't give new apps its recommendations, so the similar songs come from Deezer's public artist radio and are matched on Spotify. When none are found, the song plays inside its album instead. Needs Spotify connected (Settings > Music).
 
