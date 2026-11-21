@@ -41,8 +41,22 @@ struct GlanceBoardView: View {
     /// The display this board is on.
     let displayKey: String
     @ObservedObject private var glance = GlanceManager.shared
+    @ObservedObject private var real = GlanceRealWindows.shared
     @Default(.glanceBackdrop) private var backdrop
     @State private var selected: UUID?
+
+    private var screen: NSScreen? { NSScreen.screens.first { GlanceManager.key(for: $0) == displayKey } }
+
+    /// Where the board's real windows are on this display (its own coordinates): clear gaps in the board.
+    private func holes(for board: GlanceBoard) -> [CGRect] {
+        guard !glance.isEditing, let screen else { return [] }
+        let mainHeight = NSScreen.screens.first?.frame.height ?? screen.frame.height
+        return board.panels.compactMap { panel in
+            guard panel.isShown, let frame = real.placedFrames[panel.id] else { return nil }
+            return CGRect(x: frame.minX - screen.frame.minX, y: frame.minY - (mainHeight - screen.frame.maxY),
+                          width: frame.width, height: frame.height)
+        }
+    }
 
     var body: some View {
         if let board = glance.board(onDisplay: displayKey) {
@@ -55,10 +69,13 @@ struct GlanceBoardView: View {
     private func content(_ board: GlanceBoard) -> some View {
         GeometryReader { geometry in
             let area = GlanceLayout.boardArea(geometry.size)
+            let gaps = holes(for: board)
             ZStack(alignment: .topLeading) {
+                // Clear gaps where real windows are: you see and click the window itself.
                 backdropView
                     .ignoresSafeArea()
-                    .contentShape(Rectangle())
+                    .mask(GlanceHoleShape(holes: gaps).fill(style: FillStyle(eoFill: true)))
+                    .contentShape(GlanceHoleShape(holes: gaps), eoFill: true)
                     .onTapGesture {
                         if glance.isEditing { selected = nil } else { glance.hide() }
                     }
@@ -89,7 +106,8 @@ struct GlanceBoardView: View {
                             .frame(width: area.width, height: area.height)
                             .offset(x: area.minX, y: area.minY)
                     } else {
-                        ForEach(shown) { panel in
+                        // A panel whose real window is there leaves its gap empty.
+                        ForEach(shown.filter { real.placedFrames[$0.id] == nil }) { panel in
                             let rect = GlanceLayout.rect(for: panel.frame, in: area, gap: GlanceLayout.gap)
                             GlancePanelCard(panel: panel, boardID: board.id, displayKey: displayKey)
                                 .frame(width: rect.width, height: rect.height)
@@ -115,6 +133,21 @@ struct GlanceBoardView: View {
                 }
             }
             .animation(.easeOut(duration: 0.15), value: glance.launcherDisplay)
+            // While arranging: drop an app (from Finder), a PDF or HTML file, or a link here.
+            .onDrop(of: [.fileURL, .url], isTargeted: nil) { providers, location in
+                guard glance.isEditing else { return false }
+                let cell = GlancePolicy.cell(atFractionX: Double((location.x - area.minX) / area.width),
+                                             y: Double((location.y - area.minY) / area.height))
+                for provider in providers {
+                    _ = provider.loadObject(ofClass: URL.self) { url, _ in
+                        guard let url else { return }
+                        Task { @MainActor in
+                            GlanceManager.shared.addDropped(url, toBoard: board.id, display: displayKey, at: cell)
+                        }
+                    }
+                }
+                return true
+            }
         }
         .environment(\.colorScheme, .dark)
     }
@@ -154,6 +187,13 @@ struct GlanceBoardView: View {
                     Label("Add", systemImage: "plus").font(.system(size: 12, weight: .semibold))
                 }
                 .buttonStyle(.borderless)
+                Button {
+                    glance.startPickingWindow(boardID: board.id, display: displayKey)
+                } label: {
+                    Label("Pick Window", systemImage: "macwindow.badge.plus").font(.system(size: 12, weight: .semibold))
+                }
+                .buttonStyle(.borderless)
+                .help("Click any window on screen (a mini player too) to put it on the board. You can also drop an app from Finder here.")
                 Menu {
                     ForEach(GlancePolicy.presets) { preset in
                         Button(preset.name) { glance.updateBoard(board.id) { GlancePolicy.applying(preset, to: $0) } }
@@ -1241,5 +1281,18 @@ struct GlanceRealWindowPlaceholder: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+/// The board's backdrop with clear gaps (even-odd: the whole board, minus each gap).
+struct GlanceHoleShape: Shape {
+    let holes: [CGRect]
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path(rect.insetBy(dx: -2000, dy: -2000))
+        for hole in holes {
+            path.addRoundedRect(in: hole, cornerSize: CGSize(width: 10, height: 10), style: .continuous)
+        }
+        return path
     }
 }

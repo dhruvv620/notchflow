@@ -42,7 +42,9 @@ struct GlanceLauncher: View {
                 switch tab {
                 case .web: GlanceLauncherWeb(add: add)
                 case .widgets: GlanceLauncherWidgets(board: board, add: add)
-                case .apps: GlanceLauncherApps(add: add)
+                case .apps: GlanceLauncherApps(add: add) {
+                    glance.startPickingWindow(boardID: boardID, display: displayKey)
+                }
                 case .files: GlanceLauncherFiles(add: add)
                 }
             }
@@ -302,6 +304,8 @@ private struct GlanceLauncherWidgets: View {
 
 private struct GlanceLauncherApps: View {
     let add: GlanceAdd
+    /// "Pick a window on screen": the launcher closes and the next window you click is added.
+    let pick: () -> Void
     @State private var allowed = CGPreflightScreenCaptureAccess()
     @State private var choices: [GlanceLiveWindows.Choice] = []
     @State private var selectedApp: String?
@@ -353,6 +357,16 @@ private struct GlanceLauncherApps: View {
                 .padding(12)
                 .background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
             }
+            Button {
+                pick()
+            } label: {
+                Label("Pick a window on screen…", systemImage: "macwindow.badge.plus")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 12).padding(.vertical, 8)
+                    .background(Color.accentColor.opacity(0.25), in: RoundedRectangle(cornerRadius: 10))
+            }
+            .buttonStyle(.plain)
+            .help("For any window that isn't listed, like Spotify's mini player")
             if let selectedApp, let app = apps.first(where: { $0.id == selectedApp }) {
                 windowsOf(app)
             } else {

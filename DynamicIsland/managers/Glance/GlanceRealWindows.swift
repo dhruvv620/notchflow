@@ -21,6 +21,10 @@ final class GlanceRealWindows: ObservableObject {
     @Published private(set) var problems: [UUID: String] = [:]
     /// Panels whose window is being opened.
     @Published private(set) var opening: Set<UUID> = []
+    /// Where each real window is on the board right now (Accessibility
+    /// coordinates; its real size, which can be bigger than the panel when
+    /// the app has a minimum). The board leaves a clear gap there.
+    @Published private(set) var placedFrames: [UUID: CGRect] = [:]
 
     /// The browser window opened for each web panel, and the address it opened.
     private var browserWindows: [UUID: (window: AXUIElement, pid: pid_t, address: String, browser: String)] = [:]
@@ -90,6 +94,7 @@ final class GlanceRealWindows: ObservableObject {
             }
         }
         placed = []
+        placedFrames = [:]
     }
 
     /// Arranging the board: windows step aside so the tiles can be moved.
@@ -136,12 +141,13 @@ final class GlanceRealWindows: ObservableObject {
             }
             Self.setFrame(window.window, target)
             placed.append((panelID: panel.id, window: window.window, pid: window.pid, original: nil, isBrowser: true))
+            placedFrames[panel.id] = Self.frame(of: window.window) ?? target
         case .window:
             guard let app = await runningApp(panel.windowApp) else {
                 problems[panel.id] = "\(panel.title) isn't installed."
                 return
             }
-            guard let window = Self.window(of: app, title: panel.windowTitle) else {
+            guard let window = Self.window(of: app, title: panel.windowTitle, floating: panel.view == "floating") else {
                 problems[panel.id] = "\(panel.title) has no window open."
                 return
             }
@@ -153,6 +159,17 @@ final class GlanceRealWindows: ObservableObject {
             if Self.isMinimized(window) { AXUIElementSetAttributeValue(window, kAXMinimizedAttribute as CFString, kCFBooleanFalse) }
             Self.setFrame(window, target)
             placed.append((panelID: panel.id, window: window, pid: app.processIdentifier, original: original, isBrowser: false))
+            // Its real frame: apps with a minimum size, or a fixed one (a mini player), stay bigger.
+            if var actual = Self.frame(of: window) {
+                if actual.width > target.width + 2 || actual.height > target.height + 2 {
+                    // Centred on the panel instead of hanging off its corner.
+                    actual.origin = CGPoint(x: target.midX - actual.width / 2, y: target.midY - actual.height / 2)
+                    Self.setPosition(window, actual.origin)
+                }
+                placedFrames[panel.id] = actual
+            } else {
+                placedFrames[panel.id] = target
+            }
         default:
             return
         }
@@ -161,9 +178,13 @@ final class GlanceRealWindows: ObservableObject {
     /// Above the board, one by one: each window becomes its app's main window and
     /// the app comes forward with only that window (not all of its windows).
     private func raiseAll() {
+        // The board leaves a clear gap where each window is, so it only has
+        // to be above the other apps' windows there.
         for entry in placed {
             AXUIElementPerformAction(entry.window, kAXRaiseAction as CFString)
             AXUIElementSetAttributeValue(entry.window, kAXMainAttribute as CFString, kCFBooleanTrue)
+            let app = AXUIElementCreateApplication(entry.pid)
+            AXUIElementSetAttributeValue(app, kAXFrontmostAttribute as CFString, kCFBooleanTrue)
             NSRunningApplication(processIdentifier: entry.pid)?.activate()
         }
     }
@@ -238,6 +259,36 @@ final class GlanceRealWindows: ObservableObject {
         return NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first
     }
 
+    /// The window under a point on screen (bottom-left origin), not NotchFlow's:
+    /// its app, title, and whether it floats (a mini player, a palette).
+    static func windowAt(screenPoint point: NSPoint) -> (bundleID: String, appName: String, title: String, floating: Bool)? {
+        let mainHeight = NSScreen.screens.first?.frame.height ?? 0
+        let flipped = CGPoint(x: point.x, y: mainHeight - point.y)
+        let own = ProcessInfo.processInfo.processIdentifier
+        guard let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] else { return nil }
+        for info in list {
+            guard let pid = (info[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value, pid != own,
+                  let layer = (info[kCGWindowLayer as String] as? NSNumber)?.intValue, layer >= 0, layer < 25,
+                  let bounds = info[kCGWindowBounds as String] as? [String: Any],
+                  let rect = CGRect(dictionaryRepresentation: bounds as CFDictionary), rect.contains(flipped),
+                  rect.width > 60, rect.height > 40,
+                  let app = NSRunningApplication(processIdentifier: pid), app.activationPolicy != .prohibited,
+                  let bundleID = app.bundleIdentifier else { continue }
+            // Its Accessibility window, by frame, for the title.
+            let element = AXUIElementCreateApplication(pid)
+            AXUIElementSetMessagingTimeout(element, 1)
+            let windows = (value(element, kAXWindowsAttribute) as? [AXUIElement]) ?? []
+            let match = windows.first { window in
+                guard let frame = frame(of: window) else { return false }
+                return abs(frame.minX - rect.minX) < 3 && abs(frame.minY - rect.minY) < 3 && abs(frame.width - rect.width) < 3
+            }
+            let subrole = match.flatMap { value($0, kAXSubroleAttribute) as? String } ?? ""
+            return (bundleID, app.localizedName ?? bundleID, match.flatMap { title(of: $0) } ?? "",
+                    subrole == (kAXFloatingWindowSubrole as String) || layer > 0)
+        }
+        return nil
+    }
+
     /// Open windows of running apps, by Accessibility (no screen recording), for picking one.
     static func appWindows() -> [(bundleID: String, appName: String, title: String)] {
         guard AXIsProcessTrusted() else { return [] }
@@ -259,16 +310,28 @@ final class GlanceRealWindows: ObservableObject {
         return AXUIElementCopyAttributeValue(element, attribute as CFString, &result) == .success ? result : nil
     }
 
-    /// An app's ordinary windows (not panels or sheets).
+    /// An app's windows you'd put on a board: ordinary ones and floating
+    /// ones like a mini player (not sheets, menus or tiny palettes).
     static func windows(of app: NSRunningApplication) -> [AXUIElement] {
         let element = AXUIElementCreateApplication(app.processIdentifier)
         AXUIElementSetMessagingTimeout(element, 1)
         guard let list = value(element, kAXWindowsAttribute) as? [AXUIElement] else { return [] }
-        return list.filter { (value($0, kAXSubroleAttribute) as? String) == (kAXStandardWindowSubrole as String) }
+        return list.filter { window in
+            let subrole = value(window, kAXSubroleAttribute) as? String
+            if subrole == (kAXStandardWindowSubrole as String) { return true }
+            guard subrole == (kAXFloatingWindowSubrole as String), let frame = frame(of: window) else { return false }
+            return frame.width >= 120 && frame.height >= 60
+        }
     }
 
-    private static func window(of app: NSRunningApplication, title wanted: String) -> AXUIElement? {
+    private static func isFloating(_ window: AXUIElement) -> Bool {
+        (value(window, kAXSubroleAttribute) as? String) == (kAXFloatingWindowSubrole as String)
+    }
+
+    private static func window(of app: NSRunningApplication, title wanted: String, floating: Bool = false) -> AXUIElement? {
         let list = windows(of: app)
+        if !wanted.isEmpty, let match = list.first(where: { title(of: $0) == wanted && (!floating || isFloating($0)) }) { return match }
+        if floating, let match = list.first(where: isFloating) { return match }
         if !wanted.isEmpty, let match = list.first(where: { title(of: $0) == wanted }) { return match }
         if let main = value(AXUIElementCreateApplication(app.processIdentifier), kAXMainWindowAttribute),
            CFGetTypeID(main) == AXUIElementGetTypeID() {

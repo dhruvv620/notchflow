@@ -59,6 +59,11 @@ final class GlanceManager: ObservableObject {
     private var isInteracting = false
     /// A click on the board kept it open (the release of the key that's held doesn't close it).
     private var keptOpenByClick = false
+    /// "Pick a window": the board steps aside and the next click on any window adds it.
+    @Published private(set) var isPickingWindow = false
+    private var pickMonitors: [Any] = []
+    private var pickTarget: (board: UUID, display: String)?
+    private var pickHint: NSPanel?
 
     private var windows: [String: GlanceWindow] = [:]
     private var pointerDisplay: String?
@@ -220,6 +225,7 @@ final class GlanceManager: ObservableObject {
     }
 
     private func handle(_ event: NSEvent) {
+        if isPickingWindow { return }
         // Esc closes the board from anywhere.
         if event.type == .keyDown, event.keyCode == 53, isShowing {
             hide()
@@ -515,6 +521,113 @@ final class GlanceManager: ObservableObject {
         isEditing = false
         launcherDisplay = nil
         presentRealWindows()
+    }
+
+    // MARK: Picking a window
+
+    /// The board steps aside; the next window you click (any app, a mini
+    /// player, a floating palette) goes onto the board. Esc cancels.
+    func startPickingWindow(boardID: UUID, display: String) {
+        guard !isPickingWindow else { return }
+        pickTarget = (boardID, display)
+        isPickingWindow = true
+        launcherDisplay = nil
+        for window in windows.values { window.orderOut(nil) }
+        showPickHint()
+        let handler: (NSEvent) -> Void = { event in
+            MainActor.assumeIsolated { GlanceManager.shared.finishPicking(event) }
+        }
+        if let monitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .keyDown], handler: handler) {
+            pickMonitors.append(monitor)
+        }
+        if let monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .keyDown], handler: { event in
+            handler(event)
+            return event
+        }) {
+            pickMonitors.append(monitor)
+        }
+    }
+
+    private func finishPicking(_ event: NSEvent) {
+        guard isPickingWindow else { return }
+        if event.type == .keyDown && event.keyCode != 53 { return }
+        let picked = event.type == .leftMouseDown ? GlanceRealWindows.windowAt(screenPoint: NSEvent.mouseLocation) : nil
+        // A click on the hint itself (NotchFlow's) is not a pick; wait for the next one.
+        if event.type == .leftMouseDown, picked == nil, event.window != nil { return }
+        isPickingWindow = false
+        pickMonitors.forEach(NSEvent.removeMonitor)
+        pickMonitors = []
+        pickHint?.orderOut(nil)
+        pickHint = nil
+        if let picked, let target = pickTarget {
+            let near = pointerCell(onDisplay: target.display)
+            updateBoard(target.board) { board in
+                var board = GlancePolicy.adding(.window, title: picked.appName, to: board, near: near)
+                if let index = board.panels.indices.last {
+                    board.panels[index].windowApp = picked.bundleID
+                    board.panels[index].windowTitle = picked.title
+                    board.panels[index].view = picked.floating ? "floating" : ""
+                }
+                return board
+            }
+        }
+        pickTarget = nil
+        // Back to arranging the board.
+        for (key, window) in windows where shownBoards[key] != nil {
+            window.alphaValue = 1
+            window.orderFrontRegardless()
+        }
+        if isShowing { pin() }
+    }
+
+    private func showPickHint() {
+        let hint = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 420, height: 44), styleMask: [.borderless, .nonactivatingPanel],
+                           backing: .buffered, defer: false)
+        hint.isOpaque = false
+        hint.backgroundColor = .clear
+        hint.level = .statusBar
+        hint.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        hint.contentView = NSHostingView(rootView:
+            Text("Click the window to put on the board · Esc cancels")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 10)
+                .background(Color.black.opacity(0.75), in: Capsule())
+                .frame(width: 420, height: 44))
+        if let screen = NSScreen.main {
+            hint.setFrameOrigin(NSPoint(x: screen.frame.midX - 210, y: screen.visibleFrame.maxY - 60))
+        }
+        hint.orderFrontRegardless()
+        pickHint = hint
+    }
+
+    /// Adds what was dropped on the board while arranging it: an app (its
+    /// window), a PDF or HTML file, or a web address.
+    func addDropped(_ url: URL, toBoard boardID: UUID, display: String, at cell: (x: Int, y: Int)?) {
+        updateBoard(boardID) { board in
+            if url.isFileURL {
+                switch url.pathExtension.lowercased() {
+                case "app":
+                    guard let bundleID = Bundle(url: url)?.bundleIdentifier else { return board }
+                    var board = GlancePolicy.adding(.window, title: url.deletingPathExtension().lastPathComponent, to: board, near: cell)
+                    if let index = board.panels.indices.last { board.panels[index].windowApp = bundleID }
+                    return board
+                case "pdf":
+                    return GlancePolicy.adding(.pdf, title: url.deletingPathExtension().lastPathComponent, address: url.path, to: board, near: cell)
+                case "html", "htm":
+                    return GlancePolicy.adding(.html, title: url.deletingPathExtension().lastPathComponent, address: url.path, to: board, near: cell)
+                default:
+                    return board
+                }
+            }
+            guard GlancePolicy.webURL(url.absoluteString) != nil else { return board }
+            return GlancePolicy.adding(.web, title: url.host?.replacingOccurrences(of: "www.", with: ""), address: url.absoluteString,
+                                       to: board, near: cell)
+        }
+        if let panel = boards.first(where: { $0.id == boardID })?.panels.last {
+            GlanceRealWindows.shared.prepare(panel)
+        }
     }
 
     /// The cell of a board under the pointer, on a display (for placing a new panel there).
