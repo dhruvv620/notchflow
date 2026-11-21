@@ -254,6 +254,21 @@ enum WorkspacePolicy {
         max(0, min(saved - open, 4))
     }
 
+    /// Whether a menu command opens a new ordinary window: "New Window",
+    /// Terminal's "New Window with Profile – Basic", in a few languages; not
+    /// "New Private Window" or "New Incognito Window".
+    static func isNewWindowCommand(_ title: String) -> Bool {
+        let text = title.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil)
+            .trimmingCharacters(in: .whitespaces)
+        return ["new window", "neues fenster", "nouvelle fenetre", "nueva ventana", "nuova finestra", "nova janela", "nieuw venster"]
+            .contains { text.hasPrefix($0) }
+    }
+
+    /// Of several New Window commands, the one to use: the plain ⌘N one if any, else the first.
+    static func preferredNewWindowCommand(_ commands: [(title: String, shortcut: String?)]) -> Int? {
+        commands.firstIndex { $0.shortcut?.uppercased() == "N" } ?? (commands.isEmpty ? nil : 0)
+    }
+
     /// AppleScript that opens one new window in a browser, when there is one for it.
     static func newWindowScript(for bundleID: String) -> String? {
         switch bundleID {

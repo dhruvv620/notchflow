@@ -389,52 +389,107 @@ final class WorkspaceManager: ObservableObject {
         }
     }
 
-    /// Opens windows the setup saved but that aren't open: a new window in a
-    /// browser, or the app's own reopen (as clicking its Dock icon does).
+    /// Brings back windows the setup saved that aren't on this desktop: a
+    /// minimized one is put back first, else the app opens a new one with its
+    /// own New Window command (pressed through Accessibility, so the app
+    /// stays in the background and the window opens on this desktop, even
+    /// when the app has other windows on other desktops). Windows already
+    /// here are never doubled.
     private func openMissingWindows(_ workspace: Workspace, only bundleIDs: Set<String>, session: UUID) {
-        guard AXIsProcessTrusted(), restoreSession?.id == session else { return }
+        guard AXIsProcessTrusted(), let current = restoreSession, current.id == session else { return }
         for app in workspace.apps where bundleIDs.contains(app.bundleID) {
-            // Already placed (and maybe minimized or closed by you since): leave it.
-            let saved = (app.windows?.count ?? 0) - (restoreSession?.placed[app.bundleID]?.count ?? 0)
-            guard saved > 0,
+            guard let saved = app.windows, !saved.isEmpty,
                   let running = NSRunningApplication.runningApplications(withBundleIdentifier: app.bundleID).first else { continue }
-            let placedWindows = restoreSession?.windows ?? []
+            // Already placed (and maybe minimized or closed by you since): left alone.
+            let done = current.placed[app.bundleID] ?? []
+            let waiting = saved.indices.filter { !done.contains($0) }
             let unplaced = Self.windowsOnThisDesktop(of: running)
-                .filter { window in !placedWindows.contains { CFEqual($0, window) } }
-            let missing = WorkspacePolicy.windowsToOpen(saved: saved, open: unplaced.count)
+                .filter { window in !current.windows.contains { CFEqual($0, window) } }
+            var missing = WorkspacePolicy.windowsToOpen(saved: waiting.count, open: unplaced.count)
             guard missing > 0 else { continue }
-            if let script = WorkspacePolicy.newWindowScript(for: app.bundleID) {
-                // A new browser window opens on the desktop you're on. If the
-                // browser can't be told (Automation not allowed), its reopen does it.
-                let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: app.bundleID)
+            if running.isHidden { running.unhide() }
+
+            // Minimized windows come back first (same title first).
+            let minimized = Self.minimizedWindows(of: running)
+            if !minimized.isEmpty {
+                let pairs = WorkspacePolicy.matchWindows(saved: waiting.map { saved[$0] },
+                                                         titles: minimized.map { Self.title(of: $0) ?? "" })
+                for pair in pairs.prefix(missing) {
+                    AXUIElementSetAttributeValue(minimized[pair.window], kAXMinimizedAttribute as CFString, kCFBooleanFalse)
+                    missing -= 1
+                }
+            }
+            guard missing > 0 else { continue }
+
+            if let command = Self.newWindowCommand(of: running) {
+                for _ in 0..<missing { AXUIElementPerformAction(command, kAXPressAction as CFString) }
+            } else if let script = WorkspacePolicy.newWindowScript(for: app.bundleID) {
+                let count = missing
                 Task { @MainActor [weak self] in
-                    for _ in 0..<missing {
+                    for _ in 0..<count {
                         do {
                             try await AppleScriptHelper.executeVoid(script)
                         } catch {
-                            if Self.windowCountOnAnyDesktop(of: running.processIdentifier) == 0, let url {
-                                let configuration = NSWorkspace.OpenConfiguration()
-                                configuration.activates = true
-                                NSWorkspace.shared.openApplication(at: url, configuration: configuration, completionHandler: nil)
-                            } else {
-                                self?.lastMessage = "Allow NotchFlow to control \(app.name) (System Settings › Privacy & Security › Automation) so setups can open its windows."
-                            }
+                            self?.lastMessage = "Allow NotchFlow to control \(app.name) (System Settings › Privacy & Security › Automation) so setups can open its windows."
                             break
                         }
                     }
                 }
             } else if Self.windowCountOnAnyDesktop(of: running.processIdentifier) == 0,
                       let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: app.bundleID) {
-                // No window anywhere: reopening it puts one here.
+                // No window anywhere: reopening it (as clicking its Dock icon does) puts one here.
                 let configuration = NSWorkspace.OpenConfiguration()
                 configuration.activates = true
-                NSWorkspace.shared.openApplication(at: url, configuration: configuration)
+                NSWorkspace.shared.openApplication(at: url, configuration: configuration, completionHandler: nil)
             } else {
-                // Its window is on another desktop: left there (switching to it
-                // would take you away from this one).
-                lastMessage = "\(app.name)'s window is on another desktop, so it was left there."
+                lastMessage = "\(app.name) has no New Window command, so its window couldn't be opened here."
             }
         }
+    }
+
+    /// The app's minimized windows (a minimized window is on no desktop).
+    private static func minimizedWindows(of app: NSRunningApplication) -> [AXUIElement] {
+        standardWindows(of: app, includeMinimized: true).filter { window in
+            var minimized: CFTypeRef?
+            AXUIElementCopyAttributeValue(window, kAXMinimizedAttribute as CFString, &minimized)
+            return (minimized as? Bool) == true
+        }
+    }
+
+    /// The app's own New Window menu command (File, Shell or Window menu,
+    /// and their submenus), when it has one and it's enabled.
+    private static func newWindowCommand(of app: NSRunningApplication) -> AXUIElement? {
+        func value(_ element: AXUIElement, _ attribute: String) -> CFTypeRef? {
+            var result: CFTypeRef?
+            return AXUIElementCopyAttributeValue(element, attribute as CFString, &result) == .success ? result : nil
+        }
+        func children(_ element: AXUIElement) -> [AXUIElement] {
+            (value(element, kAXChildrenAttribute) as? [AXUIElement]) ?? []
+        }
+        let application = AXUIElementCreateApplication(app.processIdentifier)
+        guard let bar = value(application, kAXMenuBarAttribute), CFGetTypeID(bar) == AXUIElementGetTypeID() else { return nil }
+        var found: [(element: AXUIElement, title: String, shortcut: String?)] = []
+        // Menu bar item › menu › items, and one level of submenus (Terminal's Shell › New Window › …).
+        func scan(_ menu: AXUIElement, depth: Int) {
+            for item in children(menu) {
+                let submenus = children(item)
+                if !submenus.isEmpty {
+                    if depth < 2 { submenus.forEach { scan($0, depth: depth + 1) } }
+                    continue
+                }
+                guard let title = value(item, kAXTitleAttribute) as? String, WorkspacePolicy.isNewWindowCommand(title),
+                      (value(item, kAXEnabledAttribute) as? Bool) != false else { continue }
+                let modifiers = (value(item, kAXMenuItemCmdModifiersAttribute) as? NSNumber)?.intValue ?? 0
+                let shortcut = modifiers == 0 ? value(item, kAXMenuItemCmdCharAttribute) as? String : nil
+                found.append((item, title, shortcut))
+            }
+        }
+        // Skip the Apple menu; the app's own menus come after it.
+        for barItem in children(bar as! AXUIElement).dropFirst() {
+            for menu in children(barItem) { scan(menu, depth: 0) }
+        }
+        guard let index = WorkspacePolicy.preferredNewWindowCommand(found.map { (title: $0.title, shortcut: $0.shortcut) }) else { return nil }
+        return found[index].element
     }
 
     /// Puts every saved window back where it was, as far as the app has

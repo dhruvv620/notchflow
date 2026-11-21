@@ -108,6 +108,13 @@ struct WorkspaceRegression {
         try require(P.newWindowScript(for: "com.google.Chrome") == #"tell application id "com.google.Chrome" to make new window"#
                     && P.newWindowScript(for: "com.apple.Safari")?.contains("make new document") == true
                     && P.newWindowScript(for: "com.spotify.client") == nil, "New window scripts")
+        try require(P.isNewWindowCommand("New Window") && P.isNewWindowCommand("New Window with Profile - Basic")
+                    && P.isNewWindowCommand("Nouvelle fenêtre") && P.isNewWindowCommand("Neues Fenster"), "New Window commands")
+        try require(!P.isNewWindowCommand("New Private Window") && !P.isNewWindowCommand("New Incognito Window")
+                    && !P.isNewWindowCommand("New Tab") && !P.isNewWindowCommand("New Note") && !P.isNewWindowCommand("Window"),
+                    "Not new ordinary windows")
+        try require(P.preferredNewWindowCommand([("New Window with Profile - Pro", nil), ("New Window with Profile - Basic", "N")]) == 1
+                    && P.preferredNewWindowCommand([("New Window", nil)]) == 0 && P.preferredNewWindowCommand([]) == nil, "Preferred command")
         print("Workspaces: OK")
     }
 }
