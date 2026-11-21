@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 dhruvv620
 
+#if canImport(CoreGraphics)
+import CoreGraphics
+#endif
 import Foundation
 
 /// What a Glance panel shows.
