@@ -132,11 +132,11 @@ struct GlanceArranger<Tile: View>: View {
 
     // MARK: Dragging
 
-    private func drag(_ panel: GlancePanel, handle: Handle, cell: CGSize) -> some Gesture {
+    private func drag(_ panel: GlancePanel, handle grabbed: Handle, cell: CGSize) -> some Gesture {
         DragGesture(minimumDistance: 2, coordinateSpace: .global)
             .onChanged { value in
                 active = panel.id
-                self.handle = handle
+                handle = grabbed
                 delta = value.translation
                 selected = panel.id
             }
