@@ -895,6 +895,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         PromiseKeeper.shared.start()
         WorkspaceManager.shared.start()
         WindowStash.shared.start()
+        GlanceManager.shared.start()
         // The clipboard header button (and its popover) is gone: the Clipboard
         // tab is where history lives, so start keeping it from launch.
         if Defaults[.clipboardDisplayMode] == .popover { Defaults[.clipboardDisplayMode] = .separateTab }

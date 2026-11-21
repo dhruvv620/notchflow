@@ -119,6 +119,12 @@ printf '\nChecking song radio...\n'
     "$SOURCE_DIR/tests/SongRadioRegression.swift" -o "$BUILD_ROOT/SongRadioRegression"
 "$BUILD_ROOT/SongRadioRegression"
 
+printf '\nChecking Glance...\n'
+/usr/bin/xcrun swiftc -swift-version 5 -parse-as-library \
+    "$SOURCE_DIR/DynamicIsland/helpers/GlancePolicy.swift" \
+    "$SOURCE_DIR/tests/GlanceRegression.swift" -o "$BUILD_ROOT/GlanceRegression"
+"$BUILD_ROOT/GlanceRegression"
+
 printf '\nChecking the window stash...\n'
 /usr/bin/xcrun swiftc -swift-version 5 -parse-as-library \
     "$SOURCE_DIR/DynamicIsland/helpers/WindowStashPolicy.swift" \

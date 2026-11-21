@@ -34,4 +34,6 @@ extension KeyboardShortcuts.Name {
     static let toggleTerminalTab = Self("toggleTerminalTab", default: .init(.backtick, modifiers: [.control]))
     static let startDemoTimer = Self("startDemoTimer", default: .init(.t, modifiers: [.command, .shift]))
     static let stashFrontWindow = Self("stashFrontWindow", default: .init(.s, modifiers: [.control, .option]))
+    /// Hold to see the Glance board, let go to hide it (tap to keep it open).
+    static let glanceHold = Self("glanceHold", default: .init(.space, modifiers: [.control, .option]))
 }

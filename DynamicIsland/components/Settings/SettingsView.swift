@@ -68,6 +68,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
     case smartTools
     case productivity
     case optimizer
+    case glance
     case terminal
     case whatsapp
     case agents
@@ -81,7 +82,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .general, .appearance, .tabsAndFeatures, .shortcuts:                return .core
         case .media, .liveActivities, .communications, .whatsapp, .agents,
              .calendar, .timer, .shelf:                                          return .notch
-        case .smartTools, .productivity, .notes, .clipboard, .screenAssistant,
+        case .smartTools, .productivity, .glance, .notes, .clipboard, .screenAssistant,
              .colorPicker, .terminal, .stats:                                    return .tools
         case .hudAndOSD, .battery, .devices, .downloads, .lockScreen, .optimizer:           return .system
         case .about:                                                            return .info
@@ -113,6 +114,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .smartTools: return String(localized: "Smart Tools")
         case .productivity: return String(localized: "Productivity")
         case .optimizer: return String(localized: "Optimizer")
+        case .glance: return String(localized: "Glance")
         case .terminal: return String(localized: "Terminal")
         case .whatsapp: return String(localized: "WhatsApp")
         case .agents: return String(localized: "AI Agents")
@@ -145,6 +147,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .smartTools: return "wand.and.stars"
         case .productivity: return "clock.badge.checkmark"
         case .optimizer: return "gauge.with.dots.needle.33percent"
+        case .glance: return "square.grid.3x2"
         case .terminal: return "apple.terminal"
         case .whatsapp: return "message.fill"
         case .agents: return "sparkles"
@@ -177,6 +180,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .smartTools: return .orange
         case .productivity: return .indigo
         case .optimizer: return .green
+        case .glance: return .cyan
         case .terminal: return Color(red: 0.2, green: 0.8, blue: 0.4)
         case .whatsapp: return .whatsAppGreen
         case .agents: return .orange
@@ -508,6 +512,7 @@ struct SettingsView: View {
             // Tools
             .smartTools,
             .productivity,
+            .glance,
             .notes,
             .clipboard,
             .screenAssistant,
@@ -939,6 +944,11 @@ struct SettingsView: View {
             SettingsSearchEntry(tab: .agents, title: "Ask in the agent's window when it is in front", keywords: ["terminal","front","approval"], highlightID: SettingsTab.agents.highlightID(for: "Ask in the agent's window when it is in front")),
             SettingsSearchEntry(tab: .agents, title: "Show working agents under the closed notch", keywords: ["status","working","closed notch"], highlightID: SettingsTab.agents.highlightID(for: "Show working agents under the closed notch")),
             SettingsSearchEntry(tab: .agents, title: "notchflow command", keywords: ["cli","command line","notchflow ask","notify","script"], highlightID: SettingsTab.agents.highlightID(for: "notchflow command")),
+            SettingsSearchEntry(tab: .glance, title: "Use Glance", keywords: ["glance", "peek", "board", "dashboard", "widgets", "overlay", "hold"], highlightID: SettingsTab.glance.highlightID(for: "Use Glance")),
+            SettingsSearchEntry(tab: .glance, title: "Hold to glance", keywords: ["glance", "shortcut", "hold", "key", "peek"], highlightID: SettingsTab.glance.highlightID(for: "Hold to glance")),
+            SettingsSearchEntry(tab: .glance, title: "Layouts", keywords: ["glance", "layout", "arrange", "drag", "preset", "grid"], highlightID: SettingsTab.glance.highlightID(for: "Layouts")),
+            SettingsSearchEntry(tab: .glance, title: "Panels", keywords: ["glance", "web page", "pdf", "calendar", "reminders", "clocks", "world clock", "promises"], highlightID: SettingsTab.glance.highlightID(for: "Panels")),
+            SettingsSearchEntry(tab: .glance, title: "Hide ads and cookie banners", keywords: ["glance", "ads", "cookies", "block", "web"], highlightID: SettingsTab.glance.highlightID(for: "Hide ads and cookie banners")),
             SettingsSearchEntry(tab: .optimizer, title: "Batch and slow the timers", keywords: ["optimizer", "battery", "cpu", "timers", "energy", "wake ups"], highlightID: SettingsTab.optimizer.highlightID(for: "Batch and slow the timers")),
             SettingsSearchEntry(tab: .optimizer, title: "React to events instead of polling", keywords: ["optimizer", "polling", "events", "cpu", "energy"], highlightID: SettingsTab.optimizer.highlightID(for: "React to events instead of polling")),
             SettingsSearchEntry(tab: .optimizer, title: "Pause when nobody's looking", keywords: ["optimizer", "idle", "locked", "sleep", "pause", "battery"], highlightID: SettingsTab.optimizer.highlightID(for: "Pause when nobody's looking")),
@@ -1104,6 +1114,10 @@ struct SettingsView: View {
         case .optimizer:
             SettingsForm(tab: .optimizer) {
                 OptimizerSettings()
+            }
+        case .glance:
+            SettingsForm(tab: .glance) {
+                GlanceSettings()
             }
         case .agents:
             SettingsForm(tab: .agents) {

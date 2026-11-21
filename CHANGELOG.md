@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Glance** (Settings > Glance): hold ⌃⌥Space and a board of your panels covers the screen, over full-screen apps too; let go and it's gone. Tap the shortcut instead to keep it open (Esc, a click outside, or the shortcut again closes it). Panels: any web page (kept loaded so it appears at once, reloads on a schedule, its own sign-ins, ads and cookie banners hidden, optional phone layout), PDFs (open on the page you left), today's calendar, reminders (tick them off), world clocks, promises, window setups (click to open), the window stash (click to bring back) and WhatsApp chats. Switch panels on and off, drag them around the board in Settings (drop one on another to swap), drag a corner to resize, start from ready-made arrangements (Focus, Dashboard, Two halves, Wide on top, Sidebar), and keep several layouts to switch between, on the board too.
 
 ### Changed
 
