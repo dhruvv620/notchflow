@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
+### Changed
+
+### Fixed
+
+## [1.2.6] - 2026-11-21
+
+### Added
 - **Glance real windows show properly, and any window can be added**: the board now leaves a clear gap where each real window sits, so you see and click the window itself (Messages, Spotify…) even when macOS won't bring that app forward. A window that can't shrink to its panel (a minimum size, a fixed mini player) is centred on it and shown whole. Floating windows like Spotify's mini player are listed too. While arranging, **Pick Window** lets you click any window on screen to put it on the board, and you can drop an app from Finder, a PDF or HTML file, or a link straight onto the board.
 - **Glance uses your own browser and real windows**:
   - **Web pages** now open in your browser, signed in as you. In Chrome Beta, Chrome, Edge, Brave and Vivaldi they're borderless windows with just the page; in Safari they're normal Safari windows. They move onto the board when it opens and wait just off screen in between, so they're instant next time. Choose the browser, or NotchFlow's own pages, in Settings > Glance > Open web pages in.
