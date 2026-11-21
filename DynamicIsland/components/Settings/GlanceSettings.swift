@@ -181,6 +181,9 @@ struct GlanceSettings: View {
 
     private var displaysSection: some View {
         Section {
+            Defaults.Toggle(key: .glanceSameOnAllDisplays) {
+                Text("Same layout on all displays")
+            }
             ForEach(NSScreen.screens, id: \.self) { screen in
                 let key = GlanceManager.key(for: screen)
                 Picker(selection: Binding(get: { glance.displayBoards[key] },
@@ -231,6 +234,11 @@ struct GlanceSettings: View {
                 }
             }
             HStack {
+                Button("Add on the Board…") {
+                    glance.startEditing()
+                    glance.launcherDisplay = NSScreen.main.map(GlanceManager.key(for:))
+                }
+                .buttonStyle(.borderedProminent)
                 Button("Add Web Page") {
                     glance.updateActive { GlancePolicy.adding(.web, to: $0) }
                     selectedPanel = glance.activeBoard.panels.last?.id
@@ -315,7 +323,18 @@ struct GlanceSettings: View {
                 }
                 Toggle("Phone layout (fits small panels)", isOn: Binding(get: { panel.mobileLayout },
                                                                         set: { value in glance.updatePanel(panel.id) { $0.mobileLayout = value } }))
-            case .pdf:
+            case .weather:
+                TextField("City", text: Binding(get: { panel.address }, set: { value in glance.updatePanel(panel.id) { $0.address = value } }),
+                          prompt: Text("Pune"))
+            case .calendar, .reminders:
+                Picker("Show", selection: Binding(get: { panel.view.isEmpty ? (panel.kind.views.first?.id ?? "") : panel.view },
+                                                  set: { value in glance.updatePanel(panel.id) { $0.view = value } })) {
+                    ForEach(panel.kind.views, id: \.id) { option in
+                        Text(option.title).tag(option.id)
+                    }
+                }
+                .pickerStyle(.segmented)
+            case .pdf, .html:
                 HStack {
                     Text(panel.address.isEmpty ? "No file" : (panel.address as NSString).abbreviatingWithTildeInPath)
                         .lineLimit(1).truncationMode(.middle)
@@ -323,7 +342,7 @@ struct GlanceSettings: View {
                     Spacer()
                     Button("Choose…") {
                         let open = NSOpenPanel()
-                        open.allowedContentTypes = [.pdf]
+                        open.allowedContentTypes = panel.kind == .pdf ? [.pdf] : [.html]
                         if open.runModal() == .OK, let url = open.url {
                             glance.updatePanel(panel.id) { $0.address = url.path }
                         }
@@ -424,113 +443,31 @@ struct GlancePresetThumbnail: View {
     }
 }
 
-/// The board in Settings: drag panels to move or swap them, drag a corner to resize.
+/// The board in Settings: the same arranging as on the board itself.
 struct GlanceLayoutEditor: View {
     @ObservedObject private var glance = GlanceManager.shared
     @Binding var selected: UUID?
-    @State private var dragging: UUID?
-    @State private var dragOffset: CGSize = .zero
-    @State private var resizing: UUID?
-    @State private var resizeDelta: CGSize = .zero
 
     var body: some View {
-        GeometryReader { geometry in
-            let area = CGRect(origin: .zero, size: geometry.size)
-            let cellWidth = area.width / CGFloat(GlancePolicy.columns)
-            let cellHeight = area.height / CGFloat(GlancePolicy.rows)
-            ZStack(alignment: .topLeading) {
-                RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.25))
-                ForEach(0..<(GlancePolicy.columns * GlancePolicy.rows), id: \.self) { index in
-                    let cell = GlanceLayout.rect(for: GlanceRect(x: index % GlancePolicy.columns, y: index / GlancePolicy.columns, width: 1, height: 1),
-                                                 in: area, gap: 6)
-                    RoundedRectangle(cornerRadius: 6)
-                        .strokeBorder(Color.secondary.opacity(0.25), style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
-                        .frame(width: cell.width, height: cell.height)
-                        .offset(x: cell.minX, y: cell.minY)
-                }
-                ForEach(glance.activeBoard.panels.filter(\.isShown)) { panel in
-                    let base = GlanceLayout.rect(for: panel.frame, in: area, gap: 6)
-                    let rect = shownRect(panel, base: base, cellWidth: cellWidth, cellHeight: cellHeight)
-                    tile(panel)
-                        .frame(width: rect.width, height: rect.height)
-                        .overlay(alignment: .bottomTrailing) { resizeHandle(panel, base: base, cellWidth: cellWidth, cellHeight: cellHeight) }
-                        .offset(x: rect.minX, y: rect.minY)
-                        .zIndex(dragging == panel.id || resizing == panel.id ? 1 : 0)
-                        .onTapGesture { selected = panel.id }
-                        .gesture(
-                            DragGesture(minimumDistance: 3)
-                                .onChanged { value in
-                                    dragging = panel.id
-                                    dragOffset = value.translation
-                                }
-                                .onEnded { value in
-                                    let x = Int(((base.minX + value.translation.width) / cellWidth).rounded())
-                                    let y = Int(((base.minY + value.translation.height) / cellHeight).rounded())
-                                    glance.updateActive { GlancePolicy.moving(panel.id, toX: x, y: y, on: $0) }
-                                    dragging = nil
-                                    dragOffset = .zero
-                                    selected = panel.id
-                                }
-                        )
-                }
-            }
-        }
-        .aspectRatio(CGFloat(GlancePolicy.columns) / CGFloat(GlancePolicy.rows) * 0.9, contentMode: .fit)
-        .frame(maxWidth: .infinity)
-    }
-
-    private func shownRect(_ panel: GlancePanel, base: CGRect, cellWidth: CGFloat, cellHeight: CGFloat) -> CGRect {
-        var rect = base
-        if dragging == panel.id { rect = rect.offsetBy(dx: dragOffset.width, dy: dragOffset.height) }
-        if resizing == panel.id {
-            rect.size.width = max(cellWidth - 6, rect.width + resizeDelta.width)
-            rect.size.height = max(cellHeight - 6, rect.height + resizeDelta.height)
-        }
-        return rect
-    }
-
-    private func tile(_ panel: GlancePanel) -> some View {
-        let isSelected = selected == panel.id
-        return RoundedRectangle(cornerRadius: 8, style: .continuous)
-            .fill(Color.accentColor.opacity(isSelected ? 0.45 : 0.28))
-            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .strokeBorder(isSelected ? Color.accentColor : Color.white.opacity(0.15), lineWidth: isSelected ? 2 : 1))
-            .overlay {
-                VStack(spacing: 4) {
-                    Image(systemName: panel.kind.symbol).font(.system(size: 16, weight: .semibold))
-                    Text(panel.title.isEmpty ? panel.kind.defaultTitle : panel.title)
-                        .font(.system(size: 11, weight: .medium))
-                        .lineLimit(1)
-                        .padding(.horizontal, 6)
-                }
-                .foregroundStyle(.white)
-            }
-            .contentShape(Rectangle())
-    }
-
-    private func resizeHandle(_ panel: GlancePanel, base: CGRect, cellWidth: CGFloat, cellHeight: CGFloat) -> some View {
-        Image(systemName: "arrow.up.left.and.arrow.down.right")
-            .font(.system(size: 9, weight: .bold))
-            .foregroundStyle(.white)
-            .frame(width: 18, height: 18)
-            .background(Color.accentColor, in: Circle())
-            .padding(4)
-            .contentShape(Rectangle())
-            .highPriorityGesture(
-                DragGesture(minimumDistance: 1)
-                    .onChanged { value in
-                        resizing = panel.id
-                        resizeDelta = value.translation
-                    }
-                    .onEnded { value in
-                        let width = Int(((base.width + 6 + value.translation.width) / cellWidth).rounded())
-                        let height = Int(((base.height + 6 + value.translation.height) / cellHeight).rounded())
-                        glance.updateActive { GlancePolicy.resizing(panel.id, width: width, height: height, on: $0) }
-                        resizing = nil
-                        resizeDelta = .zero
-                        selected = panel.id
-                    }
-            )
-            .help("Drag to resize")
+        GlanceArranger(board: glance.activeBoard, gap: 5, cornerRadius: 8, selected: $selected,
+                       change: { glance.updateActive($0) },
+                       tile: { panel in
+                           RoundedRectangle(cornerRadius: 8, style: .continuous)
+                               .fill(Color.accentColor.opacity(selected == panel.id ? 0.45 : 0.28))
+                               .overlay {
+                                   VStack(spacing: 3) {
+                                       Image(systemName: panel.kind.symbol).font(.system(size: 14, weight: .semibold))
+                                       Text(panel.title.isEmpty ? panel.kind.defaultTitle : panel.title)
+                                           .font(.system(size: 10, weight: .medium))
+                                           .lineLimit(1)
+                                           .padding(.horizontal, 4)
+                                   }
+                                   .foregroundStyle(.white)
+                               }
+                       })
+            .padding(6)
+            .background(Color.black.opacity(0.25), in: RoundedRectangle(cornerRadius: 10))
+            .aspectRatio(16.0 / 10.0, contentMode: .fit)
+            .frame(maxWidth: .infinity)
     }
 }

@@ -25,6 +25,8 @@ extension Defaults.Keys {
     static let glanceMode = Key<String>("glanceMode", default: "holdOrTap")
     /// What opens it: "shortcut", or a modifier key on its own ("fn", "shift", "rightCommand"…).
     static let glanceTrigger = Key<String>("glanceTrigger", default: "shortcut")
+    /// Every display shows the selected board (instead of a board per display).
+    static let glanceSameOnAllDisplays = Key<Bool>("glanceSameOnAllDisplays", default: false)
     /// The screen behind the panels: "clear", "dim" or "blur".
     static let glanceBackdrop = Key<String>("glanceBackdrop", default: "dim")
 }
@@ -45,6 +47,12 @@ final class GlanceManager: ObservableObject {
     @Published private(set) var shownBoards: [String: UUID] = [:]
     /// The board you gave each display (Settings › Glance › Displays).
     @Published private(set) var displayBoards: [String: UUID] = [:]
+    /// Arranging the boards on screen (Edit on the board).
+    @Published private(set) var isEditing = false
+    /// The display showing the + launcher (adding a panel).
+    @Published var launcherDisplay: String?
+    /// A real app window was moved into its panel to be used there.
+    private var isInteracting = false
 
     private var windows: [String: GlanceWindow] = [:]
     private var pointerDisplay: String?
@@ -314,7 +322,8 @@ final class GlanceManager: ObservableObject {
         let keys = screens.map(Self.key(for:))
         pointerDisplay = Self.key(for: pointerScreen)
         shownBoards = GlancePolicy.boardsToShow(displays: keys, pointer: pointerDisplay, assignments: displayBoards,
-                                                selected: activeBoardID, boards: Set(boards.map(\.id)))
+                                                selected: activeBoardID, boards: Set(boards.map(\.id)),
+                                                sameOnAll: Defaults[.glanceSameOnAllDisplays])
         previousApp = NSWorkspace.shared.frontmostApplication
         prepareContent()
 
@@ -326,6 +335,7 @@ final class GlanceManager: ObservableObject {
             let window = windows[key] ?? makeWindow(displayKey: key)
             windows[key] = window
             window.setFrame(screen.frame, display: false)
+            window.level = GlanceWindow.boardLevel
             window.alphaValue = 0
             window.orderFrontRegardless()
             NSAnimationContext.runAnimationGroup { context in
@@ -338,7 +348,15 @@ final class GlanceManager: ObservableObject {
         isShowing = true
         GlanceLiveWindows.shared.resume()
         GlanceStocks.shared.startRefreshing(GlanceManager.shared.boardsOnScreen)
+        GlanceWeather.shared.refresh(boardsOnScreen)
         if pinned { pin() }
+    }
+
+    /// Which copy of a panel's page or window a display shows: the panel's
+    /// own, or (with the same board on several displays) one per display.
+    func instanceKey(_ panel: GlancePanel, display: String) -> String {
+        guard Defaults[.glanceSameOnAllDisplays], !display.isEmpty, display != pointerDisplay else { return panel.id.uuidString }
+        return panel.id.uuidString + "|" + display
     }
 
     /// Loads what the boards on screen show (web pages).
@@ -359,6 +377,12 @@ final class GlanceManager: ObservableObject {
         let wasPinned = isPinned
         isShowing = false
         isPinned = false
+        isEditing = false
+        launcherDisplay = nil
+        if isInteracting {
+            isInteracting = false
+            GlanceLiveWindows.shared.restoreMoved()
+        }
         releaseWatch?.invalidate()
         releaseWatch = nil
         GlanceLiveWindows.shared.pauseAll()
@@ -409,11 +433,97 @@ final class GlanceManager: ObservableObject {
         }
     }
 
+    /// Changes a panel, on whichever board it's on.
     func updatePanel(_ id: UUID, _ change: (inout GlancePanel) -> Void) {
-        updateActive { board in
-            var board = board
-            if let index = board.panels.firstIndex(where: { $0.id == id }) { change(&board.panels[index]) }
-            return board
+        guard let boardIndex = boards.firstIndex(where: { $0.panels.contains { $0.id == id } }),
+              let index = boards[boardIndex].panels.firstIndex(where: { $0.id == id }) else { return }
+        change(&boards[boardIndex].panels[index])
+        persist()
+        if isShowing { prepareContent() }
+    }
+
+    /// Changes any board (the one on a display, while arranging it there).
+    func updateBoard(_ id: UUID, _ change: (GlanceBoard) -> GlanceBoard) {
+        guard let index = boards.firstIndex(where: { $0.id == id }) else { return }
+        boards[index] = change(boards[index])
+        persist()
+        if isShowing {
+            prepareContent()
+            GlanceStocks.shared.startRefreshing(boardsOnScreen)
+            GlanceWeather.shared.refresh(boardsOnScreen)
+            GlanceLiveWindows.shared.resume()
+        }
+    }
+
+    // MARK: Editing on the board
+
+    /// Arrange the boards where they are: the board stays open and takes the keyboard.
+    func startEditing() {
+        if !isShowing { show(pinned: true) } else { pin() }
+        isEditing = true
+    }
+
+    func stopEditing() {
+        isEditing = false
+        launcherDisplay = nil
+    }
+
+    /// Clicking an App window panel: the real window moves into the panel,
+    /// above the board, to be used right there; it goes back when Glance
+    /// closes. If it can't be moved, Glance closes and the window comes forward.
+    func interact(with panel: GlancePanel, display: String) {
+        guard let screen = NSScreen.screens.first(where: { Self.key(for: $0) == display }) ?? NSScreen.main else { return }
+        let area = GlanceLayout.boardArea(screen.frame.size)
+        let rect = GlanceLayout.rect(for: panel.frame, in: area, gap: GlanceLayout.gap)
+        let primaryHeight = NSScreen.screens.first?.frame.height ?? screen.frame.height
+        let target = CGRect(x: screen.frame.minX + rect.minX, y: primaryHeight - screen.frame.maxY + rect.minY,
+                            width: rect.width, height: rect.height)
+        if GlanceLiveWindows.shared.moveIntoPanel(panel, frame: target) {
+            isInteracting = true
+            // Let the app's window sit above the board.
+            for window in windows.values { window.level = .normal }
+        } else {
+            hide()
+            GlanceLiveWindows.shared.bringForward(panel)
+        }
+    }
+
+    /// Opens what a panel shows in its own app (right-click › Open in App).
+    func openInApp(_ panel: GlancePanel) {
+        let workspace = NSWorkspace.shared
+        func open(bundle: String) {
+            if let url = workspace.urlForApplication(withBundleIdentifier: bundle) {
+                workspace.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration(), completionHandler: nil)
+            }
+        }
+        hide()
+        switch panel.kind {
+        case .web:
+            if let url = GlancePolicy.webURL(panel.address) { workspace.open(url) }
+        case .pdf, .html:
+            workspace.open(URL(fileURLWithPath: (panel.address as NSString).expandingTildeInPath))
+        case .window:
+            GlanceLiveWindows.shared.bringForward(panel)
+        case .calendar: open(bundle: "com.apple.iCal")
+        case .reminders: open(bundle: "com.apple.reminders")
+        case .clocks: open(bundle: "com.apple.clock")
+        case .stocks: open(bundle: "com.apple.stocks")
+        case .weather: open(bundle: "com.apple.weather")
+        case .nowPlaying:
+            if let bundle = MusicManager.shared.bundleIdentifier { open(bundle: bundle) }
+        case .whatsapp: open(bundle: "net.whatsapp.WhatsApp")
+        case .promises, .setups, .stash:
+            SettingsWindowController.shared.showWindow()
+        }
+    }
+
+    /// Whether a panel has an app to open it in.
+    static func canOpenInApp(_ panel: GlancePanel) -> Bool {
+        switch panel.kind {
+        case .web: return GlancePolicy.webURL(panel.address) != nil
+        case .pdf, .html: return !panel.address.isEmpty
+        case .window: return !panel.windowApp.isEmpty
+        default: return true
         }
     }
 
@@ -458,6 +568,8 @@ final class GlanceManager: ObservableObject {
 /// desktop and over full-screen apps, without taking focus until it's kept open.
 final class GlanceWindow: NSPanel {
     var onEscape: (() -> Void)?
+    /// Above every app's windows and the menu bar.
+    static let boardLevel = NSWindow.Level(rawValue: NSWindow.Level.mainMenu.rawValue + 2)
 
     init() {
         super.init(contentRect: NSScreen.main?.frame ?? .zero, styleMask: [.borderless, .nonactivatingPanel],
@@ -465,7 +577,7 @@ final class GlanceWindow: NSPanel {
         isOpaque = false
         backgroundColor = .clear
         hasShadow = false
-        level = NSWindow.Level(rawValue: NSWindow.Level.mainMenu.rawValue + 2)
+        level = Self.boardLevel
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
         isMovable = false
         hidesOnDeactivate = false

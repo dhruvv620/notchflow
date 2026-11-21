@@ -18,16 +18,23 @@ enum GlanceLayout {
                       width: CGFloat(frame.width) * cellWidth - gap,
                       height: CGFloat(frame.height) * cellHeight - gap)
     }
+
+    /// The part of a display the panels go in (below the menu bar, with margins).
+    static func boardArea(_ size: CGSize) -> CGRect {
+        CGRect(x: 28, y: 52, width: max(200, size.width - 56), height: max(200, size.height - 80))
+    }
+
+    static let gap: CGFloat = 18
 }
 
 /// The board itself: your panels, as glass cards, over the screen (clear,
-/// dimmed or blurred behind them).
+/// dimmed or blurred behind them). Edit arranges them right here.
 struct GlanceBoardView: View {
     /// The display this board is on.
     let displayKey: String
     @ObservedObject private var glance = GlanceManager.shared
     @Default(.glanceBackdrop) private var backdrop
-    @Default(.glanceMode) private var mode
+    @State private var selected: UUID?
 
     var body: some View {
         if let board = glance.board(onDisplay: displayKey) {
@@ -39,32 +46,67 @@ struct GlanceBoardView: View {
 
     private func content(_ board: GlanceBoard) -> some View {
         GeometryReader { geometry in
-            let area = CGRect(x: 28, y: 52, width: max(200, geometry.size.width - 56), height: max(200, geometry.size.height - 80))
+            let area = GlanceLayout.boardArea(geometry.size)
             ZStack(alignment: .topLeading) {
                 backdropView
                     .ignoresSafeArea()
                     .contentShape(Rectangle())
-                    .onTapGesture { glance.hide() }
+                    .onTapGesture {
+                        if glance.isEditing { selected = nil } else { glance.hide() }
+                    }
 
                 let shown = board.panels.filter(\.isShown)
                 if shown.isEmpty {
-                    Text("Nothing on this board yet. Add panels in Settings › Glance.")
-                        .font(.title3)
-                        .foregroundStyle(.white.opacity(0.7))
-                        .frame(width: geometry.size.width, height: geometry.size.height)
-                        .allowsHitTesting(false)
+                    VStack(spacing: 10) {
+                        Text("Nothing on this board yet.")
+                            .font(.title3)
+                        Button("Add Panels") {
+                            glance.startEditing()
+                            glance.launcherDisplay = displayKey
+                        }
+                        .controlSize(.large)
+                    }
+                    .foregroundStyle(.white.opacity(0.8))
+                    .frame(width: geometry.size.width, height: geometry.size.height)
                 }
-                ForEach(shown) { panel in
-                    let rect = GlanceLayout.rect(for: panel.frame, in: area, gap: 18)
-                    GlancePanelCard(panel: panel)
-                        .frame(width: rect.width, height: rect.height)
-                        .offset(x: rect.minX, y: rect.minY)
+
+                Group {
+                    if glance.isEditing {
+                        GlanceArranger(board: board, gap: GlanceLayout.gap, cornerRadius: 18, selected: $selected,
+                                       change: { glance.updateBoard(board.id, $0) },
+                                       tile: { panel in
+                                           GlancePanelCard(panel: panel, boardID: board.id, displayKey: displayKey)
+                                               .allowsHitTesting(false)
+                                       })
+                            .frame(width: area.width, height: area.height)
+                            .offset(x: area.minX, y: area.minY)
+                    } else {
+                        ForEach(shown) { panel in
+                            let rect = GlanceLayout.rect(for: panel.frame, in: area, gap: GlanceLayout.gap)
+                            GlancePanelCard(panel: panel, boardID: board.id, displayKey: displayKey)
+                                .frame(width: rect.width, height: rect.height)
+                                .offset(x: rect.minX, y: rect.minY)
+                        }
+                    }
                 }
+                .scaleEffect(glance.isShowing ? 1 : 0.97)
+                .animation(.spring(response: 0.28, dampingFraction: 0.86), value: glance.isShowing)
 
                 header(board)
                     .frame(width: geometry.size.width)
                     .padding(.top, 12)
+
+                if glance.launcherDisplay == displayKey {
+                    Color.black.opacity(0.3)
+                        .ignoresSafeArea()
+                        .onTapGesture { glance.launcherDisplay = nil }
+                    GlanceLauncher(boardID: board.id, displayKey: displayKey)
+                        .frame(width: min(640, geometry.size.width - 80), height: min(480, geometry.size.height - 120))
+                        .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
+                        .transition(.scale(scale: 0.96).combined(with: .opacity))
+                }
             }
+            .animation(.easeOut(duration: 0.15), value: glance.launcherDisplay)
         }
         .environment(\.colorScheme, .dark)
     }
@@ -82,9 +124,10 @@ struct GlanceBoardView: View {
         }
     }
 
-    /// A small bar at the top: the layout (switch it with several), edit, close.
+    /// A small bar at the top: the layout (switch it with several), Edit;
+    /// while editing: Add, ready-made arrangements, Done.
     private func header(_ board: GlanceBoard) -> some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 12) {
             if glance.boards.count > 1 {
                 Menu {
                     ForEach(glance.boards) { other in
@@ -96,40 +139,66 @@ struct GlanceBoardView: View {
                 .menuStyle(.borderlessButton)
                 .fixedSize()
             }
-            Button {
-                glance.hide()
-                SettingsWindowController.shared.showWindow()
-            } label: {
-                Image(systemName: "slider.horizontal.3").font(.system(size: 11, weight: .semibold))
-            }
-            .buttonStyle(.borderless)
-            .help("Edit the layout in Settings")
-            if glance.isPinned {
+            if glance.isEditing {
                 Button {
-                    glance.hide()
+                    glance.launcherDisplay = displayKey
                 } label: {
-                    Image(systemName: "xmark").font(.system(size: 11, weight: .bold))
+                    Label("Add", systemImage: "plus").font(.system(size: 12, weight: .semibold))
                 }
                 .buttonStyle(.borderless)
-                .help("Close (Esc)")
+                Menu {
+                    ForEach(GlancePolicy.presets) { preset in
+                        Button(preset.name) { glance.updateBoard(board.id) { GlancePolicy.applying(preset, to: $0) } }
+                    }
+                } label: {
+                    Label("Arrange", systemImage: "rectangle.3.group").font(.system(size: 12, weight: .semibold))
+                }
+                .menuStyle(.borderlessButton)
+                .fixedSize()
+                Button("Done") {
+                    selected = nil
+                    glance.stopEditing()
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+            } else {
+                Button {
+                    glance.startEditing()
+                } label: {
+                    Label("Edit", systemImage: "slider.horizontal.3").font(.system(size: 11, weight: .semibold))
+                }
+                .buttonStyle(.borderless)
+                .help("Arrange and add panels")
+                if glance.isPinned {
+                    Button {
+                        glance.hide()
+                    } label: {
+                        Image(systemName: "xmark").font(.system(size: 11, weight: .bold))
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Close (Esc)")
+                }
             }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 5)
         .background(.ultraThinMaterial, in: Capsule())
         .overlay(Capsule().strokeBorder(Color.white.opacity(0.1)))
-        .opacity(0.85)
         .frame(maxWidth: .infinity)
     }
 }
 
 /// One panel: a glass card with what it shows, edge to edge. Hovering shows
-/// its name (and Reload for a web page).
+/// its name (and a web page's controls); right-click for more.
 struct GlancePanelCard: View {
     let panel: GlancePanel
+    var boardID: UUID?
+    var displayKey = ""
     @State private var hovering = false
 
     private static let shape = RoundedRectangle(cornerRadius: 18, style: .continuous)
+    private var instance: String { GlanceManager.shared.instanceKey(panel, display: displayKey) }
+    private var isPage: Bool { panel.kind == .web || panel.kind == .html }
 
     var body: some View {
         content
@@ -143,26 +212,34 @@ struct GlancePanelCard: View {
             .clipShape(Self.shape)
             .overlay(Self.shape.strokeBorder(Color.white.opacity(0.1), lineWidth: 1))
             .overlay(alignment: .topTrailing) {
-                if hovering { hoverBar }
+                if hovering && !GlanceManager.shared.isEditing { hoverBar }
             }
             .shadow(color: .black.opacity(0.35), radius: 22, y: 10)
             .onHover { hovering = $0 }
             .animation(.easeOut(duration: 0.15), value: hovering)
+            .contextMenu { menu }
     }
 
     private var hoverBar: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 8) {
             Text(panel.title.isEmpty ? panel.kind.defaultTitle : panel.title)
                 .font(.system(size: 10, weight: .semibold))
                 .lineLimit(1)
             if panel.kind == .web {
-                Button {
-                    GlanceWebPanels.shared.reload(panel.id)
-                } label: {
-                    Image(systemName: "arrow.clockwise").font(.system(size: 9, weight: .bold))
+                barButton("chevron.left", help: "Back") { GlanceWebPanels.shared.goBack(instance) }
+                barButton("chevron.right", help: "Forward") { GlanceWebPanels.shared.goForward(instance) }
+            }
+            if isPage {
+                barButton("arrow.clockwise", help: "Reload") { GlanceWebPanels.shared.reload(instance) }
+            }
+            if panel.kind == .web {
+                barButton("eye.slash", help: "Hide part of the page: click it (Esc cancels)") {
+                    GlanceManager.shared.pin()
+                    GlanceWebPanels.shared.startPickingElement(instance)
                 }
-                .buttonStyle(.borderless)
-                .help("Reload")
+            }
+            if GlanceManager.canOpenInApp(panel) {
+                barButton("arrow.up.forward.app", help: "Open in its app") { openInApp() }
             }
         }
         .padding(.horizontal, 8)
@@ -172,16 +249,63 @@ struct GlancePanelCard: View {
         .transition(.opacity)
     }
 
+    private func barButton(_ symbol: String, help: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol).font(.system(size: 9, weight: .bold))
+        }
+        .buttonStyle(.borderless)
+        .help(help)
+    }
+
+    @ViewBuilder
+    private var menu: some View {
+        if GlanceManager.canOpenInApp(panel) {
+            Button("Open in App") { openInApp() }
+        }
+        if isPage {
+            Button("Reload") { GlanceWebPanels.shared.reload(instance) }
+        }
+        if panel.kind == .web {
+            Button("Hide Part of the Page…") {
+                GlanceManager.shared.pin()
+                GlanceWebPanels.shared.startPickingElement(instance)
+            }
+            if !panel.hiddenSelectors.isEmpty {
+                Button("Show Hidden Parts Again") { GlanceManager.shared.updatePanel(panel.id) { $0.hiddenSelectors = [] } }
+            }
+        }
+        Divider()
+        Button("Edit Layout") { GlanceManager.shared.startEditing() }
+        if let boardID {
+            Button("Remove from Board", role: .destructive) {
+                GlanceManager.shared.updateBoard(boardID) { board in
+                    panel.kind.isBuiltIn ? GlancePolicy.setting(panel.id, shown: false, on: board) : GlancePolicy.removing(panel.id, from: board)
+                }
+            }
+        }
+    }
+
+    /// Open in its app; a web page opens at the address it's on now.
+    private func openInApp() {
+        if panel.kind == .web, let url = GlanceWebPanels.shared.currentURL(instance) {
+            GlanceManager.shared.hide()
+            NSWorkspace.shared.open(url)
+        } else {
+            GlanceManager.shared.openInApp(panel)
+        }
+    }
+
     @ViewBuilder
     private var content: some View {
         switch panel.kind {
-        case .web: GlanceWebPanelView(panel: panel)
+        case .web, .html: GlanceWebPanelView(panel: panel, instance: instance)
         case .pdf: GlancePDFPanelView(panel: panel)
-        case .window: GlanceLiveWindowPanel(panel: panel)
-        case .calendar: GlanceTodayPanel()
-        case .reminders: GlanceRemindersPanel()
+        case .window: GlanceLiveWindowPanel(panel: panel, instance: instance, displayKey: displayKey)
+        case .calendar: GlanceCalendarPanel(view: panel.view)
+        case .reminders: GlanceRemindersPanel(view: panel.view)
         case .clocks: GlanceClocksPanel(timeZones: panel.timeZones)
         case .stocks: GlanceStocksPanel(symbols: panel.symbols)
+        case .weather: GlanceWeatherPanel(city: panel.address)
         case .nowPlaying: GlanceNowPlayingPanel()
         case .promises: GlancePromisesPanel()
         case .setups: GlanceSetupsPanel()
@@ -196,6 +320,7 @@ struct GlancePanelCard: View {
 /// Hosts a panel's kept-loaded page (it moves into whichever board shows it).
 struct GlanceWebPanelView: NSViewRepresentable {
     let panel: GlancePanel
+    let instance: String
 
     func makeNSView(context: Context) -> NSView {
         let container = NSView()
@@ -208,7 +333,7 @@ struct GlanceWebPanelView: NSViewRepresentable {
     }
 
     private func attach(to container: NSView) {
-        let page = GlanceWebPanels.shared.view(for: panel)
+        let page = GlanceWebPanels.shared.view(for: panel, instance: instance)
         guard page.superview !== container else { return }
         page.removeFromSuperview()
         page.frame = container.bounds
@@ -274,7 +399,9 @@ private struct PanelMessage: View {
 }
 
 /// Today as a timeline: hours down the side, events as blocks, a red line at now.
-struct GlanceTodayPanel: View {
+struct GlanceCalendarPanel: View {
+    /// "week" for the week ahead; anything else is today's timeline.
+    let view: String
     @State private var events: [EKEvent] = []
     @State private var allowed = true
     private static let store = EKEventStore()
@@ -284,16 +411,59 @@ struct GlanceTodayPanel: View {
         Group {
             if !allowed {
                 PanelMessage(text: "Allow Calendar access in Settings › Calendar & Todos.")
+            } else if view == "week" {
+                week
             } else {
                 timeline
             }
         }
         .onAppear(perform: load)
+        .onChange(of: view) { _, _ in load() }
+    }
+
+    /// The next seven days side by side, each with its events.
+    private var week: some View {
+        let days = GlancePolicy.weekDays(from: Date())
+        return HStack(alignment: .top, spacing: 6) {
+            ForEach(days, id: \.self) { day in
+                let dayEvents = events.filter { Calendar.current.isDate($0.startDate, inSameDayAs: day)
+                    || ($0.isAllDay && $0.startDate <= day && $0.endDate > day) }
+                VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text(day.formatted(.dateTime.weekday(.abbreviated)).uppercased())
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(Calendar.current.isDateInToday(day) ? Color.red : .secondary)
+                        Text(day.formatted(.dateTime.day()))
+                            .font(.system(size: 16, weight: .semibold))
+                    }
+                    .padding(.bottom, 2)
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 4) {
+                            ForEach(dayEvents, id: \.self) { event in
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(event.title ?? "Event").font(.system(size: 10, weight: .semibold)).lineLimit(2)
+                                    if !event.isAllDay {
+                                        Text(event.startDate.formatted(date: .omitted, time: .shortened))
+                                            .font(.system(size: 9)).foregroundStyle(.secondary)
+                                    }
+                                }
+                                .padding(.horizontal, 5).padding(.vertical, 3)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(Color(cgColor: event.calendar.cgColor).opacity(0.3), in: RoundedRectangle(cornerRadius: 5))
+                            }
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .padding(12)
     }
 
     private var timeline: some View {
-        let allDay = events.filter(\.isAllDay)
-        let timed = events.filter { !$0.isAllDay }
+        let today = events.filter { Calendar.current.isDateInToday($0.startDate) || ($0.isAllDay && $0.startDate <= Date() && $0.endDate > Date()) }
+        let allDay = today.filter(\.isAllDay)
+        let timed = today.filter { !$0.isAllDay }
         return VStack(alignment: .leading, spacing: 6) {
             if !allDay.isEmpty {
                 VStack(alignment: .leading, spacing: 4) {
@@ -374,7 +544,7 @@ struct GlanceTodayPanel: View {
         allowed = status == .fullAccess || status.rawValue == 3
         guard allowed else { return }
         let start = Calendar.current.startOfDay(for: Date())
-        guard let end = Calendar.current.date(byAdding: .day, value: 1, to: start) else { return }
+        guard let end = Calendar.current.date(byAdding: .day, value: view == "week" ? 7 : 1, to: start) else { return }
         let predicate = Self.store.predicateForEvents(withStart: start, end: end, calendars: nil)
         events = Self.store.events(matching: predicate).sorted { $0.startDate < $1.startDate }
     }
@@ -423,6 +593,8 @@ struct GlanceTodayPanel: View {
 
 /// Reminders to do, grouped by when (Today, Tomorrow, This week…); tick one off here.
 struct GlanceRemindersPanel: View {
+    /// "today", "scheduled", "overdue" or all.
+    let view: String
     @ObservedObject private var reminders = RemindersManager.shared
 
     private var groups: [(title: String, items: [ReminderItem])] {
@@ -431,7 +603,8 @@ struct GlanceRemindersPanel: View {
         let tomorrow = calendar.date(byAdding: .day, value: 1, to: today) ?? today
         let dayAfter = calendar.date(byAdding: .day, value: 2, to: today) ?? today
         let weekEnd = calendar.date(byAdding: .day, value: 7, to: today) ?? today
-        let open = reminders.reminders.filter { !$0.isCompleted }
+        let now = Date()
+        let open = reminders.reminders.filter { !$0.isCompleted && GlancePolicy.reminderMatches(view: view, due: $0.dueDate, now: now) }
             .sorted { ($0.dueDate ?? .distantFuture) < ($1.dueDate ?? .distantFuture) }
         func items(_ test: (Date?) -> Bool) -> [ReminderItem] { open.filter { test($0.dueDate) } }
         return [
@@ -814,14 +987,18 @@ struct GlanceSparkline: View {
 // MARK: - Live window
 
 /// Another app's window, live; click it to go to that window.
+/// Another app's window, live. Click it to use it right there: the real
+/// window moves into the panel (and goes back when Glance closes).
 struct GlanceLiveWindowPanel: View {
     let panel: GlancePanel
+    let instance: String
+    let displayKey: String
     @ObservedObject private var live = GlanceLiveWindows.shared
 
     var body: some View {
         ZStack {
-            GlanceLiveWindowLayer(panel: panel)
-            if let problem = live.problems[panel.id] {
+            GlanceLiveWindowLayer(panel: panel, instance: instance)
+            if let problem = live.problems[instance] {
                 PanelMessage(text: problem)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(.regularMaterial)
@@ -829,15 +1006,15 @@ struct GlanceLiveWindowPanel: View {
         }
         .contentShape(Rectangle())
         .onTapGesture {
-            GlanceManager.shared.hide()
-            GlanceLiveWindows.shared.bringForward(panel)
+            GlanceManager.shared.interact(with: panel, display: displayKey)
         }
-        .help("Click to go to this window")
+        .help("Click to use this window here")
     }
 }
 
 private struct GlanceLiveWindowLayer: NSViewRepresentable {
     let panel: GlancePanel
+    let instance: String
 
     func makeNSView(context: Context) -> NSView {
         // A layer-hosting view: the layer first, then wantsLayer.
@@ -846,12 +1023,12 @@ private struct GlanceLiveWindowLayer: NSViewRepresentable {
         layer.contentsGravity = .resizeAspect
         view.layer = layer
         view.wantsLayer = true
-        GlanceLiveWindows.shared.register(panel, layer: layer)
+        GlanceLiveWindows.shared.register(panel, instance: instance, layer: layer)
         return view
     }
 
     func updateNSView(_ view: NSView, context: Context) {
-        if let layer = view.layer { GlanceLiveWindows.shared.register(panel, layer: layer) }
+        if let layer = view.layer { GlanceLiveWindows.shared.register(panel, instance: instance, layer: layer) }
     }
 }
 
@@ -936,5 +1113,68 @@ struct GlanceNowPlayingPanel: View {
     private static func time(_ seconds: TimeInterval) -> String {
         let total = max(0, Int(seconds.isFinite ? seconds : 0))
         return String(format: "%d:%02d", total / 60, total % 60)
+    }
+}
+
+// MARK: - Weather
+
+/// A city's weather now and the next days.
+struct GlanceWeatherPanel: View {
+    let city: String
+    @ObservedObject private var weather = GlanceWeather.shared
+
+    var body: some View {
+        if let report = weather.report(for: city) {
+            GeometryReader { geometry in
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(alignment: .top) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(weather.placeName(for: city) ?? city).font(.system(size: 15, weight: .semibold))
+                            Text(GlancePolicy.weatherDescription(code: report.code)).font(.system(size: 11)).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Image(systemName: GlancePolicy.weatherSymbol(code: report.code, isDay: report.isDay))
+                            .symbolRenderingMode(.multicolor)
+                            .font(.system(size: 26))
+                    }
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text("\(Int(report.temperature.rounded()))°")
+                            .font(.system(size: 40, weight: .light, design: .rounded))
+                        if let today = report.days.first {
+                            Text("H \(Int(today.high.rounded()))°  L \(Int(today.low.rounded()))°")
+                                .font(.system(size: 11)).foregroundStyle(.secondary)
+                        }
+                    }
+                    if geometry.size.height > 150 {
+                        Divider().opacity(0.3)
+                        HStack(spacing: 0) {
+                            ForEach(report.days.dropFirst().prefix(5), id: \.date) { day in
+                                VStack(spacing: 4) {
+                                    Text(Self.weekday(day.date)).font(.system(size: 10, weight: .medium)).foregroundStyle(.secondary)
+                                    Image(systemName: GlancePolicy.weatherSymbol(code: day.code))
+                                        .symbolRenderingMode(.multicolor)
+                                        .font(.system(size: 14))
+                                    Text("\(Int(day.high.rounded()))°").font(.system(size: 11, weight: .semibold))
+                                    Text("\(Int(day.low.rounded()))°").font(.system(size: 10)).foregroundStyle(.secondary)
+                                }
+                                .frame(maxWidth: .infinity)
+                            }
+                        }
+                    }
+                }
+                .padding(14)
+            }
+        } else if weather.hasFailed(city) {
+            PanelMessage(text: city.isEmpty ? "Set a city for this panel in Settings › Glance." : "Couldn't find the weather for \(city).")
+        } else {
+            PanelMessage(text: "Loading the weather…")
+        }
+    }
+
+    private static func weekday(_ isoDate: String) -> String {
+        let parser = DateFormatter()
+        parser.dateFormat = "yyyy-MM-dd"
+        guard let date = parser.date(from: isoDate) else { return "" }
+        return date.formatted(.dateTime.weekday(.abbreviated))
     }
 }

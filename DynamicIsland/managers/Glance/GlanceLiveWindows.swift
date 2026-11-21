@@ -13,8 +13,8 @@ import ScreenCaptureKit
 final class GlanceLiveWindows: ObservableObject {
     static let shared = GlanceLiveWindows()
 
-    /// Why a panel shows no picture, by panel id.
-    @Published private(set) var problems: [UUID: String] = [:]
+    /// Why a panel shows no picture, by instance (see GlanceManager.instanceKey).
+    @Published private(set) var problems: [String: String] = [:]
 
     private final class Target {
         weak var layer: CALayer?
@@ -26,7 +26,7 @@ final class GlanceLiveWindows: ObservableObject {
         }
     }
 
-    private var targets: [UUID: Target] = [:]
+    private var targets: [String: Target] = [:]
     private var running = false
 
     /// A window you can put on a board.
@@ -34,12 +34,14 @@ final class GlanceLiveWindows: ObservableObject {
         let bundleID: String
         let appName: String
         let title: String
-        var id: String { bundleID + "|" + title }
+        /// The window right now (for its thumbnail).
+        var windowID: UInt32 = 0
+        var id: String { bundleID + "|" + title + "|\(windowID)" }
     }
 
     /// Called by the panel's view: where its picture goes.
-    func register(_ panel: GlancePanel, layer: CALayer) {
-        if let target = targets[panel.id] {
+    func register(_ panel: GlancePanel, instance: String, layer: CALayer) {
+        if let target = targets[instance] {
             let changed = target.panel.windowApp != panel.windowApp || target.panel.windowTitle != panel.windowTitle
                 || target.layer !== layer
             target.panel = panel
@@ -47,20 +49,24 @@ final class GlanceLiveWindows: ObservableObject {
             if changed, running {
                 target.capture?.stop()
                 target.capture = nil
-                Task { await start(panel.id) }
+                Task { await start(instance) }
             }
             return
         }
-        targets[panel.id] = Target(layer: layer, panel: panel)
-        if running { Task { await start(panel.id) } }
+        targets[instance] = Target(layer: layer, panel: panel)
+        if running { Task { await start(instance) } }
     }
 
     /// The board opened: start capturing every registered window.
     func resume() {
         running = true
         let shown = Set(GlanceManager.shared.boardsOnScreen.flatMap(\.panels).filter { $0.isShown && $0.kind == .window }.map(\.id))
-        for id in targets.keys where !shown.contains(id) { targets[id]?.capture?.stop(); targets[id] = nil }
-        for id in targets.keys where targets[id]?.capture == nil { Task { await start(id) } }
+        // Panels taken off a board, and views that are gone (a display not showing a board this time).
+        for (key, target) in targets where !shown.contains(target.panel.id) || target.layer == nil {
+            target.capture?.stop()
+            targets[key] = nil
+        }
+        for key in targets.keys where targets[key]?.capture == nil { Task { await start(key) } }
     }
 
     /// The board closed: stop every capture (nothing is recorded while you work).
@@ -72,7 +78,7 @@ final class GlanceLiveWindows: ObservableObject {
         }
     }
 
-    private func start(_ id: UUID) async {
+    private func start(_ id: String) async {
         guard running, let target = targets[id], target.capture == nil, let layer = target.layer else { return }
         let panel = target.panel
         guard !panel.windowApp.isEmpty else {
@@ -126,10 +132,87 @@ final class GlanceLiveWindows: ObservableObject {
             .filter { $0.windowLayer == 0 && $0.frame.width * $0.frame.height >= 10_000 }
             .compactMap { window -> Choice? in
                 guard let app = window.owningApplication, app.bundleIdentifier != own, !app.bundleIdentifier.isEmpty else { return nil }
-                let choice = Choice(bundleID: app.bundleIdentifier, appName: app.applicationName, title: window.title ?? "")
+                let choice = Choice(bundleID: app.bundleIdentifier, appName: app.applicationName, title: window.title ?? "",
+                                    windowID: window.windowID)
                 return seen.insert(choice.id).inserted ? choice : nil
             }
             .sorted { ($0.appName, $0.title) < ($1.appName, $1.title) }
+    }
+
+    /// A small picture of a window, for picking it.
+    func thumbnail(for choice: Choice) async -> NSImage? {
+        guard CGPreflightScreenCaptureAccess(),
+              let content = try? await SCShareableContent.excludingDesktopWindows(true, onScreenWindowsOnly: true),
+              let window = content.windows.first(where: { $0.windowID == choice.windowID }) else { return nil }
+        let configuration = SCStreamConfiguration()
+        let scale = min(1, 360 / max(1, window.frame.width))
+        configuration.width = max(32, Int(window.frame.width * scale))
+        configuration.height = max(32, Int(window.frame.height * scale))
+        configuration.showsCursor = false
+        guard let image = try? await SCScreenshotManager.captureImage(contentFilter: SCContentFilter(desktopIndependentWindow: window),
+                                                                     configuration: configuration) else { return nil }
+        return NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height))
+    }
+
+    // MARK: Using a window in its panel
+
+    /// Windows moved into their panels, and where they were.
+    private var moved: [(window: AXUIElement, frame: CGRect)] = []
+
+    /// Moves the real window onto its panel (Accessibility coordinates) and
+    /// brings it forward, so you can use it there. False when it can't be found.
+    func moveIntoPanel(_ panel: GlancePanel, frame: CGRect) -> Bool {
+        guard AXIsProcessTrusted(),
+              let app = NSRunningApplication.runningApplications(withBundleIdentifier: panel.windowApp).first,
+              let window = Self.axWindow(of: app, title: panel.windowTitle),
+              let original = Self.frame(of: window) else { return false }
+        if !moved.contains(where: { CFEqual($0.window, window) }) { moved.append((window, original)) }
+        Self.set(window, frame: frame)
+        app.activate()
+        AXUIElementPerformAction(window, kAXRaiseAction as CFString)
+        return true
+    }
+
+    /// Glance closed: the windows go back where they were.
+    func restoreMoved() {
+        for entry in moved { Self.set(entry.window, frame: entry.frame) }
+        moved = []
+    }
+
+    private static func axWindow(of app: NSRunningApplication, title: String) -> AXUIElement? {
+        let element = AXUIElementCreateApplication(app.processIdentifier)
+        var value: CFTypeRef?
+        if AXUIElementCopyAttributeValue(element, kAXWindowsAttribute as CFString, &value) == .success,
+           let windows = value as? [AXUIElement], !windows.isEmpty {
+            if !title.isEmpty, let match = windows.first(where: { window in
+                var text: CFTypeRef?
+                AXUIElementCopyAttributeValue(window, kAXTitleAttribute as CFString, &text)
+                return (text as? String) == title
+            }) { return match }
+        }
+        var main: CFTypeRef?
+        if AXUIElementCopyAttributeValue(element, kAXMainWindowAttribute as CFString, &main) == .success, let main,
+           CFGetTypeID(main) == AXUIElementGetTypeID() {
+            return (main as! AXUIElement)
+        }
+        return (value as? [AXUIElement])?.first
+    }
+
+    private static func frame(of window: AXUIElement) -> CGRect? {
+        var position: CFTypeRef?, size: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(window, kAXPositionAttribute as CFString, &position) == .success,
+              AXUIElementCopyAttributeValue(window, kAXSizeAttribute as CFString, &size) == .success,
+              let position, let size else { return nil }
+        var origin = CGPoint.zero, extent = CGSize.zero
+        guard AXValueGetValue(position as! AXValue, .cgPoint, &origin), AXValueGetValue(size as! AXValue, .cgSize, &extent) else { return nil }
+        return CGRect(origin: origin, size: extent)
+    }
+
+    private static func set(_ window: AXUIElement, frame: CGRect) {
+        var origin = frame.origin, size = frame.size
+        if let value = AXValueCreate(.cgPoint, &origin) { AXUIElementSetAttributeValue(window, kAXPositionAttribute as CFString, value) }
+        if let value = AXValueCreate(.cgSize, &size) { AXUIElementSetAttributeValue(window, kAXSizeAttribute as CFString, value) }
+        if let value = AXValueCreate(.cgPoint, &origin) { AXUIElementSetAttributeValue(window, kAXPositionAttribute as CFString, value) }
     }
 
     /// Clicking the panel: that window comes to the front.
