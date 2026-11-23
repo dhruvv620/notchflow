@@ -89,6 +89,8 @@ public enum NotchViews {
     case agents
     /// Workspaces, today's time and the week's report.
     case flow
+    /// Projects and people that build themselves (Orbit).
+    case orbit
     /// Temporary tab for something just copied (CopyActionManager); not reorderable.
     case copyAction
 }

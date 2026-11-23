@@ -135,6 +135,7 @@ final class TimeTracker: ObservableObject {
         guard TimeTrackingPolicy.shouldCount(idleSeconds: idle, category: category, locked: LockScreenManager.shared.isLocked) else { return }
 
         let project = TimeTrackingPolicy.project(in: sample.windowTitle, bundleID: bundleID, known: knownProjects)
+        if let project, Orbit.shared.isRunning { Orbit.shared.focused(onProjectNamed: project, seconds: elapsed) }
         let hour = Calendar.current.component(.hour, from: now)
         log.add(seconds: elapsed, category: category, label: TimeTrackingPolicy.label(for: sample), project: project, hour: hour)
         if now.timeIntervalSince(lastPublish) >= 30 { publish() }

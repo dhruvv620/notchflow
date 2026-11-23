@@ -1,0 +1,402 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 dhruvv620
+
+import AppKit
+import Combine
+import Defaults
+import os
+
+extension Defaults.Keys {
+    /// Orbit's master switch. Off means nothing runs: no listeners, no timers,
+    /// nothing kept in memory.
+    static let enableOrbit = Key<Bool>("enableOrbit", default: false)
+    /// Build project pages from terminal commands, AI agents, builds and focus time.
+    static let orbitTrackProjects = Key<Bool>("orbitTrackProjects", default: true)
+    /// Build people pages from messages and promises.
+    static let orbitTrackPeople = Key<Bool>("orbitTrackPeople", default: true)
+    /// Write the pages as markdown into an Obsidian vault.
+    static let orbitWriteVault = Key<Bool>("orbitWriteVault", default: false)
+    /// The vault folder. Empty means ~/Documents/NotchFlow Vault.
+    static let orbitVaultPath = Key<String>("orbitVaultPath", default: "")
+    /// Also keep a daily note of what happened.
+    static let orbitDailyNotes = Key<Bool>("orbitDailyNotes", default: true)
+}
+
+/// Orbit: projects and people that build themselves from what you already do,
+/// kept on this Mac and (optionally) written into an Obsidian vault.
+///
+/// Only the switches are watched while Orbit is off. Turning it on loads the
+/// saved state and starts listening; turning it off saves, stops every
+/// listener and timer, and drops everything from memory.
+@MainActor
+final class Orbit: ObservableObject {
+    static let shared = Orbit()
+
+    @Published private(set) var state = OrbitState.empty
+    /// True while Orbit listens. Other managers check this before calling in,
+    /// so a switched-off Orbit costs them one Bool read.
+    @Published private(set) var isRunning = false
+    @Published private(set) var vaultStatus: String?
+
+    private let log = Logger(subsystem: "com.dhruvv620.NotchFlow", category: "Orbit")
+    private var switches = Set<AnyCancellable>()
+    private var signals = Set<AnyCancellable>()
+    private var saveTask: Task<Void, Never>?
+    private var vaultTask: Task<Void, Never>?
+    private var dirtyProjects = Set<String>()
+    private var dirtyPeople = Set<String>()
+    private var agentStates: [String: Bool] = [:]
+    private var seenNotifications = Set<String>()
+    private var seenPromises = Set<UUID>()
+    private var lastBuild: String?
+    /// Focus seconds not yet counted as whole minutes, per project.
+    private var pendingFocus: [String: TimeInterval] = [:]
+
+    private init() {}
+
+    // MARK: Switches
+
+    func start() {
+        guard switches.isEmpty else { return }
+        let keys: [AnyPublisher<Void, Never>] = [
+            Defaults.publisher(.enableOrbit, options: []).map { _ in () }.eraseToAnyPublisher(),
+            Defaults.publisher(.orbitTrackProjects, options: []).map { _ in () }.eraseToAnyPublisher(),
+            Defaults.publisher(.orbitTrackPeople, options: []).map { _ in () }.eraseToAnyPublisher(),
+            Defaults.publisher(.orbitWriteVault, options: []).map { _ in () }.eraseToAnyPublisher(),
+            Defaults.publisher(.orbitDailyNotes, options: []).map { _ in () }.eraseToAnyPublisher(),
+        ]
+        Publishers.MergeMany(keys).receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.apply() }
+            .store(in: &switches)
+        apply()
+    }
+
+    private var tracksProjects: Bool { Defaults[.enableOrbit] && Defaults[.orbitTrackProjects] }
+    private var tracksPeople: Bool { Defaults[.enableOrbit] && Defaults[.orbitTrackPeople] }
+
+    private func apply() {
+        let shouldRun = tracksProjects || tracksPeople
+        if shouldRun && !isRunning {
+            state = Self.load()
+            isRunning = true
+            log.info("Orbit on")
+        } else if !shouldRun && isRunning {
+            shutDown()
+            return
+        }
+        guard isRunning else { return }
+        wireSignals()
+        if Defaults[.orbitWriteVault] { scheduleVaultWrite(all: true) } else { vaultTask?.cancel(); vaultTask = nil; vaultStatus = nil }
+    }
+
+    /// Saves, stops every listener and timer, and frees the memory.
+    private func shutDown() {
+        signals.removeAll()
+        flushFocus()
+        let snapshot = state
+        saveTask?.cancel(); saveTask = nil
+        vaultTask?.cancel(); vaultTask = nil
+        Task.detached(priority: .utility) { Self.write(snapshot) }
+        state = .empty
+        dirtyProjects = []; dirtyPeople = []
+        agentStates = [:]; seenNotifications = []; seenPromises = []; lastBuild = nil
+        pendingFocus = [:]
+        vaultStatus = nil
+        isRunning = false
+        log.info("Orbit off")
+    }
+
+    // MARK: Listening
+
+    private func wireSignals() {
+        signals.removeAll()
+        if tracksProjects {
+            agentStates = Dictionary(uniqueKeysWithValues: AgentHub.shared.sessions.map { ($0.id, $0.isWorking) })
+            AgentHub.shared.$sessions
+                .receive(on: RunLoop.main)
+                .sink { [weak self] in self?.agentsChanged($0) }
+                .store(in: &signals)
+            lastBuild = BuildWatchManager.shared.announcement?.id
+            BuildWatchManager.shared.$announcement
+                .compactMap { $0 }
+                .receive(on: RunLoop.main)
+                .sink { [weak self] in self?.buildFinished($0) }
+                .store(in: &signals)
+        }
+        if tracksPeople {
+            // Only what arrives from now on; the backlog was seen before.
+            seenNotifications = Set(NotificationHub.shared.items.map(\.id))
+            NotificationHub.shared.$items
+                .debounce(for: .seconds(1), scheduler: RunLoop.main)
+                .sink { [weak self] in self?.notificationsChanged($0) }
+                .store(in: &signals)
+            seenPromises = Set(PromiseKeeper.shared.promises.map(\.id))
+            PromiseKeeper.shared.$promises
+                .receive(on: RunLoop.main)
+                .sink { [weak self] in self?.promisesChanged($0) }
+                .store(in: &signals)
+        }
+    }
+
+    private var projectNames: [String] { state.projects.values.map(\.name) }
+
+    private func projectID(mentionedIn text: String) -> String? {
+        guard tracksProjects, let name = OrbitPolicy.project(mentionedIn: text, names: projectNames) else { return nil }
+        return OrbitPolicy.key(name)
+    }
+
+    /// A project for a folder: its root folder's project, or nil outside one.
+    private func projectID(forFolder folder: String, fallbackName: String? = nil) -> String? {
+        let manager = FileManager.default
+        if let root = OrbitPolicy.projectRoot(for: folder, home: NSHomeDirectory(), exists: { manager.fileExists(atPath: $0) }) {
+            return OrbitPolicy.upsertProject(name: OrbitPolicy.projectName(root: root), root: root, at: Date(), in: &state)
+        }
+        guard let fallbackName, !fallbackName.isEmpty else { return nil }
+        return OrbitPolicy.upsertProject(name: fallbackName, root: nil, at: Date(), in: &state)
+    }
+
+    private func agentsChanged(_ sessions: [AgentSession]) {
+        guard tracksProjects else { return }
+        for session in sessions {
+            let wasWorking = agentStates[session.id] ?? false
+            agentStates[session.id] = session.isWorking
+            guard wasWorking, !session.isWorking else { continue }
+            let project = projectID(forFolder: session.cwd, fallbackName: session.project)
+            let prompt = session.lastPrompt.map { ": \($0)" } ?? ""
+            let outcome = session.isWaiting ? "needs you" : "finished"
+            add(OrbitEvent(date: Date(), kind: .agent, text: "\(session.agent.displayName) \(outcome)\(prompt)", project: project))
+        }
+        // Forget sessions that are gone.
+        let live = Set(sessions.map(\.id))
+        agentStates = agentStates.filter { live.contains($0.key) }
+    }
+
+    private func buildFinished(_ run: WatchedRun) {
+        guard tracksProjects, run.state != .running, run.id != lastBuild else { return }
+        lastBuild = run.id
+        let project = projectID(mentionedIn: run.title + " " + run.detail)
+        let result = run.state == .success ? "passed" : run.state == .failure ? "failed" : "cancelled"
+        add(OrbitEvent(date: Date(), kind: .build, text: "\(run.title) \(result)", project: project, url: run.url?.absoluteString))
+    }
+
+    private func notificationsChanged(_ items: [NotchNotification]) {
+        guard tracksPeople else { return }
+        let fresh = items.filter { !seenNotifications.contains($0.id) }
+        seenNotifications = Set(items.map(\.id))
+        for item in fresh where OrbitPolicy.isMessagingApp(item.appName) {
+            guard let name = OrbitPolicy.personName(fromTitle: item.title) else { continue }
+            let person = OrbitPolicy.upsertPerson(name: name, app: item.appName, at: item.date, in: &state)
+            // Message text stays out of the log unless it ties to a project.
+            let project = projectID(mentionedIn: item.body)
+            let text = project != nil ? item.body : "Message on \(item.appName)"
+            add(OrbitEvent(date: item.date, kind: .message, text: text, project: project, person: person))
+        }
+    }
+
+    private func promisesChanged(_ promises: [TrackedPromise]) {
+        guard tracksPeople else { return }
+        for promise in promises where !seenPromises.contains(promise.id) {
+            seenPromises.insert(promise.id)
+            let person = OrbitPolicy.personName(fromTitle: promise.person).map {
+                OrbitPolicy.upsertPerson(name: $0, app: promise.sourceName, at: promise.created, in: &state)
+            }
+            add(OrbitEvent(date: promise.created, kind: .promise, text: promise.title,
+                           project: projectID(mentionedIn: promise.title + " " + promise.quote), person: person))
+        }
+    }
+
+    /// From the Terminal tab: a command finished in `folder`.
+    func commandFinished(_ command: String, duration: TimeInterval, folder: String?) {
+        guard isRunning, tracksProjects, OrbitPolicy.isNoteworthy(command: command, duration: duration),
+              let folder, let project = projectID(forFolder: folder) else { return }
+        add(OrbitEvent(date: Date(), kind: .command, text: OrbitPolicy.describe(command: command, duration: duration), project: project))
+    }
+
+    /// From time tracking: `seconds` spent on a project named in a window title.
+    func focused(onProjectNamed name: String, seconds: TimeInterval) {
+        guard isRunning, tracksProjects, seconds > 0 else { return }
+        let id = OrbitPolicy.key(name)
+        // Only projects Orbit already knows; window titles are noisy.
+        guard state.projects[id] != nil else { return }
+        pendingFocus[id, default: 0] += seconds
+        if pendingFocus[id, default: 0] >= 60 { flushFocus() }
+    }
+
+    private func flushFocus() {
+        let day = OrbitPolicy.dayKey(Date())
+        for (id, seconds) in pendingFocus where seconds >= 60 {
+            OrbitPolicy.addFocus(minutes: Int(seconds / 60), project: id, day: day, in: &state)
+            pendingFocus[id] = seconds.truncatingRemainder(dividingBy: 60)
+            dirtyProjects.insert(id)
+        }
+        scheduleSave()
+    }
+
+    private func add(_ event: OrbitEvent) {
+        OrbitPolicy.record(event, in: &state)
+        if let project = event.project { dirtyProjects.insert(project) }
+        if let person = event.person { dirtyPeople.insert(person) }
+        scheduleSave()
+        if Defaults[.orbitWriteVault] { scheduleVaultWrite(all: false) }
+    }
+
+    // MARK: Editing from the UI
+
+    func togglePin(_ id: String) {
+        guard isRunning else { return }
+        state.projects[id]?.pinned.toggle()
+        scheduleSave()
+    }
+
+    func addNote(_ text: String, project: String) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard isRunning, !trimmed.isEmpty else { return }
+        add(OrbitEvent(date: Date(), kind: .note, text: trimmed, project: project))
+    }
+
+    func forget(project id: String) {
+        guard isRunning else { return }
+        state.projects[id] = nil
+        state.events.removeAll { $0.project == id }
+        for key in state.people.keys { state.people[key]?.projects[id] = nil }
+        scheduleSave()
+    }
+
+    /// Deletes everything Orbit kept (the vault's notes stay).
+    func forgetEverything() {
+        state = .empty
+        dirtyProjects = []; dirtyPeople = []
+        pendingFocus = [:]
+        Task.detached(priority: .utility) { try? FileManager.default.removeItem(at: Self.storeURL) }
+    }
+
+    // MARK: Saving
+
+    nonisolated static var storeURL: URL {
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Library/Application Support")
+        return base.appendingPathComponent("NotchFlow/Orbit/orbit.json")
+    }
+
+    private static func load() -> OrbitState {
+        guard let data = try? Data(contentsOf: storeURL),
+              let state = try? JSONDecoder().decode(OrbitState.self, from: data) else { return .empty }
+        return state
+    }
+
+    nonisolated private static func write(_ state: OrbitState) {
+        guard let data = try? JSONEncoder().encode(state) else { return }
+        let url = storeURL
+        try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? data.write(to: url, options: .atomic)
+    }
+
+    private func scheduleSave() {
+        saveTask?.cancel()
+        saveTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(8))
+            guard let self, !Task.isCancelled, self.isRunning else { return }
+            let snapshot = self.state
+            await Task.detached(priority: .utility) { Self.write(snapshot) }.value
+        }
+    }
+
+    // MARK: Obsidian vault
+
+    var vaultURL: URL {
+        let path = Defaults[.orbitVaultPath].trimmingCharacters(in: .whitespaces)
+        if !path.isEmpty { return URL(fileURLWithPath: (path as NSString).expandingTildeInPath, isDirectory: true) }
+        return FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Documents/NotchFlow Vault", isDirectory: true)
+    }
+
+    /// Where Orbit's own notes go inside the vault.
+    var orbitFolder: URL { vaultURL.appendingPathComponent("Orbit", isDirectory: true) }
+
+    func noteURL(forProject project: OrbitProject) -> URL {
+        orbitFolder.appendingPathComponent("Projects/\(OrbitPolicy.fileName(project.name)).md")
+    }
+
+    func noteURL(forPerson person: OrbitPerson) -> URL {
+        orbitFolder.appendingPathComponent("People/\(OrbitPolicy.fileName(person.name)).md")
+    }
+
+    func writeVaultNow() { scheduleVaultWrite(all: true, delay: 0) }
+
+    private func scheduleVaultWrite(all: Bool, delay: Double = 20) {
+        guard isRunning, Defaults[.orbitWriteVault] else { return }
+        if all {
+            dirtyProjects.formUnion(state.projects.keys)
+            dirtyPeople.formUnion(state.people.keys)
+        }
+        vaultTask?.cancel()
+        vaultTask = Task { [weak self] in
+            if delay > 0 { try? await Task.sleep(for: .seconds(delay)) }
+            guard let self, !Task.isCancelled else { return }
+            await self.writeVault()
+        }
+    }
+
+    private struct NoteFile: Sendable {
+        let url: URL
+        let header: String
+        let body: String
+    }
+
+    private func writeVault() async {
+        guard isRunning, Defaults[.orbitWriteVault] else { return }
+        flushFocus()
+        var files: [NoteFile] = []
+        for id in dirtyProjects {
+            guard let project = state.projects[id] else { continue }
+            files.append(NoteFile(url: noteURL(forProject: project), header: OrbitPolicy.projectNoteHeader(project),
+                                  body: OrbitPolicy.projectNote(project, state: state)))
+        }
+        for id in dirtyPeople {
+            guard let person = state.people[id] else { continue }
+            files.append(NoteFile(url: noteURL(forPerson: person), header: OrbitPolicy.personNoteHeader(person),
+                                  body: OrbitPolicy.personNote(person, state: state)))
+        }
+        if Defaults[.orbitDailyNotes] {
+            let day = OrbitPolicy.dayKey(Date())
+            files.append(NoteFile(url: orbitFolder.appendingPathComponent("Daily/\(day).md"),
+                                  header: OrbitPolicy.dailyNoteHeader(day: day), body: OrbitPolicy.dailyNote(day: day, state: state)))
+        }
+        dirtyProjects = []; dirtyPeople = []
+        let vault = vaultURL
+        let failed = await Task.detached(priority: .utility) { () -> String? in
+            let manager = FileManager.default
+            do {
+                // A new vault: make it one Obsidian recognizes.
+                if !manager.fileExists(atPath: vault.path) {
+                    try manager.createDirectory(at: vault.appendingPathComponent(".obsidian"), withIntermediateDirectories: true)
+                }
+                for file in files {
+                    try manager.createDirectory(at: file.url.deletingLastPathComponent(), withIntermediateDirectories: true)
+                    let existing = try? String(contentsOf: file.url, encoding: .utf8)
+                    let merged = OrbitPolicy.merge(existing: existing, managed: file.body, header: file.header)
+                    if merged != existing { try merged.write(to: file.url, atomically: true, encoding: .utf8) }
+                }
+                return nil
+            } catch {
+                return error.localizedDescription
+            }
+        }.value
+        guard isRunning else { return }
+        let time = Date().formatted(date: .omitted, time: .shortened)
+        vaultStatus = failed.map { "Couldn't write the vault: \($0)" } ?? "Vault updated at \(time)"
+    }
+
+    /// Opens a note (or the vault) in Obsidian, or in Finder without Obsidian.
+    func openInObsidian(_ url: URL?) {
+        let target = url ?? orbitFolder
+        let hasObsidian = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "md.obsidian") != nil
+        if hasObsidian, FileManager.default.fileExists(atPath: target.path),
+           let link = OrbitPolicy.obsidianURL(forFile: target.path) {
+            NSWorkspace.shared.open(link)
+        } else if FileManager.default.fileExists(atPath: target.path) {
+            NSWorkspace.shared.activateFileViewerSelecting([target])
+        } else {
+            NSWorkspace.shared.open(vaultURL.deletingLastPathComponent())
+        }
+    }
+}

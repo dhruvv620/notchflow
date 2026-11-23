@@ -95,6 +95,9 @@ extension NotchViews {
             // Workspace chips, the window stash's row, and today's time when tracked.
             let extra: CGFloat = (Defaults[.timeTrackingEnabled] ? 50 : 0) + (Defaults[.enableWindowStash] ? 40 : 0)
             return extra > 0 ? .taller(by: extra) : .preset
+        case .orbit:
+            // A list beside a timeline and a note field.
+            return .taller(by: 80)
         case .notifications:
             // A short inbox gets a short panel; a long one grows a little.
             return .fitsContent(shrinkBy: 40, growBy: 60)

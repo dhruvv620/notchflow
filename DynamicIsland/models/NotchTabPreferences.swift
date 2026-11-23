@@ -16,7 +16,7 @@ extension Notification.Name {
 }
 
 enum NotchBuiltinTab: String, CaseIterable, Identifiable {
-    case music, shelf, timers, stats, usage, notes, clipboard, cuely, todos, notifications, whatsapp, calendar, terminal, agents, flow
+    case music, shelf, timers, stats, usage, notes, clipboard, cuely, todos, notifications, whatsapp, calendar, terminal, agents, flow, orbit
     var id: String { rawValue }
     var title: String {
         switch self {
@@ -35,6 +35,7 @@ enum NotchBuiltinTab: String, CaseIterable, Identifiable {
         case .terminal: return "Terminal"
         case .agents: return "AI Agents"
         case .flow: return "Flow"
+        case .orbit: return "Orbit"
         }
     }
     var symbol: String {
@@ -54,6 +55,7 @@ enum NotchBuiltinTab: String, CaseIterable, Identifiable {
         case .terminal: return "apple.terminal"
         case .agents: return "sparkles"
         case .flow: return "clock.badge.checkmark"
+        case .orbit: return "circle.circle"
         }
     }
     var view: NotchViews {
@@ -73,6 +75,7 @@ enum NotchBuiltinTab: String, CaseIterable, Identifiable {
         case .terminal: return .terminal
         case .agents: return .agents
         case .flow: return .flow
+        case .orbit: return .orbit
         }
     }
     static func identifier(for view: NotchViews) -> String {
@@ -95,6 +98,7 @@ enum NotchBuiltinTab: String, CaseIterable, Identifiable {
         case .terminal: return Defaults[.enableTerminalFeature]
         case .agents: return Defaults[.enableAgentsFeature]
         case .flow: return Defaults[.timeTrackingEnabled] || Defaults[.enableWorkspaces] || Defaults[.enableWindowStash]
+        case .orbit: return Defaults[.enableOrbit]
         }
     }
     var settingsDestination: String {
@@ -114,6 +118,7 @@ enum NotchBuiltinTab: String, CaseIterable, Identifiable {
         case .terminal: return "terminal"
         case .agents: return "agents"
         case .flow: return "productivity"
+        case .orbit: return "orbit"
         }
     }
 }
@@ -157,6 +162,8 @@ final class NotchTabPreferences: ObservableObject {
         changes.append(Defaults.publisher(.timeTrackingEnabled, options: []).map { _ in true }.eraseToAnyPublisher())
         changes.append(Defaults.publisher(.enableWorkspaces, options: []).map { _ in true }.eraseToAnyPublisher())
         changes.append(Defaults.publisher(.enableWindowStash, options: []).map { _ in true }.eraseToAnyPublisher())
+        changes.append(Defaults.publisher(.enableAgentsFeature, options: []).map { _ in true }.eraseToAnyPublisher())
+        changes.append(Defaults.publisher(.enableOrbit, options: []).map { _ in true }.eraseToAnyPublisher())
         Publishers.MergeMany(changes)
             .receive(on: RunLoop.main).sink { [weak self] _ in
             self?.revision += 1

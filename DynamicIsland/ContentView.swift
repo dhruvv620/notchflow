@@ -1391,6 +1391,7 @@ struct ContentView: View {
         case .copyAction: NotchCopyActionView()
         case .agents: NotchAgentsView()
         case .flow: NotchFlowView()
+        case .orbit: NotchOrbitView()
         }
     }
 

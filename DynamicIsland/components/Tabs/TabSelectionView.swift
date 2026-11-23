@@ -119,6 +119,9 @@ struct TabSelectionView: View {
         if Defaults[.timeTrackingEnabled] || Defaults[.enableWorkspaces] || Defaults[.enableWindowStash] {
             tabsArray.append(TabModel(label: "Flow", icon: "clock.badge.checkmark", view: .flow))
         }
+        if Defaults[.enableOrbit] {
+            tabsArray.append(TabModel(label: "Orbit", icon: "circle.circle", view: .orbit))
+        }
         return tabsArray
     }
     static var availableTabs: [TabModel] {

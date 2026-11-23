@@ -18,6 +18,7 @@
  */
 
 import AppKit
+import Darwin
 import Foundation
 import SwiftUI
 import SwiftTerm
@@ -479,6 +480,10 @@ class TerminalManager: ObservableObject {
                 let command = session.command ?? ""
                 session.commandStart = nil
                 session.command = nil
+                // Orbit (when on) files it under the project the shell is in.
+                if Orbit.shared.isRunning {
+                    Orbit.shared.commandFinished(command, duration: duration, folder: Self.workingDirectory(shell))
+                }
                 let watching = isTabVisible && session.id == selectedID && NSApp.isActive
                 guard TerminalCommandPolicy.shouldNotify(command: command, duration: duration,
                                                          threshold: Double(Defaults[.terminalNotifyAfterSeconds]),
@@ -493,6 +498,17 @@ class TerminalManager: ObservableObject {
                 }
             }
         }
+    }
+
+    /// A process's current folder.
+    private static func workingDirectory(_ pid: pid_t) -> String? {
+        var info = proc_vnodepathinfo()
+        let size = Int32(MemoryLayout<proc_vnodepathinfo>.size)
+        guard proc_pidinfo(pid, PROC_PIDVNODEPATHINFO, 0, &info, size) == size else { return nil }
+        let path = withUnsafeBytes(of: &info.pvi_cdir.vip_path) { bytes in
+            String(decoding: bytes.prefix { $0 != 0 }, as: UTF8.self)
+        }
+        return path.isEmpty ? nil : path
     }
 
     /// A process's name (what `ps` calls it).

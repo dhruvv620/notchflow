@@ -896,6 +896,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         WorkspaceManager.shared.start()
         WindowStash.shared.start()
         GlanceManager.shared.start()
+        // Orbit only watches its switches until it is turned on.
+        Orbit.shared.start()
         // The clipboard header button (and its popover) is gone: the Clipboard
         // tab is where history lives, so start keeping it from launch.
         if Defaults[.clipboardDisplayMode] == .popover { Defaults[.clipboardDisplayMode] = .separateTab }

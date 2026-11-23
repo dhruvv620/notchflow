@@ -131,6 +131,12 @@ printf '\nChecking terminal command notifications...\n'
     "$SOURCE_DIR/tests/TerminalCommandRegression.swift" -o "$BUILD_ROOT/TerminalCommandRegression"
 "$BUILD_ROOT/TerminalCommandRegression"
 
+printf '\nChecking Orbit...\n'
+/usr/bin/xcrun swiftc -swift-version 5 -parse-as-library \
+    "$SOURCE_DIR/DynamicIsland/helpers/OrbitPolicy.swift" \
+    "$SOURCE_DIR/tests/OrbitRegression.swift" -o "$BUILD_ROOT/OrbitRegression"
+"$BUILD_ROOT/OrbitRegression"
+
 printf '\nChecking the window stash...\n'
 /usr/bin/xcrun swiftc -swift-version 5 -parse-as-library \
     "$SOURCE_DIR/DynamicIsland/helpers/WindowStashPolicy.swift" \

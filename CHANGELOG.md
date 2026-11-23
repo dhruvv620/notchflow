@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Orbit (off by default)**: project and people pages that build themselves. Turn it on in Settings > Orbit. Projects come from commands you run in the Terminal tab (filed under the folder's project), AI agents finishing work, builds and focus time; people come from messages and promises. The new Orbit tab shows each project's timeline, its people, today's focus, and a note field; each person shows their projects and recent history. With "Write notes to an Obsidian vault" on, it keeps Projects, People and Daily notes in markdown with [[links]], rewriting only its own marked section so your own writing is kept. Every part has its own switch, and off means Orbit does nothing at all: no listeners, no timers, nothing in memory.
 - **YouTube Music without opening tabs**: a song picked in the notch's search now plays without a new tab or anything coming forward. With the YouTube Music desktop app installed (with its API Server plugin on), it goes next in the app's queue and plays, the app started hidden if needed. Otherwise it plays in one YouTube Music window of your browser (Chrome Beta, Chrome, Edge, Brave, Vivaldi or Safari, signed in as you), kept just off screen and reused for every song; after 15 minutes without playing that window closes to free its memory.
 
 ### Changed
