@@ -69,9 +69,26 @@ struct OrbitState: Codable, Equatable, Sendable {
     var projects: [String: OrbitProject] = [:]
     var people: [String: OrbitPerson] = [:]
     var events: [OrbitEvent] = []
+    /// Loop id → when it was marked done (Loops).
+    var dismissedLoops: [String: Date] = [:]
+    /// Loop id → hidden until.
+    var snoozedLoops: [String: Date] = [:]
     var version = 1
 
     static let empty = OrbitState()
+
+    init() {}
+
+    /// Every field is optional on disk, so older files still load.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        projects = try container.decodeIfPresent([String: OrbitProject].self, forKey: .projects) ?? [:]
+        people = try container.decodeIfPresent([String: OrbitPerson].self, forKey: .people) ?? [:]
+        events = try container.decodeIfPresent([OrbitEvent].self, forKey: .events) ?? []
+        dismissedLoops = try container.decodeIfPresent([String: Date].self, forKey: .dismissedLoops) ?? [:]
+        snoozedLoops = try container.decodeIfPresent([String: Date].self, forKey: .snoozedLoops) ?? [:]
+        version = try container.decodeIfPresent(Int.self, forKey: .version) ?? 1
+    }
 }
 
 enum OrbitPolicy {

@@ -10,6 +10,8 @@ enum SecretStore {
     enum Secret: String {
         case minimaxAPIKey = "minimax-api-key"
         case githubToken = "github-token"
+        /// Orbit's two-way Linear.
+        case linear = "linear-api-key"
     }
 
     private static let service = "com.dhruvv620.NotchFlow.secrets"

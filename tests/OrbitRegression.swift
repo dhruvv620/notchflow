@@ -100,6 +100,72 @@ struct OrbitRegression {
         try require(P.dailyNote(day: "2001-01-01", state: small, calendar: calendar) == "Nothing recorded yet.", "Empty day")
         try require(P.obsidianURL(forFile: "/v/Projects/A B.md")?.absoluteString == "obsidian://open?path=/v/Projects/A%20B.md", "Obsidian URL")
 
+        // Older files without the Loops fields still load.
+        let old = try JSONDecoder().decode(OrbitState.self, from: Data(#"{"projects":{},"people":{},"events":[],"version":1}"#.utf8))
+        try require(old.dismissedLoops.isEmpty, "Old file loads")
+
+        // Loops
+        typealias L = OrbitLoopsPolicy
+        let messages = L.messageLoops([
+            .init(app: "WhatsApp", sender: "Ana", text: "first", date: now.addingTimeInterval(-60)),
+            .init(app: "WhatsApp", sender: "Ana (2 messages)", text: "second", date: now),
+            .init(app: "Slack", sender: "New message", text: "x", date: now),
+        ])
+        try require(messages.count == 1 && messages[0].title == "Reply to Ana (2 messages)" && messages[0].detail == "WhatsApp: second",
+                    "Message loops: \(messages)")
+        let agent = OrbitLoop(id: "agent:1", kind: .agent, title: "Claude needs you", date: now.addingTimeInterval(-500))
+        let promise = OrbitLoop(id: "promise:1", kind: .promise, title: "Send deck", date: now, due: now.addingTimeInterval(-10))
+        let later = OrbitLoop(id: "promise:2", kind: .promise, title: "Call", date: now.addingTimeInterval(10), due: now.addingTimeInterval(3600))
+        let issue = OrbitLoop(id: "linear:1", kind: .linear, title: "ENG-1", date: now)
+        var shown = L.visible([issue, later, promise, agent, messages[0]], dismissed: [:], snoozed: [:], now: now)
+        try require(shown.map(\.id) == ["agent:1", "promise:1", "promise:2", "msg:ana", "linear:1"], "Order: \(shown.map(\.id))")
+        shown = L.visible([agent, promise, messages[0]], dismissed: ["msg:ana": now.addingTimeInterval(10)], snoozed: ["agent:1": now.addingTimeInterval(60)], now: now)
+        try require(shown.map(\.id) == ["promise:1"], "Dismissed and snoozed: \(shown.map(\.id))")
+        shown = L.visible([messages[0]], dismissed: ["msg:ana": now.addingTimeInterval(-30)], snoozed: [:], now: now)
+        try require(shown.count == 1, "A newer message reopens the loop")
+        try require(L.pruned(["a": now.addingTimeInterval(-40 * 86_400), "b": now], now: now, keepFor: L.dismissalMemory).keys.sorted() == ["b"], "Prune")
+
+        // Linear
+        let viewerJSON = #"""
+        {"data":{"viewer":{"id":"u1","name":"Dhruv","assignedIssues":{"nodes":[
+          {"id":"i1","identifier":"ENG-12","title":"Fix tabs","url":"https://linear.app/x/issue/ENG-12","priority":2,
+           "updatedAt":"2026-11-18T10:00:00.000Z","state":{"name":"Todo","type":"unstarted"},
+           "team":{"id":"t1","key":"ENG","name":"Engineering"},"project":{"name":"NotchFlow"}},
+          {"id":"i2","identifier":"ENG-13","title":"No project","url":"u","priority":0,"updatedAt":null,
+           "state":{"name":"In Progress","type":"started"},"team":{"id":"t1","key":"ENG","name":"Engineering"},"project":null}
+        ]}}}}
+        """#
+        let viewer = L.viewer(from: Data(viewerJSON.utf8))
+        try require(viewer?.name == "Dhruv" && viewer?.issues.count == 2, "Viewer")
+        let first = viewer!.issues[0]
+        try require(first.projectName == "NotchFlow" && first.teamKey == "ENG" && first.updatedAt != nil && first.priority == 2, "Issue fields")
+        try require(viewer!.issues[1].projectName == nil && viewer!.issues[1].updatedAt == nil, "Nulls")
+        try require(L.project(for: first, projects: Array(small.projects.values)) == "notchflow", "Issue project")
+        try require(L.loop(for: first, project: nil).detail == "Todo · NotchFlow", "Issue loop")
+
+        let teams = L.teams(from: Data(#"""
+        {"data":{"teams":{"nodes":[{"id":"t1","key":"ENG","name":"Engineering","states":{"nodes":[
+          {"id":"s3","name":"Done","type":"completed","position":3},{"id":"s2","name":"In Review","type":"started","position":2},
+          {"id":"s1","name":"In Progress","type":"started","position":1},{"id":"s0","name":"Todo","type":"unstarted","position":0}]}}]}}}
+        """#.utf8))
+        try require(teams.count == 1 && teams[0].states.count == 4, "Teams")
+        try require(L.state(ofType: "started", in: teams[0])?.id == "s1" && L.state(ofType: "completed", in: teams[0])?.id == "s3", "States")
+
+        try require(L.identifiers(in: "Fix ENG-12 and ENG-12, see OPS-4 and UTF-8", teamKeys: ["ENG", "OPS"]) == ["ENG-12", "OPS-4"], "Identifiers")
+        try require(L.identifiers(in: "ENG-12 UTF-8") == ["ENG-12", "UTF-8"], "Identifiers without keys")
+        let moved = viewer!.issues.map { $0.id == "i1" ? LinearIssue(id: "i1", identifier: "ENG-12", title: "Fix tabs", url: "", stateName: "In Progress", stateType: "started", teamID: "t1", teamKey: "ENG", teamName: "Engineering", projectName: nil, priority: 2, updatedAt: nil) : $0 }
+        let moves = L.moves(from: viewer!.issues, to: moved)
+        try require(moves.count == 1 && moves[0].from == "Todo" && moves[0].issue.stateName == "In Progress", "Moves")
+
+        let create = String(decoding: L.createIssueBody(teamID: "t1", title: "Ship it", description: "From Orbit")!, as: UTF8.self)
+        try require(create.contains(#""teamId":"t1""#) && create.contains("issueCreate") && create.contains(#""description":"From Orbit""#), "Create body: \(create)")
+        let move = String(decoding: L.moveIssueBody(issueID: "i1", stateID: "s3")!, as: UTF8.self)
+        try require(move.contains(#""stateId":"s3""#) && move.contains(#""id":"i1""#), "Move body")
+        try require(L.createdIssue(from: Data(#"{"data":{"issueCreate":{"success":true,"issue":{"id":"x","identifier":"ENG-14","url":"https://l/ENG-14","title":"t"}}}}"#.utf8))?.identifier == "ENG-14", "Created")
+        try require(L.succeeded(Data(#"{"data":{"commentCreate":{"success":true}}}"#.utf8), operation: "commentCreate"), "Succeeded")
+        try require(L.error(in: Data(#"{"errors":[{"message":"Authentication required"}]}"#.utf8)) == "Authentication required", "Error")
+        try require(L.error(in: Data(#"{"data":{}}"#.utf8)) == nil, "No error")
+
         print("Orbit: all checks passed")
     }
 }

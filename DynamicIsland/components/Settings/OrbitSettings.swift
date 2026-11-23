@@ -14,7 +14,11 @@ struct OrbitSettings: View {
     @Default(.orbitTrackPeople) private var trackPeople
     @Default(.orbitWriteVault) private var writeVault
     @Default(.orbitVaultPath) private var vaultPath
+    @Default(.orbitLinear) private var linearOn
+    @Default(.orbitLinearTeam) private var linearTeam
+    @ObservedObject private var linear = OrbitLinear.shared
     @State private var confirmForget = false
+    @State private var linearKey = ""
 
     var body: some View {
         Form {
@@ -28,6 +32,13 @@ struct OrbitSettings: View {
                 }
                 .settingsHighlight(id: "orbit-Use Orbit")
                 if enableOrbit {
+                    Defaults.Toggle(key: .orbitLoops) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Loops")
+                            Text("One inbox of what's still open: agents waiting on you, promises, unanswered messages, failing builds and Linear issues.")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
                     Defaults.Toggle(key: .orbitTrackProjects) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Projects")
@@ -89,6 +100,64 @@ struct OrbitSettings: View {
                 }
 
                 Section {
+                    Defaults.Toggle(key: .orbitLinear) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Connect Linear")
+                            Text("Your open assigned issues appear in Loops (Start and Done move them in Linear), and anything in Orbit can become a Linear issue. Checks every five minutes while on.")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    .settingsHighlight(id: "orbit-Linear")
+                    if linearOn {
+                        HStack {
+                            SecureField(linear.hasKey ? "API key saved (paste a new one to replace it)" : "Personal API key (lin_api_…)", text: $linearKey)
+                            Button("Save") {
+                                linear.saveKey(linearKey)
+                                linearKey = ""
+                            }
+                            .disabled(linearKey.trimmingCharacters(in: .whitespaces).isEmpty)
+                            if linear.hasKey {
+                                Button("Remove") { linear.saveKey("") }
+                            }
+                        }
+                        HStack {
+                            if let name = linear.accountName {
+                                Label("Connected as \(name), \(linear.issues.count) open issues", systemImage: "checkmark.circle.fill")
+                                    .foregroundStyle(.green)
+                            } else if let error = linear.lastError {
+                                Label(error, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                            } else {
+                                Text("Make a key in Linear: Settings › Account › Security & access › Personal API keys.")
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Button("Check Now") { Task { await linear.refresh() } }
+                                .disabled(!linear.isActive || linear.isRefreshing)
+                        }
+                        .font(.caption)
+                        if !linear.teams.isEmpty {
+                            Picker("New issues go to", selection: $linearTeam) {
+                                Text("First team").tag("")
+                                ForEach(linear.teams) { team in
+                                    Text("\(team.name) (\(team.key))").tag(team.id)
+                                }
+                            }
+                        }
+                        Defaults.Toggle(key: .orbitLinearAgentComments) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Comment when an agent finishes an issue")
+                                Text("When an AI agent's task names one of your issues (like ENG-12), Orbit adds a comment to it when the agent is done.")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                } header: {
+                    Text("Linear")
+                } footer: {
+                    Text("The key is kept in your Keychain. Off means no requests to Linear at all.")
+                }
+
+                Section {
                     Button("Forget Everything…", role: .destructive) { confirmForget = true }
                         .disabled(!orbit.isRunning)
                 } header: {
@@ -104,7 +173,7 @@ struct OrbitSettings: View {
     }
 
     private var statusText: String {
-        guard orbit.isRunning else { return "Paused: turn on Projects or People." }
+        guard orbit.isRunning else { return "Paused: turn on a part above." }
         let state = orbit.state
         return "Running: \(state.projects.count) projects, \(state.people.count) people, \(state.events.count) events."
     }

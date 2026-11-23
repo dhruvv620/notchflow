@@ -20,6 +20,8 @@ extension Defaults.Keys {
     static let orbitVaultPath = Key<String>("orbitVaultPath", default: "")
     /// Also keep a daily note of what happened.
     static let orbitDailyNotes = Key<Bool>("orbitDailyNotes", default: true)
+    /// One inbox of everything still open (agents waiting, promises, replies, failing builds, Linear).
+    static let orbitLoops = Key<Bool>("orbitLoops", default: true)
 }
 
 /// Orbit: projects and people that build themselves from what you already do,
@@ -64,6 +66,8 @@ final class Orbit: ObservableObject {
             Defaults.publisher(.orbitTrackPeople, options: []).map { _ in () }.eraseToAnyPublisher(),
             Defaults.publisher(.orbitWriteVault, options: []).map { _ in () }.eraseToAnyPublisher(),
             Defaults.publisher(.orbitDailyNotes, options: []).map { _ in () }.eraseToAnyPublisher(),
+            Defaults.publisher(.orbitLoops, options: []).map { _ in () }.eraseToAnyPublisher(),
+            Defaults.publisher(.orbitLinear, options: []).map { _ in () }.eraseToAnyPublisher(),
         ]
         Publishers.MergeMany(keys).receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.apply() }
@@ -73,11 +77,15 @@ final class Orbit: ObservableObject {
 
     private var tracksProjects: Bool { Defaults[.enableOrbit] && Defaults[.orbitTrackProjects] }
     private var tracksPeople: Bool { Defaults[.enableOrbit] && Defaults[.orbitTrackPeople] }
+    var showsLoops: Bool { Defaults[.enableOrbit] && Defaults[.orbitLoops] }
 
     private func apply() {
-        let shouldRun = tracksProjects || tracksPeople
+        let shouldRun = tracksProjects || tracksPeople || showsLoops || (Defaults[.enableOrbit] && Defaults[.orbitLinear])
         if shouldRun && !isRunning {
             state = Self.load()
+            let now = Date()
+            state.dismissedLoops = OrbitLoopsPolicy.pruned(state.dismissedLoops, now: now, keepFor: OrbitLoopsPolicy.dismissalMemory)
+            state.snoozedLoops = state.snoozedLoops.filter { $0.value > now }
             isRunning = true
             log.info("Orbit on")
         } else if !shouldRun && isRunning {
@@ -86,12 +94,14 @@ final class Orbit: ObservableObject {
         }
         guard isRunning else { return }
         wireSignals()
+        OrbitLinear.shared.setActive(true)
         if Defaults[.orbitWriteVault] { scheduleVaultWrite(all: true) } else { vaultTask?.cancel(); vaultTask = nil; vaultStatus = nil }
     }
 
     /// Saves, stops every listener and timer, and frees the memory.
     private func shutDown() {
         signals.removeAll()
+        OrbitLinear.shared.setActive(false)
         flushFocus()
         let snapshot = state
         saveTask?.cancel(); saveTask = nil
@@ -164,7 +174,17 @@ final class Orbit: ObservableObject {
             let project = projectID(forFolder: session.cwd, fallbackName: session.project)
             let prompt = session.lastPrompt.map { ": \($0)" } ?? ""
             let outcome = session.isWaiting ? "needs you" : "finished"
-            add(OrbitEvent(date: Date(), kind: .agent, text: "\(session.agent.displayName) \(outcome)\(prompt)", project: project))
+            let text = "\(session.agent.displayName) \(outcome)\(prompt)"
+            let linear = OrbitLinear.shared
+            let identifiers = linear.isActive ? OrbitLoopsPolicy.identifiers(in: session.lastPrompt ?? "", teamKeys: linear.teamKeys) : []
+            let issueURL = identifiers.first.flatMap { id in linear.issues.first { $0.identifier == id }?.url }
+            add(OrbitEvent(date: Date(), kind: .agent, text: text, project: project, url: issueURL))
+            // Hand-off: tell the Linear issue the agent worked on.
+            if Defaults[.orbitLinearAgentComments], !session.isWaiting {
+                for identifier in identifiers {
+                    Task { await linear.comment(onIdentifier: identifier, text: "\(text)\n\n_From NotchFlow Orbit_") }
+                }
+            }
         }
         // Forget sessions that are gone.
         let live = Set(sessions.map(\.id))
@@ -238,6 +258,107 @@ final class Orbit: ObservableObject {
         if let person = event.person { dirtyPeople.insert(person) }
         scheduleSave()
         if Defaults[.orbitWriteVault] { scheduleVaultWrite(all: false) }
+    }
+
+    // MARK: Linear
+
+    func linearIssueMoved(_ issue: LinearIssue, from: String) {
+        guard isRunning, tracksProjects else { return }
+        let project = OrbitLoopsPolicy.project(for: issue, projects: Array(state.projects.values))
+        add(OrbitEvent(date: Date(), kind: .note, text: "\(issue.identifier) \(issue.title): \(from) → \(issue.stateName)",
+                       project: project, url: issue.url))
+    }
+
+    func linearIssueCreated(identifier: String, title: String, url: String, project: String?) {
+        guard isRunning else { return }
+        add(OrbitEvent(date: Date(), kind: .note, text: "Created \(identifier) \(title)", project: project, url: url))
+    }
+
+    // MARK: Loops
+
+    /// Everything still open, from what the other features already hold in
+    /// memory. Worked out when the tab asks, so it costs nothing in between.
+    func loops(now: Date = Date()) -> [OrbitLoop] {
+        guard isRunning, showsLoops else { return [] }
+        var all: [OrbitLoop] = []
+        for session in AgentHub.shared.sessions where session.isWaiting {
+            var detail = session.project
+            if let prompt = session.lastPrompt { detail += " · " + OrbitPolicy.clip(prompt, to: 80) }
+            all.append(OrbitLoop(id: "agent:\(session.id)", kind: .agent, title: "\(session.agent.displayName) needs you",
+                                 detail: detail, date: session.updatedAt, project: OrbitPolicy.key(session.project)))
+        }
+        for promise in PromiseKeeper.shared.promises where promise.status == .open {
+            let mine = promise.kind == .mine
+            all.append(OrbitLoop(id: "promise:\(promise.id.uuidString)", kind: mine ? .promise : .theirPromise,
+                                 title: mine ? "You promised \(promise.person): \(promise.title)" : "\(promise.person) promised: \(promise.title)",
+                                 detail: "Due " + promise.due.formatted(date: .abbreviated, time: promise.hasExplicitTime ? .shortened : .omitted),
+                                 date: promise.created, due: promise.due, person: OrbitPolicy.key(promise.person)))
+        }
+        for run in BuildWatchManager.shared.runs where run.state == .failure {
+            all.append(OrbitLoop(id: "build:\(run.id)", kind: .build, title: "\(run.title) failed", detail: run.detail,
+                                 date: run.updatedAt, project: projectID(mentionedIn: run.title), url: run.url?.absoluteString))
+        }
+        let messages = NotificationHub.shared.items
+            .filter { OrbitPolicy.isMessagingApp($0.appName) }
+            .map { OrbitLoopsPolicy.Message(app: $0.appName, sender: $0.title, text: $0.body, date: $0.date) }
+        all += OrbitLoopsPolicy.messageLoops(messages)
+        let projects = Array(state.projects.values)
+        all += OrbitLinear.shared.issues.map { OrbitLoopsPolicy.loop(for: $0, project: OrbitLoopsPolicy.project(for: $0, projects: projects)) }
+        return OrbitLoopsPolicy.visible(all, dismissed: state.dismissedLoops, snoozed: state.snoozedLoops, now: now)
+    }
+
+    /// Opens what the loop is about.
+    func open(_ loop: OrbitLoop) {
+        switch loop.kind {
+        case .agent:
+            let id = String(loop.id.dropFirst("agent:".count))
+            if let session = AgentHub.shared.sessions.first(where: { $0.id == id }), session.appBundleID != nil {
+                AgentHub.shared.openWindow(bundleID: session.appBundleID)
+            } else {
+                DynamicIslandViewCoordinator.shared.currentView = .agents
+            }
+        case .message:
+            let person = loop.person
+            if let item = NotificationHub.shared.items
+                .filter({ OrbitPolicy.isMessagingApp($0.appName) && OrbitPolicy.personName(fromTitle: $0.title).map(OrbitPolicy.key) == person })
+                .max(by: { $0.date < $1.date }) {
+                NotificationHub.shared.open(item)
+            }
+        case .promise, .theirPromise:
+            PromiseKeeper.shared.showListRequested = true
+            DynamicIslandViewCoordinator.shared.currentView = .reminders
+        case .build, .linear:
+            if let link = loop.url, let url = URL(string: link) { NSWorkspace.shared.open(url) }
+        }
+    }
+
+    /// Closes the loop: promises are marked done, Linear issues moved to Done,
+    /// the rest hidden until something new comes in.
+    func done(_ loop: OrbitLoop) {
+        switch loop.kind {
+        case .promise, .theirPromise:
+            if let id = UUID(uuidString: String(loop.id.dropFirst("promise:".count))) { PromiseKeeper.shared.markDone(id) }
+        case .linear:
+            if let issue = loop.issueID { Task { await OrbitLinear.shared.move(issueID: issue, toType: "completed") } }
+        default:
+            state.dismissedLoops[loop.id] = Date()
+            scheduleSave()
+        }
+    }
+
+    func snooze(_ loop: OrbitLoop, hours: Double) {
+        if loop.kind == .promise || loop.kind == .theirPromise,
+           let id = UUID(uuidString: String(loop.id.dropFirst("promise:".count))) {
+            PromiseKeeper.shared.snooze(id, by: hours * 3600)
+            return
+        }
+        state.snoozedLoops[loop.id] = Date().addingTimeInterval(hours * 3600)
+        scheduleSave()
+    }
+
+    /// Makes a Linear issue from a loop or a timeline entry.
+    func sendToLinear(title: String, detail: String, project: String?) {
+        Task { await OrbitLinear.shared.createIssue(title: title, description: detail + "\n\n_From NotchFlow Orbit_", project: project) }
     }
 
     // MARK: Editing from the UI

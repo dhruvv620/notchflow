@@ -134,6 +134,7 @@ printf '\nChecking terminal command notifications...\n'
 printf '\nChecking Orbit...\n'
 /usr/bin/xcrun swiftc -swift-version 5 -parse-as-library \
     "$SOURCE_DIR/DynamicIsland/helpers/OrbitPolicy.swift" \
+    "$SOURCE_DIR/DynamicIsland/helpers/OrbitLoopsPolicy.swift" \
     "$SOURCE_DIR/tests/OrbitRegression.swift" -o "$BUILD_ROOT/OrbitRegression"
 "$BUILD_ROOT/OrbitRegression"
 

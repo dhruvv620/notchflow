@@ -13,9 +13,20 @@ struct NotchOrbitView: View {
     @Default(.orbitTrackProjects) private var trackProjects
     @Default(.orbitTrackPeople) private var trackPeople
     @Default(.orbitWriteVault) private var writeVault
+    @Default(.orbitLoops) private var showLoops
+    @Default(.orbitLinear) private var linearOn
+    @ObservedObject private var linear = OrbitLinear.shared
+    // Loops are worked out from other features' live data; these keep the
+    // list fresh while the tab is open.
+    @ObservedObject private var agents = AgentHub.shared
+    @ObservedObject private var promises = PromiseKeeper.shared
+    @ObservedObject private var hub = NotificationHub.shared
 
-    enum Mode: String { case projects, people }
-    @State private var mode: Mode = .projects
+    enum Mode: String, CaseIterable {
+        case loops, projects, people
+        var title: String { rawValue.capitalized }
+    }
+    @State private var mode: Mode = .loops
     @State private var selectedProject: String?
     @State private var selectedPerson: String?
     @State private var draft = ""
@@ -32,9 +43,11 @@ struct NotchOrbitView: View {
             header
             if !orbit.isRunning {
                 NotchEmptyState(symbol: "circle.dashed", title: "Orbit is off",
-                                detail: "Turn on Projects or People in Settings › Orbit.") {
+                                detail: "Turn on Loops, Projects or People in Settings › Orbit.") {
                     NotchPillButton(title: "Open Settings", symbol: "gearshape") { SettingsWindowController.shared.showWindow() }
                 }
+            } else if mode == .loops {
+                loopsView
             } else if mode == .projects {
                 if projects.isEmpty {
                     NotchEmptyState(symbol: "folder.badge.plus", title: "No projects yet",
@@ -53,18 +66,31 @@ struct NotchOrbitView: View {
         }
         .notchTabPadding()
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .onAppear { fixMode() }
+        .onAppear {
+            fixMode()
+            if linear.isActive { Task { await linear.refresh() } }
+        }
         .onChange(of: trackProjects) { _, _ in fixMode() }
         .onChange(of: trackPeople) { _, _ in fixMode() }
+        .onChange(of: showLoops) { _, _ in fixMode() }
         .onChange(of: noteFocused) { _, focused in
             vm.setAutoCloseSuppression(focused, token: interactionToken)
         }
         .onDisappear { vm.setAutoCloseSuppression(false, token: interactionToken) }
     }
 
+    private var modes: [Mode] {
+        Mode.allCases.filter { mode in
+            switch mode {
+            case .loops: return showLoops
+            case .projects: return trackProjects
+            case .people: return trackPeople
+            }
+        }
+    }
+
     private func fixMode() {
-        if mode == .projects && !trackProjects && trackPeople { mode = .people }
-        if mode == .people && !trackPeople && trackProjects { mode = .projects }
+        if !modes.contains(mode), let first = modes.first { mode = first }
     }
 
     // MARK: Header
@@ -72,10 +98,11 @@ struct NotchOrbitView: View {
     private var header: some View {
         HStack(spacing: NotchTokens.Spacing.s) {
             Text("Orbit").font(NotchTokens.Typography.title)
-            if trackProjects && trackPeople {
+            if modes.count > 1 {
                 Picker("", selection: $mode) {
-                    Text("Projects").tag(Mode.projects)
-                    Text("People").tag(Mode.people)
+                    ForEach(modes, id: \.self) { option in
+                        Text(option.title).tag(option)
+                    }
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
@@ -97,6 +124,81 @@ struct NotchOrbitView: View {
                 .frame(width: 170)
             Divider().opacity(0.3)
             detail.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }
+    }
+
+    // MARK: Loops
+
+    @ViewBuilder private var loopsView: some View {
+        let loops = Orbit.shared.loops()
+        VStack(alignment: .leading, spacing: 4) {
+            if linearOn, let error = linear.lastError {
+                Label(error, systemImage: "exclamationmark.triangle")
+                    .font(NotchTokens.Typography.caption).foregroundStyle(.orange).lineLimit(1)
+            }
+            if loops.isEmpty {
+                NotchEmptyState(symbol: "checkmark.circle", title: "Nothing open",
+                                detail: "Agents waiting on you, promises, unanswered messages, failing builds and your Linear issues show up here.")
+            } else {
+                ScrollView(.vertical, showsIndicators: false) {
+                    LazyVStack(alignment: .leading, spacing: 2) {
+                        ForEach(loops) { loop in loopRow(loop) }
+                    }
+                }
+            }
+        }
+    }
+
+    private func loopRow(_ loop: OrbitLoop) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: loop.kind.symbol)
+                .font(.system(size: 11))
+                .foregroundStyle(loop.kind == .agent || loop.kind == .build ? Color.orange : Color.secondary)
+                .frame(width: 16)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(loop.title).font(NotchTokens.Typography.bodyEmphasis).lineLimit(1)
+                if !loop.detail.isEmpty {
+                    Text(loop.detail).font(NotchTokens.Typography.caption).foregroundStyle(.secondary).lineLimit(1)
+                }
+            }
+            Spacer(minLength: 4)
+            if let due = loop.due, due < Date() {
+                NotchBadge(text: "Overdue", tint: .red)
+            } else {
+                Text(relative(loop.date)).font(NotchTokens.Typography.caption).foregroundStyle(.tertiary)
+            }
+            if loop.kind == .linear, let issue = loop.issueID {
+                NotchIconButton(symbol: "play", help: "Start (move to In Progress)", size: 20) {
+                    Task { await linear.move(issueID: issue, toType: "started") }
+                }
+            }
+            Menu {
+                Button("In an Hour") { Orbit.shared.snooze(loop, hours: 1) }
+                Button("Tomorrow") { Orbit.shared.snooze(loop, hours: 20) }
+                Button("Next Week") { Orbit.shared.snooze(loop, hours: 24 * 7) }
+            } label: {
+                Image(systemName: "clock").font(.system(size: 10))
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .help("Snooze")
+            NotchIconButton(symbol: "checkmark", help: loop.kind == .linear ? "Done (moves the issue to Done)" : "Done", size: 20) {
+                Orbit.shared.done(loop)
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .background(RoundedRectangle(cornerRadius: NotchTokens.Radius.row, style: .continuous).fill(Color.white.opacity(0.05)))
+        .contentShape(Rectangle())
+        .onTapGesture { Orbit.shared.open(loop) }
+        .contextMenu {
+            Button("Open") { Orbit.shared.open(loop) }
+            if linear.isActive && loop.kind != .linear {
+                Button("Create Linear Issue") {
+                    Orbit.shared.sendToLinear(title: loop.title, detail: loop.detail, project: loop.project)
+                }
+            }
         }
     }
 
@@ -251,6 +353,13 @@ struct NotchOrbitView: View {
                     .contentShape(Rectangle())
                     .onTapGesture {
                         if let link = event.url, let url = URL(string: link) { NSWorkspace.shared.open(url) }
+                    }
+                    .contextMenu {
+                        if linear.isActive {
+                            Button("Create Linear Issue") {
+                                Orbit.shared.sendToLinear(title: event.text, detail: "", project: event.project)
+                            }
+                        }
                     }
                 }
             }
