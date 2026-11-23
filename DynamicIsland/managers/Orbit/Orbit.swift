@@ -137,7 +137,7 @@ final class Orbit: ObservableObject {
     private func wireSignals() {
         signals.removeAll()
         if tracksProjects {
-            agentStates = Dictionary(uniqueKeysWithValues: AgentHub.shared.sessions.map { ($0.id, $0.isWorking) })
+            agentStates = Dictionary(AgentHub.shared.sessions.map { ($0.id, $0.isWorking) }, uniquingKeysWith: { a, _ in a })
             AgentHub.shared.$sessions
                 .receive(on: RunLoop.main)
                 .sink { [weak self] in self?.agentsChanged($0) }
