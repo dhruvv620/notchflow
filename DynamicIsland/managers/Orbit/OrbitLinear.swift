@@ -27,7 +27,7 @@ final class OrbitLinear: ObservableObject {
     @Published private(set) var lastError: String?
     @Published private(set) var isRefreshing = false
 
-    private let log = Logger(subsystem: "com.dhruvv620.NotchFlow", category: "OrbitLinear")
+    private let log = os.Logger(subsystem: "com.dhruvv620.NotchFlow", category: "OrbitLinear")
     private var timer: Timer?
     @Published private(set) var isActive = false
     private static let interval: TimeInterval = 300

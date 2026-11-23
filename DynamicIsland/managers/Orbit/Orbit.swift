@@ -49,7 +49,7 @@ final class Orbit: ObservableObject {
     @Published private(set) var isRunning = false
     @Published private(set) var vaultStatus: String?
 
-    private let log = Logger(subsystem: "com.dhruvv620.NotchFlow", category: "Orbit")
+    private let log = os.Logger(subsystem: "com.dhruvv620.NotchFlow", category: "Orbit")
     private var switches = Set<AnyCancellable>()
     private var signals = Set<AnyCancellable>()
     private var saveTask: Task<Void, Never>?
