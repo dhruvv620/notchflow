@@ -148,6 +148,8 @@ class TerminalManager: ObservableObject {
         var commandStart: Date?
         /// A command finished here while you weren't looking.
         var hasFinished = false
+        /// Typed into the shell once it starts (Orbit scenes: cd into a project).
+        var startupInput: String?
     }
 
     /// The terminals, in tab order.
@@ -343,6 +345,10 @@ class TerminalManager: ObservableObject {
             execName: execName
         )
         session.isRunning = true
+        if let input = session.startupInput {
+            session.startupInput = nil
+            view.send(txt: input)
+        }
         objectWillChange.send()
         startCommandWatch()
     }
@@ -405,6 +411,15 @@ class TerminalManager: ObservableObject {
     /// A new terminal tab, selected (its shell starts when it's shown).
     func newSession() {
         let session = Session()
+        sessions.append(session)
+        select(session.id)
+    }
+
+    /// A new terminal tab that starts in `directory`.
+    func newSession(in directory: String) {
+        let session = Session()
+        session.title = (directory as NSString).lastPathComponent
+        session.startupInput = "cd \(TerminalCommandPolicy.shellQuoted(directory)) && clear\n"
         sessions.append(session)
         select(session.id)
     }

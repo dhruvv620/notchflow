@@ -17,6 +17,11 @@ enum TerminalCommandPolicy {
     ]
 
     /// The program's name as `ps` shows it ("-zsh" → "zsh", "/usr/bin/git" → "git").
+    /// A path or word safe to type into a POSIX shell.
+    static func shellQuoted(_ text: String) -> String {
+        "'" + text.replacingOccurrences(of: "'", with: "'\\''") + "'"
+    }
+
     static func programName(_ raw: String) -> String {
         var name = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         if name.hasPrefix("-") { name.removeFirst() }

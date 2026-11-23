@@ -28,6 +28,7 @@ struct TerminalCommandRegression {
                     "iTerm script: \(iterm)")
         try require(P.openScript(bundleID: "com.apple.Terminal", directory: "/tmp")?.contains("do script \"cd '/tmp'\"") == true
                     && P.openScript(bundleID: "com.mitchellh.ghostty", directory: "/tmp") == nil, "Other apps")
+        try require(P.shellQuoted("/Users/d/My Code/it's") == #"'/Users/d/My Code/it'\''s'"#, "Quoting: \(P.shellQuoted("/Users/d/My Code/it's"))")
         print("Terminal commands: OK")
     }
 }

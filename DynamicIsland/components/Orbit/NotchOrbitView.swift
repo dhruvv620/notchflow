@@ -21,9 +21,12 @@ struct NotchOrbitView: View {
     @ObservedObject private var agents = AgentHub.shared
     @ObservedObject private var promises = PromiseKeeper.shared
     @ObservedObject private var hub = NotificationHub.shared
+    @Default(.orbitTeam) private var showTeam
+    @Default(.orbitScenes) private var showScenes
+    @Default(.orbitDailyBrief) private var briefOn
 
     enum Mode: String, CaseIterable {
-        case loops, projects, people
+        case today, loops, team, projects, people
         var title: String { rawValue.capitalized }
     }
     @State private var mode: Mode = .loops
@@ -46,6 +49,10 @@ struct NotchOrbitView: View {
                                 detail: "Turn on Loops, Projects or People in Settings › Orbit.") {
                     NotchPillButton(title: "Open Settings", symbol: "gearshape") { SettingsWindowController.shared.showWindow() }
                 }
+            } else if mode == .today {
+                todayView
+            } else if mode == .team {
+                teamView
             } else if mode == .loops {
                 loopsView
             } else if mode == .projects {
@@ -73,6 +80,9 @@ struct NotchOrbitView: View {
         .onChange(of: trackProjects) { _, _ in fixMode() }
         .onChange(of: trackPeople) { _, _ in fixMode() }
         .onChange(of: showLoops) { _, _ in fixMode() }
+        .onChange(of: showTeam) { _, _ in fixMode() }
+        .onChange(of: showScenes) { _, _ in fixMode() }
+        .onChange(of: briefOn) { _, _ in fixMode() }
         .onChange(of: noteFocused) { _, focused in
             vm.setAutoCloseSuppression(focused, token: interactionToken)
         }
@@ -82,7 +92,9 @@ struct NotchOrbitView: View {
     private var modes: [Mode] {
         Mode.allCases.filter { mode in
             switch mode {
+            case .today: return briefOn || showScenes
             case .loops: return showLoops
+            case .team: return showTeam
             case .projects: return trackProjects
             case .people: return trackPeople
             }
@@ -194,12 +206,159 @@ struct NotchOrbitView: View {
         .onTapGesture { Orbit.shared.open(loop) }
         .contextMenu {
             Button("Open") { Orbit.shared.open(loop) }
+            if showTeam, let folder = orbit.folder(forProject: loop.project) ?? agents.recentProjects.first {
+                Menu("Hand Off in \((folder as NSString).lastPathComponent)") {
+                    ForEach(AgentHookPolicy.LaunchAgent.allCases, id: \.self) { agent in
+                        Button(agent.title) { orbit.handOff(loop, to: agent, folder: folder) }
+                    }
+                }
+            }
             if linear.isActive && loop.kind != .linear {
                 Button("Create Linear Issue") {
                     Orbit.shared.sendToLinear(title: loop.title, detail: loop.detail, project: loop.project)
                 }
             }
         }
+    }
+
+    // MARK: Today
+
+    @ViewBuilder private var todayView: some View {
+        VStack(alignment: .leading, spacing: NotchTokens.Spacing.s) {
+            if briefOn {
+                briefCard
+            }
+            if showScenes {
+                scenesRow
+            }
+        }
+    }
+
+    private var briefCard: some View {
+        NotchCard {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Image(systemName: "sun.max").foregroundStyle(.yellow)
+                    Text(currentBrief?.headline ?? "Your brief").font(NotchTokens.Typography.headline)
+                    Spacer(minLength: 0)
+                    NotchIconButton(symbol: "arrow.clockwise", help: "Make the brief again", size: 20) { orbit.makeBrief() }
+                }
+                if let brief = currentBrief {
+                    ForEach(brief.lines, id: \.self) { line in
+                        Text("• " + line).font(NotchTokens.Typography.body).foregroundStyle(.secondary).lineLimit(1)
+                    }
+                } else {
+                    Text("Comes each morning at the hour set in Settings › Orbit. Refresh to make one now.")
+                        .font(NotchTokens.Typography.caption).foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    private var currentBrief: OrbitBrief? {
+        guard let brief = orbit.state.lastBrief, brief.day == OrbitPolicy.dayKey(Date()) else { return nil }
+        return brief
+    }
+
+    private var scenesRow: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text("Scenes").font(NotchTokens.Typography.captionEmphasis).foregroundStyle(.secondary)
+                Spacer(minLength: 0)
+                if let top = projects.first, !orbit.state.scenes.contains(where: { $0.project == top.id }) {
+                    NotchPillButton(title: "Scene for \(top.name)", symbol: "plus") {
+                        orbit.saveScene(OrbitTeamPolicy.starterScene(for: top))
+                    }
+                }
+                NotchIconButton(symbol: "slider.horizontal.3", help: "Edit scenes in Settings", size: 20) {
+                    SettingsWindowController.shared.showWindow()
+                }
+            }
+            if orbit.state.scenes.isEmpty {
+                Text("A scene sets you up in one click: a workspace, quiet time, a terminal in the project and an agent on a task.")
+                    .font(NotchTokens.Typography.caption).foregroundStyle(.secondary)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: NotchTokens.Spacing.s) {
+                        ForEach(orbit.state.scenes) { scene in sceneCard(scene) }
+                    }
+                }
+            }
+        }
+    }
+
+    private func sceneCard(_ scene: OrbitScene) -> some View {
+        let project = scene.project.flatMap { orbit.state.projects[$0] }
+        let workspace = scene.workspace.flatMap { id in WorkspaceManager.shared.workspaces.first { $0.id == id } }
+        let steps = OrbitTeamPolicy.steps(of: scene, projectName: project?.name, workspaceName: workspace?.name)
+        return Button { orbit.run(scene) } label: {
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 5) {
+                    Image(systemName: scene.symbol).font(.system(size: 11))
+                    Text(scene.name).font(NotchTokens.Typography.bodyEmphasis).lineLimit(1)
+                    Image(systemName: "play.fill").font(.system(size: 8)).foregroundStyle(.secondary)
+                }
+                Text(steps.joined(separator: " · ")).font(NotchTokens.Typography.caption).foregroundStyle(.secondary).lineLimit(2)
+            }
+            .frame(width: 180, alignment: .leading)
+            .padding(8)
+            .background(RoundedRectangle(cornerRadius: NotchTokens.Radius.card, style: .continuous).fill(Color.white.opacity(0.07)))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help("Run this scene")
+        .contextMenu {
+            Button("Delete Scene", role: .destructive) { orbit.deleteScene(scene.id) }
+        }
+    }
+
+    // MARK: Team
+
+    @ViewBuilder private var teamView: some View {
+        let members = agents.sessions.sorted { a, b in
+            (a.isWaiting ? 0 : a.isWorking ? 1 : 2, b.updatedAt) < (b.isWaiting ? 0 : b.isWorking ? 1 : 2, a.updatedAt)
+        }
+        if members.isEmpty {
+            NotchEmptyState(symbol: "person.3", title: "No agents at work",
+                            detail: "Hand a loop to an agent (right-click it in Loops), run a scene with an agent task, or start one in the AI Agents tab.")
+        } else {
+            ScrollView(.vertical, showsIndicators: false) {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 190), spacing: 6)], alignment: .leading, spacing: 6) {
+                    ForEach(members) { session in memberCard(session) }
+                }
+            }
+        }
+    }
+
+    private func memberCard(_ session: AgentSession) -> some View {
+        let status = OrbitTeamPolicy.status(working: session.isWorking, waiting: session.isWaiting,
+                                            since: session.turnStartedAt ?? session.updatedAt, now: Date())
+        let tint: Color = session.isWaiting ? .orange : session.isWorking ? .green : .secondary
+        return Button {
+            if session.appBundleID != nil {
+                agents.openWindow(bundleID: session.appBundleID)
+            } else {
+                DynamicIslandViewCoordinator.shared.currentView = .agents
+            }
+        } label: {
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 5) {
+                    Circle().fill(tint).frame(width: 7, height: 7)
+                    Text(session.agent.displayName).font(NotchTokens.Typography.bodyEmphasis).lineLimit(1)
+                    Spacer(minLength: 0)
+                    Text(session.project).font(NotchTokens.Typography.caption).foregroundStyle(.secondary).lineLimit(1)
+                }
+                Text(status).font(NotchTokens.Typography.caption).foregroundStyle(tint)
+                if let prompt = session.lastPrompt {
+                    Text(prompt).font(NotchTokens.Typography.caption).foregroundStyle(.secondary).lineLimit(2)
+                }
+            }
+            .padding(8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: NotchTokens.Radius.card, style: .continuous).fill(Color.white.opacity(0.07)))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: Projects

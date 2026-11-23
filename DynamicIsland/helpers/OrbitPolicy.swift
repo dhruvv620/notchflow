@@ -73,6 +73,8 @@ struct OrbitState: Codable, Equatable, Sendable {
     var dismissedLoops: [String: Date] = [:]
     /// Loop id → hidden until.
     var snoozedLoops: [String: Date] = [:]
+    var scenes: [OrbitScene] = []
+    var lastBrief: OrbitBrief?
     var version = 1
 
     static let empty = OrbitState()
@@ -87,6 +89,8 @@ struct OrbitState: Codable, Equatable, Sendable {
         events = try container.decodeIfPresent([OrbitEvent].self, forKey: .events) ?? []
         dismissedLoops = try container.decodeIfPresent([String: Date].self, forKey: .dismissedLoops) ?? [:]
         snoozedLoops = try container.decodeIfPresent([String: Date].self, forKey: .snoozedLoops) ?? [:]
+        scenes = try container.decodeIfPresent([OrbitScene].self, forKey: .scenes) ?? []
+        lastBrief = try container.decodeIfPresent(OrbitBrief.self, forKey: .lastBrief)
         version = try container.decodeIfPresent(Int.self, forKey: .version) ?? 1
     }
 }
@@ -404,8 +408,12 @@ enum OrbitPolicy {
     /// The day's journal: what happened, grouped by project.
     static func dailyNote(day: String, state: OrbitState, calendar: Calendar = .current) -> String {
         let todays = state.events.filter { dayKey($0.date, calendar: calendar) == day }
-        guard !todays.isEmpty else { return "Nothing recorded yet." }
         var out: [String] = []
+        if let brief = state.lastBrief, brief.day == day {
+            out.append(OrbitTeamPolicy.markdown(brief))
+            out.append("")
+        }
+        guard !todays.isEmpty else { return (out + ["Nothing recorded yet."]).joined(separator: "\n") }
         let grouped = Dictionary(grouping: todays) { $0.project ?? "" }
         let order = grouped.keys.sorted { a, b in
             if a.isEmpty != b.isEmpty { return !a.isEmpty }

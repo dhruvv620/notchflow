@@ -166,6 +166,54 @@ struct OrbitRegression {
         try require(L.error(in: Data(#"{"errors":[{"message":"Authentication required"}]}"#.utf8)) == "Authentication required", "Error")
         try require(L.error(in: Data(#"{"data":{}}"#.utf8)) == nil, "No error")
 
+        // Team
+        typealias T = OrbitTeamPolicy
+        let prompt = T.handoffPrompt(title: "ENG-12 Fix tabs", detail: "Todo · NotchFlow", url: "https://linear.app/x")
+        try require(prompt.hasPrefix("Task: ENG-12 Fix tabs\nContext: Todo · NotchFlow\nLink: https://linear.app/x"), "Prompt: \(prompt)")
+        try require(!T.handoffPrompt(title: "A", detail: " ", url: nil).contains("Context"), "No empty context")
+        try require(T.status(working: true, waiting: false, since: now.addingTimeInterval(-720), now: now) == "Working 12m", "Working")
+        try require(T.status(working: false, waiting: true, since: nil, now: now) == "Waiting for you", "Waiting")
+        try require(T.status(working: false, waiting: false, since: now.addingTimeInterval(-3600), now: now) == "Done 1h 0m ago", "Done")
+
+        // Scenes
+        var scene = T.starterScene(for: small.projects[p]!)
+        try require(scene.quietMinutes == 50 && scene.openTerminal && scene.project == p, "Starter scene")
+        scene.agentTask = "Review open PRs"
+        try require(T.steps(of: scene, projectName: "NotchFlow", workspaceName: "Coding") == ["Open Coding", "Quiet for 50 min", "Terminal in NotchFlow", "Agent: Review open PRs"], "Steps")
+        try require(T.steps(of: OrbitScene(name: "x"), projectName: nil, workspaceName: nil) == ["Nothing set up yet"], "Empty scene")
+
+        // Brief timing
+        let nine = calendar.date(bySettingHour: 9, minute: 0, second: 0, of: now)!
+        try require(T.nextBriefDate(after: nine.addingTimeInterval(-60), hour: 9, calendar: calendar) == nine, "Brief later today")
+        try require(T.nextBriefDate(after: nine.addingTimeInterval(60), hour: 9, calendar: calendar) == nine.addingTimeInterval(86_400), "Brief tomorrow")
+        try require(T.briefIsDue(lastDay: "", now: nine.addingTimeInterval(60), hour: 9, calendar: calendar), "Due")
+        try require(!T.briefIsDue(lastDay: "2026-11-18", now: nine.addingTimeInterval(60), hour: 9, calendar: calendar), "Already given")
+        try require(!T.briefIsDue(lastDay: "", now: nine.addingTimeInterval(-60), hour: 9, calendar: calendar), "Too early")
+
+        // Brief content
+        var briefState = OrbitState.empty
+        let bp = P.upsertProject(name: "NotchFlow", root: "/r", at: now, in: &briefState)
+        let yesterdayDate = now.addingTimeInterval(-86_400)
+        P.record(OrbitEvent(date: yesterdayDate, kind: .command, text: "Ran swift", project: bp), in: &briefState)
+        P.record(OrbitEvent(date: yesterdayDate, kind: .agent, text: "Claude finished", project: bp), in: &briefState)
+        P.addFocus(minutes: 90, project: bp, day: P.dayKey(yesterdayDate, calendar: calendar), in: &briefState)
+        let overduePromise = OrbitLoop(id: "promise:9", kind: .promise, title: "Send deck", date: nine.addingTimeInterval(-100), due: nine.addingTimeInterval(-60))
+        let briefLoops = L.visible([agent, overduePromise, messages[0]], dismissed: [:], snoozed: [:], now: nine)
+        let meeting = T.Meeting(title: "Standup", start: nine.addingTimeInterval(3600), allDay: false)
+        let brief = T.brief(state: briefState, loops: briefLoops, meetings: [meeting, T.Meeting(title: "Holiday", start: nine, allDay: true)], now: nine, calendar: calendar)
+        try require(brief.headline == "3 open loops, 1 meeting", "Headline: \(brief.headline)")
+        try require(brief.lines.contains("Yesterday on NotchFlow: 2 updates, 1.5h focus"), "Yesterday: \(brief.lines)")
+        try require(brief.lines.contains("1 meeting today, next at 10:00: Standup"), "Meetings: \(brief.lines)")
+        try require(brief.lines.contains("Open: 1 agent waiting, 1 overdue promise, 1 reply owed"), "Open: \(brief.lines)")
+        try require(brief.lines.last == "Start with: Claude needs you", "Start with")
+        try require(T.brief(state: .empty, loops: [], meetings: [], now: now, calendar: calendar).headline == "A clear day", "Clear day")
+        briefState.lastBrief = brief
+        let dailyWithBrief = P.dailyNote(day: brief.day, state: briefState, calendar: calendar)
+        try require(dailyWithBrief.hasPrefix("## Brief\n**3 open loops, 1 meeting**"), "Brief in daily note: \(dailyWithBrief)")
+        let briefData = try JSONEncoder().encode(briefState)
+        let briefDecoded = try JSONDecoder().decode(OrbitState.self, from: briefData)
+        try require(briefDecoded == briefState, "Brief round trip")
+
         print("Orbit: all checks passed")
     }
 }

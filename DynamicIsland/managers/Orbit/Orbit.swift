@@ -22,6 +22,15 @@ extension Defaults.Keys {
     static let orbitDailyNotes = Key<Bool>("orbitDailyNotes", default: true)
     /// One inbox of everything still open (agents waiting, promises, replies, failing builds, Linear).
     static let orbitLoops = Key<Bool>("orbitLoops", default: true)
+    /// Your AI agents as a team board, and handing loops to them.
+    static let orbitTeam = Key<Bool>("orbitTeam", default: true)
+    /// One-click setups for a kind of work.
+    static let orbitScenes = Key<Bool>("orbitScenes", default: true)
+    /// A morning brief (a notification and the top of the daily note).
+    static let orbitDailyBrief = Key<Bool>("orbitDailyBrief", default: false)
+    static let orbitBriefHour = Key<Int>("orbitBriefHour", default: 9)
+    /// The day the brief was last given ("2026-11-23").
+    static let orbitLastBriefDay = Key<String>("orbitLastBriefDay", default: "")
 }
 
 /// Orbit: projects and people that build themselves from what you already do,
@@ -68,6 +77,10 @@ final class Orbit: ObservableObject {
             Defaults.publisher(.orbitDailyNotes, options: []).map { _ in () }.eraseToAnyPublisher(),
             Defaults.publisher(.orbitLoops, options: []).map { _ in () }.eraseToAnyPublisher(),
             Defaults.publisher(.orbitLinear, options: []).map { _ in () }.eraseToAnyPublisher(),
+            Defaults.publisher(.orbitTeam, options: []).map { _ in () }.eraseToAnyPublisher(),
+            Defaults.publisher(.orbitScenes, options: []).map { _ in () }.eraseToAnyPublisher(),
+            Defaults.publisher(.orbitDailyBrief, options: []).map { _ in () }.eraseToAnyPublisher(),
+            Defaults.publisher(.orbitBriefHour, options: []).map { _ in () }.eraseToAnyPublisher(),
         ]
         Publishers.MergeMany(keys).receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.apply() }
@@ -80,7 +93,8 @@ final class Orbit: ObservableObject {
     var showsLoops: Bool { Defaults[.enableOrbit] && Defaults[.orbitLoops] }
 
     private func apply() {
-        let shouldRun = tracksProjects || tracksPeople || showsLoops || (Defaults[.enableOrbit] && Defaults[.orbitLinear])
+        let parts = Defaults[.orbitLinear] || Defaults[.orbitTeam] || Defaults[.orbitScenes] || Defaults[.orbitDailyBrief]
+        let shouldRun = tracksProjects || tracksPeople || showsLoops || (Defaults[.enableOrbit] && parts)
         if shouldRun && !isRunning {
             state = Self.load()
             let now = Date()
@@ -95,6 +109,7 @@ final class Orbit: ObservableObject {
         guard isRunning else { return }
         wireSignals()
         OrbitLinear.shared.setActive(true)
+        OrbitBriefing.shared.setActive(Defaults[.orbitDailyBrief])
         if Defaults[.orbitWriteVault] { scheduleVaultWrite(all: true) } else { vaultTask?.cancel(); vaultTask = nil; vaultStatus = nil }
     }
 
@@ -102,6 +117,7 @@ final class Orbit: ObservableObject {
     private func shutDown() {
         signals.removeAll()
         OrbitLinear.shared.setActive(false)
+        OrbitBriefing.shared.setActive(false)
         flushFocus()
         let snapshot = state
         saveTask?.cancel(); saveTask = nil
@@ -359,6 +375,90 @@ final class Orbit: ObservableObject {
     /// Makes a Linear issue from a loop or a timeline entry.
     func sendToLinear(title: String, detail: String, project: String?) {
         Task { await OrbitLinear.shared.createIssue(title: title, description: detail + "\n\n_From NotchFlow Orbit_", project: project) }
+    }
+
+    // MARK: Team (agents)
+
+    var showsTeam: Bool { Defaults[.enableOrbit] && Defaults[.orbitTeam] }
+
+    /// The folder to start an agent in for a project.
+    func folder(forProject id: String?) -> String? {
+        guard let id else { return nil }
+        if let root = state.projects[id]?.root { return root }
+        // Agent sessions name projects by folder name.
+        return AgentHub.shared.recentProjects.first { OrbitPolicy.key(($0 as NSString).lastPathComponent) == id }
+    }
+
+    /// Gives a loop to an AI agent: it starts in the loop's project folder
+    /// with the loop as its task, and the loop is marked handed off.
+    func handOff(_ loop: OrbitLoop, to agent: AgentHookPolicy.LaunchAgent, folder: String) {
+        guard isRunning, showsTeam else { return }
+        let prompt = OrbitTeamPolicy.handoffPrompt(title: loop.title, detail: loop.detail, url: loop.url)
+        AgentHub.shared.startTask(agent: agent, prompt: prompt, directory: folder)
+        let project = loop.project ?? projectID(forFolder: folder)
+        add(OrbitEvent(date: Date(), kind: .agent, text: "Handed to \(agent.title): \(loop.title)", project: project, url: loop.url))
+        if loop.kind != .linear && loop.kind != .promise && loop.kind != .theirPromise {
+            state.dismissedLoops[loop.id] = Date()
+        }
+        if loop.kind == .linear, let issue = loop.issueID {
+            Task { await OrbitLinear.shared.move(issueID: issue, toType: "started") }
+        }
+    }
+
+    // MARK: Scenes
+
+    var showsScenes: Bool { Defaults[.enableOrbit] && Defaults[.orbitScenes] }
+
+    func saveScene(_ scene: OrbitScene) {
+        guard isRunning else { return }
+        if let index = state.scenes.firstIndex(where: { $0.id == scene.id }) {
+            state.scenes[index] = scene
+        } else {
+            state.scenes.append(scene)
+        }
+        scheduleSave()
+    }
+
+    func deleteScene(_ id: UUID) {
+        guard isRunning else { return }
+        state.scenes.removeAll { $0.id == id }
+        scheduleSave()
+    }
+
+    /// Runs each step the scene has.
+    func run(_ scene: OrbitScene) {
+        guard isRunning, showsScenes else { return }
+        if let id = scene.workspace, let workspace = WorkspaceManager.shared.workspaces.first(where: { $0.id == id }) {
+            WorkspaceManager.shared.open(workspace)
+        }
+        if scene.quietMinutes > 0 { FocusQuiet.shared.startManual(minutes: scene.quietMinutes) }
+        let directory = folder(forProject: scene.project)
+        if scene.openTerminal, let directory, Defaults[.enableTerminalFeature] {
+            TerminalManager.shared.newSession(in: directory)
+            DynamicIslandViewCoordinator.shared.currentView = .terminal
+        }
+        let task = scene.agentTask.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !task.isEmpty, let directory {
+            let agent = AgentHookPolicy.LaunchAgent(rawValue: Defaults[.agentLaunchAgent]) ?? .claude
+            AgentHub.shared.startTask(agent: agent, prompt: task, directory: directory)
+        }
+        add(OrbitEvent(date: Date(), kind: .note, text: "Started scene \(scene.name)", project: scene.project))
+    }
+
+    // MARK: Daily brief
+
+    /// Builds the brief from now's state, keeps it for the daily note, and returns it.
+    @discardableResult
+    func makeBrief() -> OrbitBrief? {
+        guard isRunning else { return nil }
+        let meetings = CalendarManager.shared.events.map {
+            OrbitTeamPolicy.Meeting(title: $0.title, start: $0.start, allDay: $0.isAllDay)
+        }
+        let brief = OrbitTeamPolicy.brief(state: state, loops: loops(), meetings: meetings, now: Date())
+        state.lastBrief = brief
+        scheduleSave()
+        if Defaults[.orbitWriteVault] { scheduleVaultWrite(all: false) }
+        return brief
     }
 
     // MARK: Editing from the UI

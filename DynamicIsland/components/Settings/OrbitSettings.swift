@@ -19,6 +19,10 @@ struct OrbitSettings: View {
     @ObservedObject private var linear = OrbitLinear.shared
     @State private var confirmForget = false
     @State private var linearKey = ""
+    @Default(.orbitDailyBrief) private var briefOn
+    @Default(.orbitBriefHour) private var briefHour
+    @Default(.orbitScenes) private var scenesOn
+    @ObservedObject private var workspaces = WorkspaceManager.shared
 
     var body: some View {
         Form {
@@ -36,6 +40,13 @@ struct OrbitSettings: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Loops")
                             Text("One inbox of what's still open: agents waiting on you, promises, unanswered messages, failing builds and Linear issues.")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    Defaults.Toggle(key: .orbitTeam) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Team")
+                            Text("Your AI agents as a board: who's working, who's waiting on you. Right-click a loop to hand it to an agent in that project's folder.")
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                     }
@@ -97,6 +108,40 @@ struct OrbitSettings: View {
                     Text("Obsidian vault")
                 } footer: {
                     Text("Notes go in the vault's Orbit folder (Projects, People, Daily) with [[links]] between them. Orbit only rewrites the part between its markers; anything you write outside it is kept. A new folder is set up as a vault, so Obsidian can open it.")
+                }
+
+                Section {
+                    Defaults.Toggle(key: .orbitDailyBrief) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Morning brief")
+                            Text("Yesterday's work, today's meetings and what's open, as a notification and at the top of the daily note. One timer for that moment; nothing runs in between.")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    .settingsHighlight(id: "orbit-Morning brief")
+                    if briefOn {
+                        Picker("At", selection: $briefHour) {
+                            ForEach(5..<13, id: \.self) { hour in
+                                Text(String(format: "%02d:00", hour)).tag(hour)
+                            }
+                        }
+                    }
+                    Defaults.Toggle(key: .orbitScenes) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Scenes")
+                            Text("One click sets you up: open a workspace, hold notifications, open a terminal in the project, start an agent on a task.")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    .settingsHighlight(id: "orbit-Scenes")
+                    if scenesOn && orbit.isRunning {
+                        ForEach(orbit.state.scenes) { scene in
+                            sceneEditor(scene)
+                        }
+                        Button("Add Scene") { orbit.saveScene(OrbitScene(name: "New scene")) }
+                    }
+                } header: {
+                    Text("Today")
                 }
 
                 Section {
@@ -169,6 +214,41 @@ struct OrbitSettings: View {
         }
         .confirmationDialog("Forget everything Orbit kept?", isPresented: $confirmForget) {
             Button("Forget Everything", role: .destructive) { orbit.forgetEverything() }
+        }
+    }
+
+    private func sceneEditor(_ scene: OrbitScene) -> some View {
+        let binding = Binding<OrbitScene>(
+            get: { orbit.state.scenes.first { $0.id == scene.id } ?? scene },
+            set: { orbit.saveScene($0) }
+        )
+        return DisclosureGroup {
+            TextField("Name", text: binding.name)
+            Picker("Project", selection: binding.project) {
+                Text("None").tag(String?.none)
+                ForEach(orbit.state.projects.values.sorted { $0.name < $1.name }) { project in
+                    Text(project.name).tag(Optional(project.id))
+                }
+            }
+            Picker("Workspace", selection: binding.workspace) {
+                Text("None").tag(UUID?.none)
+                ForEach(workspaces.workspaces) { workspace in
+                    Text(workspace.name).tag(Optional(workspace.id))
+                }
+            }
+            Stepper(value: binding.quietMinutes, in: 0...240, step: 10) {
+                Text(binding.wrappedValue.quietMinutes == 0 ? "Don't hold notifications" : "Hold notifications for \(binding.wrappedValue.quietMinutes) min")
+            }
+            Toggle("Open a Terminal tab in the project", isOn: binding.openTerminal)
+            TextField("Agent task (optional)", text: binding.agentTask, axis: .vertical)
+                .lineLimit(1...3)
+            HStack {
+                Spacer()
+                Button("Run") { orbit.run(binding.wrappedValue) }
+                Button("Delete", role: .destructive) { orbit.deleteScene(scene.id) }
+            }
+        } label: {
+            Label(scene.name, systemImage: scene.symbol)
         }
     }
 
