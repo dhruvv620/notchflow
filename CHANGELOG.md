@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 ### Fixed
+- **YouTube Music no longer opens tabs**: songs song.link has no YouTube Music link for are now matched by their YouTube video (the same id plays on YouTube Music), and a song that can't be matched at all opens YouTube Music's search in the same player window, brought forward to pick, instead of a new tab. If macOS blocks NotchFlow from controlling your browser, the search says so (System Settings > Privacy & Security > Automation) instead of opening a tab.
+- **The music search closes with the notch**: clicking anywhere outside the notch closes the search and the notch, and the notch closing for any reason closes the search. It only keeps the notch open while you're typing in it.
 
 ## [1.2.6] - 2026-11-21
 

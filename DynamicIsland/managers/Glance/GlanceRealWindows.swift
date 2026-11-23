@@ -308,6 +308,17 @@ final class GlanceRealWindows: ObservableObject {
         setPosition(window, GlancePolicy.parkingOrigin(displays: displaysInAXCoordinates()))
     }
 
+    /// Whether a window is waiting off screen (parked).
+    static func isParked(_ window: AXUIElement) -> Bool {
+        guard let frame = frame(of: window) else { return false }
+        let parking = GlancePolicy.parkingOrigin(displays: displaysInAXCoordinates())
+        return frame.minX >= parking.x - 2 || frame.minY >= parking.y - 2
+    }
+
+    static func move(_ window: AXUIElement, to frame: CGRect) {
+        setFrame(window, frame)
+    }
+
     // MARK: Accessibility helpers
 
     private static func value(_ element: AXUIElement, _ attribute: String) -> CFTypeRef? {

@@ -134,18 +134,40 @@ final class MusicSearchService: ObservableObject {
             case .youtubeMusic:
                 // The exact song, without a new tab: in the YouTube Music app, else in one
                 // YouTube Music window of your browser kept out of sight and reused.
-                let link = await Self.link(for: result, on: "youtubeMusic")
-                if let videoID = MusicSearchPolicy.youtubeVideoID(from: link) {
-                    switch await YouTubeMusicPlayers.shared.play(videoID: videoID) {
-                    case .app:
-                        message = "Playing \(result.title) in YouTube Music."
+                // The song's video: its YouTube Music link, else its YouTube one (same id).
+                var link = await Self.link(for: result, on: "youtubeMusic")
+                var videoID = MusicSearchPolicy.youtubeVideoID(from: link)
+                if videoID == nil {
+                    let youtube = await Self.link(for: result, on: "youtube")
+                    videoID = MusicSearchPolicy.youtubeVideoID(from: youtube)
+                    if link == nil { link = youtube }
+                }
+                let players = YouTubeMusicPlayers.shared
+                let outcome: YouTubeMusicPlayers.Outcome
+                if let videoID {
+                    outcome = await players.play(videoID: videoID)
+                } else if let search = MusicSearchPolicy.youtubeMusicURL(title: result.title, artist: result.artist) {
+                    // Not matched: YouTube Music's search, in the player window, brought forward to pick.
+                    outcome = await players.showSearch(search)
+                    if case .browser = outcome {
+                        message = "Couldn't match the exact song: pick it in YouTube Music."
                         return
-                    case .browser(let name):
-                        message = "Playing \(result.title) on YouTube Music, in \(name) out of sight."
-                        return
-                    case .failed:
-                        break
                     }
+                } else {
+                    outcome = .failed
+                }
+                switch outcome {
+                case .app:
+                    message = "Playing \(result.title) in YouTube Music."
+                    return
+                case .browser(let name):
+                    message = "Playing \(result.title) on YouTube Music, in \(name) out of sight."
+                    return
+                case .needsPermission(let name):
+                    message = "Allow NotchFlow to control \(name): System Settings › Privacy & Security › Automation."
+                    return
+                case .failed:
+                    break
                 }
                 if let url = link {
                     Self.openInBackground(url)
@@ -247,6 +269,7 @@ struct MusicSearchPanel: View {
     @EnvironmentObject private var vm: DynamicIslandViewModel
     @FocusState private var focused: Bool
     @State private var token = UUID()
+    @State private var outsideClicks: Any?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -284,9 +307,27 @@ struct MusicSearchPanel: View {
         }
         .onAppear {
             focused = true
+            // The notch stays open only while you're typing; a click anywhere
+            // outside the notch closes the search and the notch.
             vm.setAutoCloseSuppression(true, token: token)
+            outsideClicks = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { _ in
+                Task { @MainActor in
+                    search.close()
+                    vm.setAutoCloseSuppression(false, token: token)
+                    vm.close()
+                }
+            }
+        }
+        .onChange(of: focused) { _, isFocused in
+            vm.setAutoCloseSuppression(isFocused, token: token)
+        }
+        .onChange(of: vm.notchState) { _, state in
+            // The notch closed (pointer left, Esc…): the search closes with it.
+            if state == .closed { search.close() }
         }
         .onDisappear {
+            if let outsideClicks { NSEvent.removeMonitor(outsideClicks) }
+            outsideClicks = nil
             vm.setAutoCloseSuppression(false, token: token)
             vm.setScrollGestureSuppression(false, token: token)
         }
