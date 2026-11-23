@@ -132,8 +132,22 @@ final class MusicSearchService: ObservableObject {
                         : "Couldn't find the exact track: opened Spotify's search. Connect Spotify in Settings › Music for exact results."
                 }
             case .youtubeMusic:
-                // A website plays in a browser tab: the exact song, opened behind what you're doing.
-                if let url = await Self.link(for: result, on: "youtubeMusic") {
+                // The exact song, without a new tab: in the YouTube Music app, else in one
+                // YouTube Music window of your browser kept out of sight and reused.
+                let link = await Self.link(for: result, on: "youtubeMusic")
+                if let videoID = MusicSearchPolicy.youtubeVideoID(from: link) {
+                    switch await YouTubeMusicPlayers.shared.play(videoID: videoID) {
+                    case .app:
+                        message = "Playing \(result.title) in YouTube Music."
+                        return
+                    case .browser(let name):
+                        message = "Playing \(result.title) on YouTube Music, in \(name) out of sight."
+                        return
+                    case .failed:
+                        break
+                    }
+                }
+                if let url = link {
                     Self.openInBackground(url)
                     message = "Playing \(result.title) on YouTube Music, in a browser tab behind this."
                 } else if let url = MusicSearchPolicy.youtubeMusicURL(title: result.title, artist: result.artist) {

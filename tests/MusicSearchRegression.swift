@@ -55,6 +55,21 @@ struct MusicSearchRegression {
                     == #"tell application "Spotify" to play track "spotify:track:4uLU6hMCjMI75M1A2tKUQC""#, "Spotify script")
         try require(P.spotifyPlayScript(trackURI: "spotify:track:T", contextURI: "spotify:album:A")
                     == #"tell application "Spotify" to play track "spotify:track:T" in context "spotify:album:A""#, "Spotify script in album")
+        // YouTube Music
+        try require(P.youtubeVideoID(from: URL(string: "https://music.youtube.com/watch?v=dQw4w9WgXcQ&feature=share")) == "dQw4w9WgXcQ"
+                    && P.youtubeVideoID(from: URL(string: "https://youtu.be/dQw4w9WgXcQ")) == "dQw4w9WgXcQ"
+                    && P.youtubeVideoID(from: URL(string: "https://www.youtube.com/watch?v=abc")) == nil
+                    && P.youtubeVideoID(from: URL(string: "https://example.com/watch?v=dQw4w9WgXcQ")) == nil, "Video ids")
+        try require(P.youtubeMusicWatchURL(videoID: "dQw4w9WgXcQ")?.absoluteString == "https://music.youtube.com/watch?v=dQw4w9WgXcQ", "Watch URL")
+        let find = P.youtubeMusicPlayerWindowScript(bundleID: "com.google.Chrome.beta", isChromium: true)
+        try require(find.contains("URL of active tab of w") && find.contains(#"starts with "https://music.youtube.com""#)
+                    && P.youtubeMusicPlayerWindowScript(bundleID: "com.apple.Safari", isChromium: false).contains("current tab"), "Find script")
+        let play = P.youtubeMusicPlayScript(bundleID: "com.apple.Safari", isChromium: false, windowID: "4242",
+                                            url: URL(string: "https://music.youtube.com/watch?v=dQw4w9WgXcQ")!)
+        try require(play == #"tell application id "com.apple.Safari" to set URL of current tab of window id 4242 to "https://music.youtube.com/watch?v=dQw4w9WgXcQ""#,
+                    "Play script: \(play)")
+        try require(P.youtubeMusicCloseScript(bundleID: "com.google.Chrome", windowID: "7") == #"tell application id "com.google.Chrome" to close window id 7"#,
+                    "Close script")
         print("Music search: OK")
     }
 }

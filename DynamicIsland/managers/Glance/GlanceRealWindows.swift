@@ -303,6 +303,11 @@ final class GlanceRealWindows: ObservableObject {
         return result
     }
 
+    /// Moves a window just off screen (it keeps running there, out of sight).
+    static func park(_ window: AXUIElement) {
+        setPosition(window, GlancePolicy.parkingOrigin(displays: displaysInAXCoordinates()))
+    }
+
     // MARK: Accessibility helpers
 
     private static func value(_ element: AXUIElement, _ attribute: String) -> CFTypeRef? {

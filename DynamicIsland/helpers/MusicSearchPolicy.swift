@@ -130,6 +130,51 @@ enum MusicSearchPolicy {
     }
 
     /// "https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC?si=…" → "spotify:track:4uLU6hMCjMI75M1A2tKUQC".
+    // MARK: YouTube Music without opening a tab
+
+    /// A song's YouTube video id, from a YouTube or YouTube Music link.
+    static func youtubeVideoID(from url: URL?) -> String? {
+        guard let url, let host = url.host?.lowercased() else { return nil }
+        var id: String?
+        if host.hasSuffix("youtu.be") {
+            id = url.pathComponents.dropFirst().first
+        } else if host.hasSuffix("youtube.com") {
+            id = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first { $0.name == "v" }?.value
+        }
+        guard let id, id.count == 11, id.allSatisfy({ $0.isLetter || $0.isNumber || $0 == "-" || $0 == "_" }) else { return nil }
+        return id
+    }
+
+    static func youtubeMusicWatchURL(videoID: String) -> URL? {
+        URL(string: "https://music.youtube.com/watch?v=\(videoID)")
+    }
+
+    /// AppleScript: the id of a browser window already playing YouTube Music (its front tab), or "".
+    static func youtubeMusicPlayerWindowScript(bundleID: String, isChromium: Bool) -> String {
+        let tab = isChromium ? "active tab" : "current tab"
+        return """
+        tell application id "\(bundleID)"
+            repeat with w in windows
+                try
+                    if (URL of \(tab) of w) starts with "https://music.youtube.com" then return (id of w) as text
+                end try
+            end repeat
+        end tell
+        return ""
+        """
+    }
+
+    /// AppleScript: plays another song in that window (its front tab goes to the song).
+    static func youtubeMusicPlayScript(bundleID: String, isChromium: Bool, windowID: String, url: URL) -> String {
+        let tab = isChromium ? "active tab" : "current tab"
+        return "tell application id \"\(bundleID)\" to set URL of \(tab) of window id \(Int(windowID) ?? 0) to \(appleScriptString(url.absoluteString))"
+    }
+
+    /// AppleScript: closes the player window (after a long pause, to free its memory).
+    static func youtubeMusicCloseScript(bundleID: String, windowID: String) -> String {
+        "tell application id \"\(bundleID)\" to close window id \(Int(windowID) ?? 0)"
+    }
+
     static func spotifyTrackURI(from url: URL?) -> String? {
         guard let url, url.host?.contains("spotify.com") == true else { return nil }
         let parts = url.path.split(separator: "/").map(String.init)
