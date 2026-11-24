@@ -81,6 +81,9 @@ final class Orbit: ObservableObject {
             Defaults.publisher(.orbitScenes, options: []).map { _ in () }.eraseToAnyPublisher(),
             Defaults.publisher(.orbitDailyBrief, options: []).map { _ in () }.eraseToAnyPublisher(),
             Defaults.publisher(.orbitBriefHour, options: []).map { _ in () }.eraseToAnyPublisher(),
+            Defaults.publisher(.orbitFocusPlan, options: []).map { _ in () }.eraseToAnyPublisher(),
+            Defaults.publisher(.orbitScatter, options: []).map { _ in () }.eraseToAnyPublisher(),
+            Defaults.publisher(.orbitBillWatch, options: []).map { _ in () }.eraseToAnyPublisher(),
         ]
         Publishers.MergeMany(keys).receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.apply() }
@@ -94,6 +97,7 @@ final class Orbit: ObservableObject {
 
     private func apply() {
         let parts = Defaults[.orbitLinear] || Defaults[.orbitTeam] || Defaults[.orbitScenes] || Defaults[.orbitDailyBrief]
+            || Defaults[.orbitFocusPlan] || Defaults[.orbitScatter] || Defaults[.orbitBillWatch]
         let shouldRun = tracksProjects || tracksPeople || showsLoops || (Defaults[.enableOrbit] && parts)
         if shouldRun && !isRunning {
             state = Self.load()
@@ -111,6 +115,7 @@ final class Orbit: ObservableObject {
         OrbitLinear.shared.setActive(true)
         OrbitBriefing.shared.setActive(Defaults[.orbitDailyBrief])
         OrbitJobs.shared.setActive(Defaults[.orbitTeam])
+        OrbitRhythm.shared.setActive(true)
         if Defaults[.orbitWriteVault] { scheduleVaultWrite(all: true) } else { vaultTask?.cancel(); vaultTask = nil; vaultStatus = nil }
     }
 
@@ -120,6 +125,7 @@ final class Orbit: ObservableObject {
         OrbitLinear.shared.setActive(false)
         OrbitBriefing.shared.setActive(false)
         OrbitJobs.shared.setActive(false)
+        OrbitRhythm.shared.setActive(false)
         flushFocus()
         let snapshot = state
         saveTask?.cancel(); saveTask = nil
@@ -332,6 +338,9 @@ final class Orbit: ObservableObject {
             .filter { OrbitPolicy.isMessagingApp($0.appName) }
             .map { OrbitLoopsPolicy.Message(app: $0.appName, sender: $0.title, text: $0.body, date: $0.date) }
         all += OrbitLoopsPolicy.messageLoops(messages)
+        if Defaults[.orbitBillWatch] {
+            all += state.bills.filter { OrbitRhythmPolicy.isVisible($0, now: now) }.map { OrbitRhythmPolicy.loop(for: $0) }
+        }
         let projects = Array(state.projects.values)
         all += OrbitLinear.shared.issues.map { OrbitLoopsPolicy.loop(for: $0, project: OrbitLoopsPolicy.project(for: $0, projects: projects)) }
         return OrbitLoopsPolicy.visible(all, dismissed: state.dismissedLoops, snoozed: state.snoozedLoops, now: now)
@@ -361,6 +370,8 @@ final class Orbit: ObservableObject {
             if let link = loop.url, let url = URL(string: link) { NSWorkspace.shared.open(url) }
         case .review:
             requestedTabMode = "team"
+        case .bill:
+            break
         }
     }
 
@@ -372,6 +383,10 @@ final class Orbit: ObservableObject {
             if let id = UUID(uuidString: String(loop.id.dropFirst("promise:".count))) { PromiseKeeper.shared.markDone(id) }
         case .linear:
             if let issue = loop.issueID { Task { await OrbitLinear.shared.move(issueID: issue, toType: "completed") } }
+        case .bill:
+            state.bills.removeAll { $0.id == loop.id }
+            state.dismissedLoops[loop.id] = Date()
+            scheduleSave()
         default:
             state.dismissedLoops[loop.id] = Date()
             scheduleSave()
@@ -504,7 +519,19 @@ final class Orbit: ObservableObject {
         let meetings = CalendarManager.shared.events.map {
             OrbitTeamPolicy.Meeting(title: $0.title, start: $0.start, allDay: $0.isAllDay)
         }
-        let brief = OrbitTeamPolicy.brief(state: state, loops: loops(), meetings: meetings, now: Date())
+        var brief = OrbitTeamPolicy.brief(state: state, loops: loops(), meetings: meetings, now: Date())
+        // What you picked last night, and your best hours.
+        var extra: [String] = []
+        let today = OrbitPolicy.dayKey(Date())
+        if state.tomorrowTopDay == today, !state.tomorrowTop.isEmpty {
+            extra.append("Top 3 from last night: " + state.tomorrowTop.joined(separator: " · "))
+        }
+        if Defaults[.orbitFocusPlan], let window = OrbitRhythm.shared.focusWindow {
+            extra.append("Best focus: \(OrbitRhythmPolicy.hourText(window.start))–\(OrbitRhythmPolicy.hourText(window.end))")
+        }
+        if !extra.isEmpty {
+            brief = OrbitBrief(day: brief.day, headline: brief.headline, lines: extra + brief.lines, created: brief.created)
+        }
         state.lastBrief = brief
         scheduleSave()
         if Defaults[.orbitWriteVault] { scheduleVaultWrite(all: false) }
@@ -530,6 +557,36 @@ final class Orbit: ObservableObject {
     func unpin(_ id: String) {
         guard isRunning else { return }
         OrbitPolicy.unpinPerson(id, in: &state)
+        scheduleSave()
+    }
+
+    // MARK: Rhythm
+
+    func setFocusBlock(_ value: String) {
+        guard isRunning else { return }
+        state.focusBlock = value
+        scheduleSave()
+    }
+
+    /// Set at shutdown; shown in the next morning's brief.
+    func setTomorrowTop(_ titles: [String]) {
+        guard isRunning else { return }
+        let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date()
+        state.tomorrowTop = titles
+        state.tomorrowTopDay = OrbitPolicy.dayKey(tomorrow)
+        scheduleSave()
+    }
+
+    /// A renewal or bill spotted in a message (the same one twice is kept once).
+    func addBill(_ bill: OrbitBill) {
+        guard isRunning, !state.dismissedLoops.keys.contains(bill.id) else { return }
+        if let index = state.bills.firstIndex(where: { $0.id == bill.id }) {
+            if state.bills[index].amount == nil { state.bills[index].amount = bill.amount }
+        } else {
+            state.bills.append(bill)
+            // Keep the list short: drop ones long past.
+            state.bills.removeAll { ($0.due ?? $0.seen) < Date().addingTimeInterval(-14 * 86_400) }
+        }
         scheduleSave()
     }
 

@@ -158,6 +158,29 @@ struct OrbitSettings: View {
                             }
                         }
                     }
+                    Defaults.Toggle(key: .orbitFocusPlan) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Best focus hours")
+                            Text("From two weeks of time tracking, Orbit finds the two hours you do your deepest work and lets you block them in one click: notifications are held then, and a scene can start.")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    .settingsHighlight(id: "orbit-Best focus hours")
+                    Defaults.Toggle(key: .orbitScatter) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Notice when I'm scattered")
+                            Text("Jumping between 6 or more apps in 10 minutes shows Scattered under the closed notch, with Focus 25 min one click away. At most every 30 minutes; it only listens for app switches.")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    Defaults.Toggle(key: .orbitBillWatch) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Bills and renewals")
+                            Text("Messages and emails about a renewal, a trial ending or a bill due show in Loops three days before (with the amount when it's mentioned). Read on this Mac only.")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    .settingsHighlight(id: "orbit-Bills and renewals")
                     Defaults.Toggle(key: .orbitScenes) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Scenes")

@@ -72,6 +72,7 @@ struct ContentView: View {
     @Default(.timeTrackingEnabled) var enableTimeTracking
     @ObservedObject var agentHub = AgentHub.shared
     @Default(.agentShowWorkingInClosedNotch) var agentShowWorkingInClosedNotch
+    @ObservedObject var orbitRhythm = OrbitRhythm.shared
     @ObservedObject var remindersManager = RemindersManager.shared
     @Default(.showTodayProgressRing) var showTodayProgressRing
     @Default(.showLyricsUnderNotch) var showLyricsUnderNotch
@@ -367,6 +368,11 @@ struct ContentView: View {
         copyActions.showsInClosedNotch && copyActions.suggestion != nil && canShowClosedActivity
     }
 
+    /// Orbit noticed you jumping between many apps.
+    private var isScatterVisible: Bool {
+        orbitRhythm.scatteredApps != nil && !isMusicFirst && canShowClosedActivity
+    }
+
     private var isFocusGuardVisible: Bool {
         focusGuard.isOffTrack && !isMusicFirst && canShowClosedActivity
     }
@@ -449,7 +455,7 @@ struct ContentView: View {
             width = max(width, vm.closedNotchSize.width + (MeetingLiveActivity.wingWidth + 6) * 2 + closedPadding)
         }
 
-        if isCopyActionVisible || isFocusGuardVisible || isBuildWatchVisible || isAgentActivityVisible || isFocusSummaryVisible
+        if isCopyActionVisible || isFocusGuardVisible || isScatterVisible || isBuildWatchVisible || isAgentActivityVisible || isFocusSummaryVisible
             || isStashDropVisible
             || isPromiseNudgeVisible || isWeeklyReportVisible || isWorkRingVisible {
             width = max(width, vm.closedNotchSize.width + 8 + ClosedNotchWingsMetrics.addedWidth + closedPadding)
@@ -1199,6 +1205,9 @@ struct ContentView: View {
                       } else if isFocusGuardVisible {
                           FocusGuardLiveActivity(isHovering: isHovering)
                               .transition(.opacity.animation(.smooth(duration: 0.25)))
+                      } else if isScatterVisible {
+                          OrbitScatterLiveActivity(isHovering: isHovering)
+                              .transition(.opacity.animation(.smooth(duration: 0.25)))
                       } else if isBuildWatchVisible {
                           BuildWatchLiveActivity(isHovering: isHovering)
                               .transition(.opacity.animation(.smooth(duration: 0.25)))
@@ -1917,6 +1926,10 @@ struct ContentView: View {
             // Right after a focus block: where the things that came in are.
             coordinator.currentView = focusQuiet.summaryDestination
             focusQuiet.dismissSummary()
+        } else if announced == nil, visibleCommunicationCall == nil, orbitRhythm.scatteredApps != nil {
+            // Scattered: Orbit's Today view, where Focus 25 min is.
+            coordinator.currentView = .orbit
+            Orbit.shared.requestedTabMode = "today"
         } else if urgentFirst, announced == nil, visibleCommunicationCall == nil, CopyActionManager.hasLiveSuggestion {
             coordinator.currentView = .copyAction
         } else if announced == nil, visibleCommunicationCall == nil,

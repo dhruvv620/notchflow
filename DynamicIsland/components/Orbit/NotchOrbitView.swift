@@ -24,6 +24,14 @@ struct NotchOrbitView: View {
     @Default(.orbitTeam) private var showTeam
     @Default(.orbitScenes) private var showScenes
     @Default(.orbitDailyBrief) private var briefOn
+    @Default(.orbitFocusPlan) private var focusPlanOn
+    @Default(.orbitFocusScene) private var focusScene
+    @Default(.orbitShutdownWorkspace) private var shutdownWorkspace
+    @Default(.orbitShutdownBackup) private var shutdownBackup
+    @Default(.orbitShutdownQuiet) private var shutdownQuiet
+    @ObservedObject private var rhythm = OrbitRhythm.shared
+    @State private var shutdownOpen = false
+    @State private var reposWithChanges: [String]?
 
     enum Mode: String, CaseIterable {
         case today, loops, team, projects, people
@@ -79,6 +87,11 @@ struct NotchOrbitView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .onAppear {
             fixMode()
+            // Opened from the closed notch (Scattered) or a Review loop.
+            if let requested = orbit.requestedTabMode, let target = Mode(rawValue: requested), modes.contains(target) {
+                mode = target
+                orbit.requestedTabMode = nil
+            }
             if linear.isActive { Task { await linear.refresh() } }
         }
         .onChange(of: trackProjects) { _, _ in fixMode() }
@@ -103,7 +116,7 @@ struct NotchOrbitView: View {
     private var modes: [Mode] {
         Mode.allCases.filter { mode in
             switch mode {
-            case .today: return briefOn || showScenes
+            case .today: return true  // the shutdown always lives here
             case .loops: return showLoops
             case .team: return showTeam
             case .projects: return trackProjects
@@ -251,14 +264,136 @@ struct NotchOrbitView: View {
     // MARK: Today
 
     @ViewBuilder private var todayView: some View {
-        VStack(alignment: .leading, spacing: NotchTokens.Spacing.s) {
-            if briefOn {
-                briefCard
-            }
-            if showScenes {
-                scenesRow
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(alignment: .leading, spacing: NotchTokens.Spacing.s) {
+                if let apps = rhythm.scatteredApps { scatterCard(apps) }
+                if briefOn { briefCard }
+                if focusPlanOn { focusPlanCard }
+                if showScenes { scenesRow }
+                shutdownCard
             }
         }
+    }
+
+    private func scatterCard(_ apps: Int) -> some View {
+        NotchCard {
+            HStack(spacing: 8) {
+                Image(systemName: "tornado").foregroundStyle(.orange)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Scattered").font(NotchTokens.Typography.headline)
+                    Text("You've jumped between \(apps) apps in 10 minutes.")
+                        .font(NotchTokens.Typography.caption).foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 4)
+                NotchPillButton(title: "Focus 25 min", symbol: "scope", prominent: true) { rhythm.focusNow() }
+                NotchIconButton(symbol: "xmark", help: "Not now", size: 20) { rhythm.dismissScatter() }
+            }
+        }
+    }
+
+    @ViewBuilder private var focusPlanCard: some View {
+        NotchCard {
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(spacing: 6) {
+                    Image(systemName: "bolt.fill").foregroundStyle(.yellow)
+                    Text("Your best focus hours").font(NotchTokens.Typography.headline)
+                    Spacer(minLength: 0)
+                }
+                if let window = rhythm.focusWindow {
+                    let range = "\(OrbitRhythmPolicy.hourText(window.start))–\(OrbitRhythmPolicy.hourText(window.end))"
+                    Text("\(range): about \(window.averageMinutes) min of deep work there on a typical day (last \(window.days) days).")
+                        .font(NotchTokens.Typography.caption).foregroundStyle(.secondary)
+                    HStack(spacing: 6) {
+                        if let block = rhythm.blockToday {
+                            Label("Blocked \(OrbitRhythmPolicy.hourText(block.start))–\(OrbitRhythmPolicy.hourText(block.end))",
+                                  systemImage: "checkmark.circle.fill")
+                                .font(NotchTokens.Typography.caption).foregroundStyle(.green)
+                            NotchPillButton(title: "Cancel", symbol: "xmark") { rhythm.cancelBlock() }
+                        } else {
+                            NotchPillButton(title: "Block \(range) today", symbol: "calendar.badge.clock", prominent: true) {
+                                rhythm.block(window)
+                            }
+                        }
+                        Spacer(minLength: 0)
+                        if !orbit.state.scenes.isEmpty {
+                            Menu {
+                                Button("No scene") { focusScene = "" }
+                                ForEach(orbit.state.scenes) { scene in
+                                    Button(scene.name) { focusScene = scene.id.uuidString }
+                                }
+                            } label: {
+                                Text(orbit.state.scenes.first { $0.id.uuidString == focusScene }.map { "Scene: \($0.name)" } ?? "Add a scene")
+                                    .font(NotchTokens.Typography.caption)
+                            }
+                            .menuStyle(.borderlessButton)
+                            .fixedSize()
+                            .help("Run this scene when the block starts")
+                        }
+                    }
+                    Text("When it starts, notifications are held until it ends.")
+                        .font(NotchTokens.Typography.caption).foregroundStyle(.tertiary)
+                } else {
+                    Text(Defaults[.timeTrackingEnabled]
+                         ? "Needs a few days of tracked work to find them. Check back soon."
+                         : "Turn on time tracking in Settings › Productivity, and after a few days Orbit finds your best hours.")
+                        .font(NotchTokens.Typography.caption).foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder private var shutdownCard: some View {
+        NotchCard {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 6) {
+                    Image(systemName: "moon.stars.fill").foregroundStyle(.indigo)
+                    Text("End of day").font(NotchTokens.Typography.headline)
+                    Spacer(minLength: 0)
+                    if !rhythm.shutdownReport.isEmpty {
+                        NotchIconButton(symbol: "xmark", help: "Clear", size: 20) { rhythm.clearReport() }
+                    } else if !shutdownOpen {
+                        NotchPillButton(title: "Shut down…", symbol: "power", prominent: true) {
+                            shutdownOpen = true
+                            reposWithChanges = nil
+                            Task { reposWithChanges = await rhythm.reposWithChanges() }
+                        }
+                    }
+                }
+                if !rhythm.shutdownReport.isEmpty {
+                    ForEach(rhythm.shutdownReport, id: \.self) { line in
+                        Text("• " + line).font(NotchTokens.Typography.caption).foregroundStyle(.secondary).lineLimit(2)
+                    }
+                } else if shutdownOpen {
+                    Text("Picks tomorrow's top 3 from your open loops, then:").font(NotchTokens.Typography.caption).foregroundStyle(.secondary)
+                    Toggle("Save open windows as a workspace", isOn: $shutdownWorkspace).toggleStyle(.checkbox)
+                        .font(NotchTokens.Typography.caption)
+                        .disabled(!Defaults[.enableWorkspaces])
+                    Toggle(backupLabel, isOn: $shutdownBackup).toggleStyle(.checkbox).font(NotchTokens.Typography.caption)
+                    Toggle("Quiet until \(OrbitRhythmPolicy.hourText(Defaults[.orbitBriefHour])) tomorrow", isOn: $shutdownQuiet)
+                        .toggleStyle(.checkbox).font(NotchTokens.Typography.caption)
+                    HStack {
+                        NotchPillButton(title: rhythm.isShuttingDown ? "Shutting down…" : "Shut down", symbol: "power", prominent: true) {
+                            Task {
+                                await rhythm.shutDown()
+                                shutdownOpen = false
+                            }
+                        }
+                        .disabled(rhythm.isShuttingDown)
+                        NotchPillButton(title: "Cancel", symbol: "xmark") { shutdownOpen = false }
+                        Spacer(minLength: 0)
+                    }
+                } else {
+                    Text("Tomorrow's top 3, your windows saved, unsaved code backed up, quiet until morning.")
+                        .font(NotchTokens.Typography.caption).foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    private var backupLabel: String {
+        guard let repos = reposWithChanges else { return "Back up unsaved code to a branch (checking…)" }
+        if repos.isEmpty { return "Back up unsaved code to a branch (nothing unsaved)" }
+        return "Back up unsaved code in \(repos.joined(separator: ", ")) to a branch (your files stay as they are)"
     }
 
     private var briefCard: some View {
@@ -686,5 +821,34 @@ struct NotchOrbitView: View {
         if seconds < 3600 { return "\(Int(seconds / 60))m" }
         if seconds < 86_400 { return "\(Int(seconds / 3600))h" }
         return "\(Int(seconds / 86_400))d"
+    }
+}
+
+/// Under the closed notch while you're jumping between many apps. Clicking
+/// opens Orbit's Today view, where Focus 25 min is one click.
+struct OrbitScatterLiveActivity: View {
+    @ObservedObject private var rhythm = OrbitRhythm.shared
+    let isHovering: Bool
+    @State private var pulse = false
+
+    var body: some View {
+        ClosedNotchWings(isHovering: isHovering) {
+            Image(systemName: "tornado")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(Color.orange)
+                .opacity(pulse ? 1 : 0.55)
+            Text("Scattered")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.85))
+                .lineLimit(1)
+        } trailing: {
+            Text("\(rhythm.scatteredApps ?? 0) apps")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(Color.orange)
+                .lineLimit(1)
+        }
+        .onAppear { withAnimation(EnergyState.repeating(.easeInOut(duration: 1.2))) { pulse = true } }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Scattered: \(rhythm.scatteredApps ?? 0) apps in 10 minutes")
     }
 }

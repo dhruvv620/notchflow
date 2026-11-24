@@ -75,6 +75,13 @@ struct OrbitState: Codable, Equatable, Sendable {
     var snoozedLoops: [String: Date] = [:]
     var scenes: [OrbitScene] = []
     var lastBrief: OrbitBrief?
+    /// Renewals and bills spotted in messages.
+    var bills: [OrbitBill] = []
+    /// Tomorrow's top three, set at shutdown ("2026-11-24" → titles).
+    var tomorrowTop: [String] = []
+    var tomorrowTopDay = ""
+    /// A focus block for today: "2026-11-24|10|12" (day, start hour, end hour).
+    var focusBlock = ""
     var version = 2
 
     static let empty = OrbitState()
@@ -91,6 +98,10 @@ struct OrbitState: Codable, Equatable, Sendable {
         snoozedLoops = try container.decodeIfPresent([String: Date].self, forKey: .snoozedLoops) ?? [:]
         scenes = try container.decodeIfPresent([OrbitScene].self, forKey: .scenes) ?? []
         lastBrief = try container.decodeIfPresent(OrbitBrief.self, forKey: .lastBrief)
+        bills = try container.decodeIfPresent([OrbitBill].self, forKey: .bills) ?? []
+        tomorrowTop = try container.decodeIfPresent([String].self, forKey: .tomorrowTop) ?? []
+        tomorrowTopDay = try container.decodeIfPresent(String.self, forKey: .tomorrowTopDay) ?? ""
+        focusBlock = try container.decodeIfPresent(String.self, forKey: .focusBlock) ?? ""
         version = try container.decodeIfPresent(Int.self, forKey: .version) ?? 1
     }
 }

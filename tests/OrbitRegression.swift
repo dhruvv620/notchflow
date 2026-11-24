@@ -283,6 +283,73 @@ struct OrbitRegression {
         let jobsBack = try JSONDecoder().decode([OrbitJob].self, from: jobData)
         try require(jobsBack == jobs, "Jobs round trip")
 
+        // Rhythm: best focus hours
+        typealias R = OrbitRhythmPolicy
+        func dayLog(_ key: String, _ entries: [(Int, TimeCategory, Double)]) -> TimeDayLog {
+            var log = TimeDayLog(day: key)
+            for (hour, category, minutes) in entries { log.add(seconds: minutes * 60, category: category, label: "x", project: nil, hour: hour) }
+            return log
+        }
+        let logs = [
+            dayLog("d1", [(10, .coding, 50), (11, .coding, 55), (15, .communication, 60), (20, .coding, 20)]),
+            dayLog("d2", [(10, .writing, 40), (11, .coding, 60), (14, .meetings, 60)]),
+            dayLog("d3", [(9, .coding, 30), (10, .coding, 45), (11, .design, 50)]),
+            TimeDayLog(day: "empty"),
+        ]
+        let window = R.bestFocusWindow(logs: logs)
+        try require(window == R.FocusWindow(start: 10, end: 12, averageMinutes: 100, days: 3), "Focus window: \(String(describing: window))")
+        try require(R.bestFocusWindow(logs: Array(logs.prefix(2))) == nil, "Needs three days")
+        try require(R.bestFocusWindow(logs: [dayLog("a", [(10, .communication, 60)]), dayLog("b", [(10, .meetings, 60)]), dayLog("c", [(10, .social, 60)])]) == nil,
+                    "Talking isn't deep work")
+        try require(R.hourText(9) == "09:00", "Hour text")
+
+        // Rhythm: scattered
+        let switches = (0..<12).map { R.Switch(date: now.addingTimeInterval(-Double($0) * 40), app: "app\($0 % 7)") }
+            + [R.Switch(date: now.addingTimeInterval(-3600), app: "old")]
+        let scattered = R.scatter(switches, now: now)
+        try require(scattered.switches == 12 && scattered.apps == 7 && R.isScattered(switches: 12, apps: 7), "Scatter: \(scattered)")
+        try require(!R.isScattered(switches: 30, apps: 3), "Two apps back and forth is not scattered")
+        try require(R.trimmed(switches, now: now).count == 12, "Trim old switches")
+
+        // Rhythm: shutdown
+        let topLoops = [
+            OrbitLoop(id: "m", kind: .message, title: "Reply to Ana", date: now),
+            OrbitLoop(id: "l", kind: .linear, title: "ENG-1", date: now),
+            OrbitLoop(id: "p", kind: .promise, title: "Send deck", date: now.addingTimeInterval(-100), due: now.addingTimeInterval(20 * 3600)),
+            OrbitLoop(id: "a", kind: .agent, title: "Claude needs you", date: now),
+        ]
+        try require(R.tomorrowTop(topLoops, now: now).map(\.id) == ["p", "a", "l"], "Top 3: \(R.tomorrowTop(topLoops, now: now).map(\.id))")
+        try require(R.tomorrowTop([topLoops[0]], now: now).map(\.id) == ["m"], "Replies when nothing else")
+        try require(R.backupBranch(day: "2026-11-24") == "wip/notchflow-2026-11-24", "Backup branch")
+        let evening = calendar.date(bySettingHour: 22, minute: 0, second: 0, of: now)!
+        try require(R.minutesUntilMorning(now: evening, hour: 9, calendar: calendar) == 11 * 60, "Quiet until 9")
+
+        // Rhythm: bills
+        try require(R.isBillMessage("Your Netflix subscription will renew on Dec 3 for $15.49"), "Renewal")
+        try require(R.isBillMessage("Reminder: your electricity bill is due tomorrow"), "Bill due")
+        try require(!R.isBillMessage("Thank you for your payment of $15.49"), "Receipt is not a bill")
+        try require(!R.isBillMessage("Lunch tomorrow?"), "Not a bill")
+        try require(R.amount(in: "will renew for $15.49 on") == "$15.49" && R.amount(in: "₹199 due") == "₹199"
+                    && R.amount(in: "charged 12.00 EUR") == "12.00 EUR" && R.amount(in: "Rs. 499 due") == "Rs. 499", "Amounts")
+        try require(R.amount(in: "renews soon") == nil, "No amount")
+        try require(R.service(in: "Your Netflix plan renews", sender: "Mail", app: "Mail") == "Netflix", "Known service")
+        try require(R.service(in: "your plan renews", sender: "Gym Club", app: "Messages") == "Gym Club", "Sender")
+        let due = now.addingTimeInterval(5 * 86_400)
+        let bill = OrbitBill(id: R.billID(service: "Netflix", due: due, calendar: calendar), service: "Netflix", amount: "$15.49",
+                             due: due, source: "Mail", seen: now, snippet: "renews")
+        try require(bill.id == "bill:netflix|2026-11-23", "Bill id: \(bill.id)")
+        try require(!R.isVisible(bill, now: now) && R.isVisible(bill, now: due.addingTimeInterval(-2 * 86_400)), "Shows 3 days before")
+        try require(!R.isVisible(bill, now: due.addingTimeInterval(8 * 86_400)), "Gone a week after")
+        let billLoop = R.loop(for: bill, calendar: calendar)
+        try require(billLoop.kind == .bill && billLoop.title == "Netflix renews · $15.49" && billLoop.detail == "Due 2026-11-23 · from Mail", "Bill loop")
+        var withBills = OrbitState.empty
+        withBills.bills = [bill]
+        withBills.tomorrowTop = ["Send deck"]
+        withBills.focusBlock = "2026-11-24|10|12"
+        let billData = try JSONEncoder().encode(withBills)
+        let billsBack = try JSONDecoder().decode(OrbitState.self, from: billData)
+        try require(billsBack == withBills, "Bills round trip")
+
         print("Orbit: all checks passed")
     }
 }

@@ -11,9 +11,10 @@ import Foundation
 /// Something still open.
 struct OrbitLoop: Identifiable, Equatable, Sendable {
     enum Kind: String, Sendable, CaseIterable {
-        case review, agent, promise, theirPromise, message, build, linear
+        case review, agent, promise, theirPromise, message, build, linear, bill
         var symbol: String {
             switch self {
+            case .bill: return "creditcard"
             case .review: return "checkmark.seal"
             case .agent: return "sparkles"
             case .promise: return "hand.raised"
@@ -26,6 +27,7 @@ struct OrbitLoop: Identifiable, Equatable, Sendable {
         /// Lower comes first.
         var rank: Int {
             switch self {
+            case .bill: return 2
             case .review: return 0
             case .agent: return 0
             case .build: return 1
