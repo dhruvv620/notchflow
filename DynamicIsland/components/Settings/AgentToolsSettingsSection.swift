@@ -15,11 +15,15 @@ struct AgentToolsSettingsSection: View {
     var body: some View {
         Section {
             ForEach(tools.all) { tool in row(tool) }
-            HStack {
-                TextField("Name", text: $newName, prompt: Text("Name (say, Local Llama)"))
-                    .frame(maxWidth: 170)
-                TextField("Command", text: $newCommand, prompt: Text("Command (say, ollama run llama3)"))
-                Button("Add") {
+            HStack(spacing: 8) {
+                TextField("Name", text: $newName, prompt: Text("Name, like Local Llama"))
+                    .labelsHidden()
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 170)
+                TextField("Command", text: $newCommand, prompt: Text("Command, like ollama run llama3"))
+                    .labelsHidden()
+                    .textFieldStyle(.roundedBorder)
+                Button("Add Tool") {
                     tools.addCustom(name: newName, command: newCommand)
                     newName = ""
                     newCommand = ""
@@ -28,8 +32,7 @@ struct AgentToolsSettingsSection: View {
                 .disabled(newCommand.trimmingCharacters(in: .whitespaces).isEmpty)
             }
             HStack {
-                Text(tools.isChecking ? "Looking for tools…" : "Found with your shell's PATH, only when this page opens or you check.")
-                    .font(.caption).foregroundStyle(.secondary)
+                SettingsStatus(text: tools.isChecking ? "Looking for tools…" : "Looked for when this page opens.")
                 Spacer()
                 Button("Check Again") { Task { await tools.check() } }
                     .disabled(tools.isChecking)
@@ -40,7 +43,7 @@ struct AgentToolsSettingsSection: View {
         } header: {
             Text("Command-line tools")
         } footer: {
-            Text("Tools with Show in notch get a Start icon at the top of the AI Agents tab: pick a project folder and the tool starts there in the notch's Terminal tab (hold ⌥ for your terminal app). Connect an agent below so its approvals and status show in the notch too.")
+            Text("Switched-on tools get a Start icon in the AI Agents tab. It opens the tool in a project folder in the notch's Terminal (hold ⌥ for your terminal app).")
         }
         .settingsHighlight(id: "agents-Command-line tools")
         .onAppear { Task { await tools.check() } }
@@ -62,21 +65,23 @@ struct AgentToolsSettingsSection: View {
                     Text(tool.command).font(.caption).foregroundStyle(.secondary)
                 }
             }
-            Spacer()
+            Spacer(minLength: 8)
             if tools.hasChecked && !found && !tool.install.isEmpty {
                 Button("Install…") { tools.install(tool) }
                     .help(tool.install)
             }
             if tool.isCustom {
                 Button { tools.removeCustom(tool) } label: { Image(systemName: "trash") }
-                    .settingsDestructiveButton()
+                    .buttonStyle(.borderless)
+                    .foregroundStyle(SettingsPalette.danger)
                     .help("Remove \(tool.name)")
                     .accessibilityLabel("Remove \(tool.name)")
             }
-            Toggle("Show in notch", isOn: Binding(get: { shownIDs.contains(tool.id) },
+            Toggle("Start icon for \(tool.name)", isOn: Binding(get: { shownIDs.contains(tool.id) },
                                                  set: { tools.setShown($0, tool) }))
+                .labelsHidden()
                 .toggleStyle(.switch)
-                .controlSize(.small)
+                .help("A Start icon for \(tool.name) in the notch")
         }
     }
 

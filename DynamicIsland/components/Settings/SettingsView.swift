@@ -336,6 +336,12 @@ extension View {
     }
 }
 
+/// Fixed measurements of the Settings window.
+enum SettingsLayout {
+    /// The title bar strip holding the window buttons (the window has no toolbar).
+    static let titleBarHeight: CGFloat = 28
+}
+
 private struct SettingsForm<Content: View>: View {
     let tab: SettingsTab
     @ViewBuilder var content: () -> Content
@@ -343,20 +349,23 @@ private struct SettingsForm<Content: View>: View {
     @EnvironmentObject private var highlightCoordinator: SettingsHighlightCoordinator
 
     var body: some View {
-        pageContent
-            // The form shows the page's background, so header and rows sit on one colour.
-            .scrollContentBackground(.hidden)
-            // The same header on every page (docs/SETTINGS_DESIGN.md), placed by the
-            // system below the toolbar; the page scrolls under it.
-            .safeAreaInset(edge: .top, spacing: 0) {
-                SettingsTabHeader(tab: tab)
-                    .padding(.horizontal, 24)
-                    .padding(.top, 12)
-                    .padding(.bottom, 6)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color(nsColor: .windowBackgroundColor))
-            }
-            .background(Color(nsColor: .windowBackgroundColor))
+        // The same header on every page (docs/SETTINGS_DESIGN.md), fixed above the
+        // page's form; only the form scrolls. The window has no toolbar, so the
+        // header keeps clear of the title bar itself.
+        VStack(spacing: 0) {
+            SettingsTabHeader(tab: tab)
+                .padding(.horizontal, 28)
+                .padding(.top, SettingsLayout.titleBarHeight + 6)
+                .padding(.bottom, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Divider().opacity(0.6)
+            pageContent
+                // The form shows the page's background, so header and rows sit on one colour.
+                .scrollContentBackground(.hidden)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .background(Color(nsColor: .windowBackgroundColor))
+        .ignoresSafeArea(.container, edges: .top)
     }
 
     private var pageContent: some View {
@@ -399,7 +408,8 @@ struct SettingsView: View {
                     onSuggestionSelected: handleSearchSuggestionSelection
                 )
                 .padding(.horizontal, 12)
-                .padding(.top, 12)
+                // Clear the window's close/minimize/zoom buttons.
+                .padding(.top, SettingsLayout.titleBarHeight + 10)
 
                 List(selection: selectionBinding) {
                     ForEach(groupedFilteredTabs, id: \.group) { section in
@@ -430,6 +440,9 @@ struct SettingsView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            // The window has no toolbar, so lay out from the very top ourselves
+            // instead of relying on a safe area that differs between pages.
+            .ignoresSafeArea(.container, edges: .top)
         } detail: {
             detailView(for: resolvedSelection)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
