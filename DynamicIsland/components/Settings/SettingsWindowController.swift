@@ -31,7 +31,7 @@ class SettingsWindowController: NSWindowController {
     
     private init() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 700, height: 600),
+            contentRect: NSRect(x: 0, y: 0, width: 860, height: 680),
             styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
@@ -60,10 +60,11 @@ class SettingsWindowController: NSWindowController {
         window.titleVisibility = .visible
         window.toolbarStyle = .unified
         window.isMovableByWindowBackground = true
+        window.minSize = NSSize(width: 760, height: 560)
         window.level = .normal
         
         // Make it behave like a regular app window with proper Spaces support
-        window.collectionBehavior = [.managed, .participatesInCycle]
+        window.collectionBehavior = [.managed, .participatesInCycle, .fullScreenNone]
         
         // Ensure proper window behavior
         window.hidesOnDeactivate = false
@@ -90,7 +91,7 @@ class SettingsWindowController: NSWindowController {
 
         // Reassert regular window semantics in case any prior state mutated this window.
         window?.level = .normal
-        window?.collectionBehavior = [.managed, .participatesInCycle]
+        window?.collectionBehavior = [.managed, .participatesInCycle, .fullScreenNone]
         
         // If window is already visible, bring it to front properly
         if window?.isVisible == true {

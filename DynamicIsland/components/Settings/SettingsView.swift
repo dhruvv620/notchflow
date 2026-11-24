@@ -337,7 +337,10 @@ private struct SettingsForm<Content: View>: View {
                 .padding(.top, 16)
                 .padding(.bottom, 2)
             pageContent
+                // The form shows the page's background, so header and rows sit on one colour.
+                .scrollContentBackground(.hidden)
         }
+        .background(Color(nsColor: .windowBackgroundColor))
     }
 
     private var pageContent: some View {
@@ -382,9 +385,6 @@ struct SettingsView: View {
                 .padding(.horizontal, 12)
                 .padding(.top, 12)
 
-                Divider()
-                    .padding(.horizontal, 12)
-
                 List(selection: selectionBinding) {
                     ForEach(groupedFilteredTabs, id: \.group) { section in
                         Section {
@@ -407,9 +407,11 @@ struct SettingsView: View {
                 .navigationSplitViewColumnWidth(min: 200, ideal: 210, max: 240)
                 .environment(\.defaultMinListRowHeight, 44)
 
-                SettingsAppControls()
-                    .padding(.horizontal, 12)
-                    .padding(.bottom, 12)
+                VStack(spacing: 0) {
+                    Divider()
+                    SettingsAppControls()
+                        .padding(12)
+                }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         } detail: {
@@ -423,34 +425,13 @@ struct SettingsView: View {
         .formStyle(.grouped)
         // One accent and one background for every page.
         .tint(SettingsPalette.accent)
-        .scrollContentBackground(.hidden)
-        .frame(width: 760)
+        .frame(minWidth: 760, idealWidth: 860, maxWidth: .infinity, minHeight: 560, idealHeight: 680, maxHeight: .infinity)
         .onChange(of: searchText) { _, newValue in
             let matches = tabsMatchingSearch(newValue)
             guard let firstMatch = matches.first else { return }
             if !matches.contains(resolvedSelection) {
                 selectedTab = firstMatch
             }
-        }
-        .background {
-            Group {
-                if #available(macOS 26.0, *) {
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .glassEffect(
-                            .clear
-                                .tint(Color.white.opacity(0.1))
-                                .interactive(),
-                            in: .rect(cornerRadius: 18)
-                        )
-                } else {
-                    ZStack {
-                        Color(NSColor.windowBackgroundColor)
-                        RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .fill(.ultraThinMaterial)
-                    }
-                }
-            }
-            .ignoresSafeArea()
         }
     }
 
@@ -3311,163 +3292,121 @@ struct CalendarSettings: View {
 
     var body: some View {
         Form {
-            Section {
-                Defaults.Toggle(key: .enableMeetingCountdown) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Meeting countdown and Join button")
-                        Text("Five minutes before an event with a Zoom, Meet, Teams or Webex link, the notch shows a countdown and Join.")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-                Defaults.Toggle(key: .pauseMusicDuringMeetings) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Pause music during meetings")
-                        Text("Music pauses when the meeting starts and resumes when it ends, if NotchFlow paused it.")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-            } header: {
-                Text("Meetings")
-            }
-            Section {
-                Defaults.Toggle(key: .enableRemindersFeature) {
-                    Text("Enable Todos tab")
-                }
-                .settingsHighlight(id: highlightID("Show Reminders tab"))
-                Text("View and create reminders in your Apple Reminders lists from the notch. This is separate from the upcoming-reminder live activity.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Defaults.Toggle(key: .showTodayProgressRing) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Show today's progress in the closed notch")
-                        Text("A ring of todos done against those due today, when nothing else is showing. Drop text, links or files on the Todos tab to add todos.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
-
             if !calendarManager.hasCalendarAccess || !calendarManager.hasReminderAccess {
-                Text("Calendar or Reminder access is denied. Please enable it in System Settings.")
-                    .foregroundStyle(SettingsPalette.danger)
-                    .multilineTextAlignment(.center)
-                    .padding()
-
-                HStack {
-                    Button("Request Access") {
-                        Task {
-                            await calendarManager.checkCalendarAuthorization()
-                            await calendarManager.checkReminderAuthorization()
+                Section {
+                    SettingsStatus(text: "NotchFlow can't see your calendar or reminders yet.", kind: .warn)
+                    HStack {
+                        Spacer()
+                        Button("Open System Settings") {
+                            if let settingsURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars") {
+                                NSWorkspace.shared.open(settingsURL)
+                            }
                         }
-                    }
-                    .buttonStyle(.borderedProminent)
-
-                    Button("Open System Settings") {
-                        if let settingsURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars") {
-                            NSWorkspace.shared.open(settingsURL)
+                        Button("Allow Access") {
+                            Task {
+                                await calendarManager.checkCalendarAuthorization()
+                                await calendarManager.checkReminderAuthorization()
+                            }
                         }
+                        .settingsPrimaryButton()
                     }
+                } header: {
+                    Text("Access")
                 }
             } else {
-                // Permissions status
-                Section(header: Text("Permissions")) {
-                    HStack {
-                        Text("Calendars")
-                        Spacer()
-                        Text(statusText(for: calendarManager.calendarAuthorizationStatus))
-                            .foregroundColor(color(for: calendarManager.calendarAuthorizationStatus))
-                    }
-                    HStack {
-                        Text("Reminders")
-                        Spacer()
-                        Text(statusText(for: calendarManager.reminderAuthorizationStatus))
-                            .foregroundColor(color(for: calendarManager.reminderAuthorizationStatus))
-                    }
-                }
-
-                Defaults.Toggle(key: .showCalendar) {
-                    Text("Show calendar")
-                }
-                .settingsHighlight(id: highlightID("Show calendar"))
-
-                Section(header: Text("Event List")) {
-                    Toggle("Hide completed reminders", isOn: $hideCompletedReminders)
-                        .settingsHighlight(id: highlightID("Hide completed reminders"))
-                    Toggle("Show full event titles", isOn: $showFullEventTitles)
-                        .settingsHighlight(id: highlightID("Show full event titles"))
-                    Toggle("Auto-scroll to next event", isOn: $autoScrollToNextEvent)
-                        .settingsHighlight(id: highlightID("Auto-scroll to next event"))
-                }
-
-                Section(header: Text("All-Day Events")) {
-                    Toggle("Hide all-day events", isOn: $hideAllDayEvents)
+                Section {
+                    SettingsToggle(key: .showCalendar, title: "Calendar tab",
+                                   detail: "Today's and upcoming events in the notch.",
+                                   highlightID: highlightID("Show calendar"))
+                    if showCalendar {
+                        Toggle(isOn: $showFullEventTitles) { SettingsRowLabel(title: "Show full event titles") }
+                            .settingsHighlight(id: highlightID("Show full event titles"))
+                        Toggle(isOn: $autoScrollToNextEvent) { SettingsRowLabel(title: "Scroll to the next event") }
+                            .settingsHighlight(id: highlightID("Auto-scroll to next event"))
+                        Toggle(isOn: $hideAllDayEvents) {
+                            SettingsRowLabel(title: "Hide all-day events",
+                                             detail: "Also hides them from the upcoming-reminder activity.")
+                        }
                         .settingsHighlight(id: highlightID("Hide all-day events"))
-                        .disabled(!showCalendar)
-
-                    Text("Turn this off to include all-day entries in the notch calendar and reminder live activity.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                    }
+                } header: {
+                    Text("Calendar")
                 }
 
-                Section(header: Text("Reminder Live Activity")) {
-                    Defaults.Toggle(key: .enableReminderLiveActivity) {
-                        Text("Show upcoming reminders in the closed notch")
-                    }
-                    .settingsHighlight(id: highlightID("Enable reminder live activity"))
+                Section {
+                    SettingsToggle(key: .enableRemindersFeature, title: "Todos tab",
+                                   detail: "Your Apple Reminders lists in the notch: see and add todos.",
+                                   highlightID: highlightID("Show Reminders tab"))
+                    Toggle(isOn: $hideCompletedReminders) { SettingsRowLabel(title: "Hide completed todos") }
+                        .settingsHighlight(id: highlightID("Hide completed reminders"))
+                    SettingsToggle(key: .showTodayProgressRing, title: "Today's progress in the closed notch",
+                                   detail: "A ring of today's todos done, when nothing else is showing.")
+                } header: {
+                    Text("Todos")
+                }
 
-                    Picker("Countdown style", selection: $reminderPresentationStyle) {
-                        ForEach(ReminderPresentationStyle.allCases) { style in
-                            Text(style.displayName).tag(style)
+                Section {
+                    SettingsToggle(key: .enableMeetingCountdown, title: "Countdown and Join button",
+                                   detail: "Five minutes before a Zoom, Meet, Teams or Webex meeting.")
+                    SettingsToggle(key: .pauseMusicDuringMeetings, title: "Pause music during meetings",
+                                   detail: "Resumes afterwards if NotchFlow paused it.")
+                } header: {
+                    Text("Meetings")
+                }
+
+                Section {
+                    SettingsToggle(key: .enableReminderLiveActivity, title: "Upcoming reminders in the closed notch",
+                                   highlightID: highlightID("Enable reminder live activity"))
+                    if enableReminderLiveActivity {
+                        Picker("Countdown style", selection: $reminderPresentationStyle) {
+                            ForEach(ReminderPresentationStyle.allCases) { style in
+                                Text(style.displayName).tag(style)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .settingsHighlight(id: highlightID("Countdown style"))
+                        LabeledContent("Show it before") {
+                            HStack(spacing: 8) {
+                                Slider(value: Binding(get: { Double(reminderLeadTime) }, set: { reminderLeadTime = Int($0) }),
+                                       in: 1...60, step: 1)
+                                    .frame(width: 180)
+                                    .labelsHidden()
+                                Text("\(reminderLeadTime) min").monospacedDigit().foregroundStyle(.secondary)
+                                    .frame(width: 52, alignment: .trailing)
+                            }
+                        }
+                        LabeledContent("Show it for") {
+                            HStack(spacing: 8) {
+                                Slider(value: $reminderSneakPeekDuration, in: 3...20, step: 1)
+                                    .frame(width: 180)
+                                    .labelsHidden()
+                                Text("\(Int(reminderSneakPeekDuration)) s").monospacedDigit().foregroundStyle(.secondary)
+                                    .frame(width: 52, alignment: .trailing)
+                            }
                         }
                     }
-                    .pickerStyle(.segmented)
-                    .disabled(!enableReminderLiveActivity)
-                    .settingsHighlight(id: highlightID("Countdown style"))
-
-                    HStack {
-                        Text("Notify before")
-                        Slider(
-                            value: Binding(
-                                get: { Double(reminderLeadTime) },
-                                set: { reminderLeadTime = Int($0) }
-                            ),
-                            in: 1...60,
-                            step: 1
-                        )
-                        .disabled(!enableReminderLiveActivity)
-                        Text("\(reminderLeadTime) min")
-                            .foregroundStyle(.secondary)
-                            .frame(width: 60, alignment: .trailing)
-                    }
-
-                    HStack {
-                        Text("Sneak peek duration")
-                        Slider(
-                            value: $reminderSneakPeekDuration,
-                            in: 3...20,
-                            step: 1
-                        )
-                        .disabled(!enableReminderLiveActivity)
-                        Text("\(Int(reminderSneakPeekDuration)) s")
-                            .foregroundStyle(.secondary)
-                            .frame(width: 60, alignment: .trailing)
-                    }
+                } header: {
+                    Text("Upcoming reminders")
                 }
 
+                Section {
+                    LabeledContent("Calendars") {
+                        SettingsStatus(text: statusText(for: calendarManager.calendarAuthorizationStatus),
+                                       kind: statusKind(for: calendarManager.calendarAuthorizationStatus))
+                    }
+                    LabeledContent("Reminders") {
+                        SettingsStatus(text: statusText(for: calendarManager.reminderAuthorizationStatus),
+                                       kind: statusKind(for: calendarManager.reminderAuthorizationStatus))
+                    }
+                } header: {
+                    Text("Access")
+                }
 
-                
                 // MARK: - Third-party Calendar Integration
                 Section {
-                    Defaults.Toggle(key: .enableThirdPartyCalendarApp) {
-                        HStack {
-                            Image(systemName: "ellipsis.calendar")
-                                .foregroundStyle(.secondary)
-                                .frame(width: 20, height: 20)
-                            Text("Enable third-party calendar app launch")
-                        }
-                    }
-                    .settingsHighlight(id: highlightID("Enable third-party calendar app launch"))
+                    SettingsToggle(key: .enableThirdPartyCalendarApp, title: "Open events in another calendar app",
+                                   detail: "Clicking an event opens it there instead of Apple Calendar.",
+                                   highlightID: highlightID("Enable third-party calendar app launch"))
                     
                     if enableThirdPartyCalendarApp {
                         Picker("Calendar App", selection: $selectedCalendarApp) {
@@ -3495,12 +3434,10 @@ struct CalendarSettings: View {
                         }
                     }
                 } header: {
-                    Text("Third-party Calendar Integration")
-                } footer: {
-                    Text("When enabled, clicking on calendar events will open the selected third-party calendar app instead of Apple Calendar.")
+                    Text("Calendar app")
                 }
 
-                Section(header: Text("Select Calendars")) {
+                Section(header: Text("Calendars to show")) {
                     let grouped = Dictionary(grouping: calendarManager.allCalendars, by: \.accountName)
                     let sortedAccounts = grouped.keys.sorted()
 
@@ -3558,22 +3495,21 @@ struct CalendarSettings: View {
 
     private func statusText(for status: EKAuthorizationStatus) -> String {
         switch status {
-        case .fullAccess, .authorized: return String(localized: "Full Access")
-        case .writeOnly: return String(localized: "Write Only")
+        case .fullAccess, .authorized: return String(localized: "Allowed")
+        case .writeOnly: return String(localized: "Add only")
         case .denied: return String(localized: "Denied")
         case .restricted: return String(localized: "Restricted")
-        case .notDetermined: return String(localized: "Not Determined")
+        case .notDetermined: return String(localized: "Not asked yet")
         @unknown default: return String(localized: "Unknown")
         }
     }
 
-    private func color(for status: EKAuthorizationStatus) -> Color {
+    private func statusKind(for status: EKAuthorizationStatus) -> SettingsStatus.Kind {
         switch status {
-        case .fullAccess, .authorized: return .green
-        case .writeOnly: return .yellow
-        case .denied, .restricted: return .red
-        case .notDetermined: return .secondary
-        @unknown default: return .secondary
+        case .fullAccess, .authorized: return .ok
+        case .writeOnly, .notDetermined: return .warn
+        case .denied, .restricted: return .error
+        @unknown default: return .neutral
         }
     }
 }
@@ -8247,7 +8183,8 @@ private struct SettingsAppControls: View {
             .help("Quit NotchFlow")
         }
         .buttonStyle(.bordered)
-        .controlSize(.regular)
+        .controlSize(.large)
+        .tint(.primary)
         .labelStyle(.titleAndIcon)
     }
 }
