@@ -241,6 +241,37 @@ struct WhatsAppSettings: View {
             } message: {
                 Text("NotchFlow is removed from that phone's linked devices. You can link it again by scanning a new QR code.")
             }
+        } else if manager.state != .disabled {
+            // The accounts (and Add Account) need the connection running;
+            // say why they're not here instead of hiding the section.
+            Section {
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(accountsUnavailableTitle)
+                        Text("Your linked accounts (and Add Account for a second one) show here once the WhatsApp connection is running. Your links are kept.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    if case .starting = manager.state {
+                        ProgressView().controlSize(.small)
+                    } else if case .failed = manager.state {
+                        Button("Restart") { manager.restartGateway() }
+                    }
+                }
+            } header: {
+                Text("Accounts")
+            }
+        }
+    }
+
+    private var accountsUnavailableTitle: String {
+        switch manager.state {
+        case .notInstalled: return String(localized: "Install the WhatsApp connection above first.")
+        case .installing: return String(localized: "Installing the WhatsApp connection…")
+        case .starting: return String(localized: "Starting the WhatsApp connection…")
+        case .failed(let message): return String(localized: "The WhatsApp connection stopped: \(message)")
+        default: return String(localized: "The WhatsApp connection isn't running.")
         }
     }
 
