@@ -886,6 +886,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         GlanceManager.shared.start()
         // Orbit only watches its switches until it is turned on.
         Orbit.shared.start()
+        // The approval card only shows while an agent waits on you.
+        AgentApprovalCard.shared.start()
         // The clipboard header button (and its popover) is gone: the Clipboard
         // tab is where history lives, so start keeping it from launch.
         if Defaults[.clipboardDisplayMode] == .popover { Defaults[.clipboardDisplayMode] = .separateTab }

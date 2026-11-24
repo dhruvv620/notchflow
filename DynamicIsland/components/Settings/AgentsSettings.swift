@@ -109,6 +109,14 @@ struct AgentsSettings: View {
                 Text("10 minutes").tag(600)
             }
             .settingsHighlight(id: highlightID("Wait for an answer in the notch"))
+            Defaults.Toggle(key: .agentApprovalCard) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Approval card at the top right")
+                    Text("When an agent asks, a small card with Allow / Always / Deny appears under the menu bar, so you can answer without opening the notch. It goes away once answered.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            .settingsHighlight(id: highlightID("Approval card at the top right"))
             Text("While an approval waits in the notch, the agent's own prompt is held back; after this long it asks in its window instead. Nothing is ever approved on its own.")
                 .font(.caption).foregroundStyle(.secondary)
             Defaults.Toggle(key: .agentAskInWindowWhenInFront) {

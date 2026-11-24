@@ -31,10 +31,12 @@ struct NotchAgentsView: View {
         .notchTabPadding()
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .onChange(of: hub.requests.isEmpty) { _, _ in updateSuppression() }
+        .onChange(of: filter) { _, _ in selectFirstSession() }
         .onChange(of: composing) { _, _ in updateSuppression() }
         .onAppear {
             conversations.refreshList(force: true)
             if let selected = conversations.selected { conversations.select(selected) }
+            selectFirstSession()
             updateSuppression()
         }
         .onDisappear {
@@ -64,8 +66,9 @@ struct NotchAgentsView: View {
                     } else if let selected = conversations.selected, kind.readsTranscripts,
                               selected.agent == (kind == .codex ? .codex : .claude) {
                         AgentChatView(summary: selected, textScale: panelSize.textScale)
-                    } else if !kind.readsTranscripts {
-                        // Gemini CLI and Cursor: their sessions as cards; the chat lives in their window.
+                    } else if !kind.readsTranscripts || hub.sessions.contains(where: { $0.agent == kind }) {
+                        // Its running sessions as cards (Gemini CLI and Cursor keep
+                        // their chat in their own window; Open shows a conversation).
                         let live = hub.sessions.filter { $0.agent == kind }
                         if live.isEmpty {
                             NotchEmptyState(symbol: kind.symbol, title: "No \(kind.displayName) sessions",
@@ -85,6 +88,18 @@ struct NotchAgentsView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
+        }
+    }
+
+    /// On an agent's tab, opens its newest conversation when none of its own is open.
+    private func selectFirstSession() {
+        guard let kind = filterKind, kind.readsTranscripts else { return }
+        let agent: AgentSessionSummary.Agent = kind == .codex ? .codex : .claude
+        if conversations.selected?.agent == agent { return }
+        if let live = hub.sessions.first(where: { $0.agent == kind }) {
+            conversations.select(sessionID: live.id)
+        } else if let recent = conversations.recent.first(where: { $0.agent == agent }) {
+            conversations.select(recent)
         }
     }
 
@@ -109,6 +124,8 @@ struct NotchAgentsView: View {
 
 private struct AgentRequestCard: View {
     let request: AgentRequest
+    /// Narrow column (the All board): shorter labels, buttons wrap under the command.
+    var compact = false
     @ObservedObject private var hub = AgentHub.shared
     @State private var denying = false
     @State private var denyReason = ""
@@ -194,6 +211,19 @@ private struct AgentRequestCard: View {
                 AgentButton(title: "Deny", symbol: "xmark", destructive: true, action: deny)
                 AgentButton(title: "Back") { denying = false }
                 Spacer(minLength: 0)
+            }
+        } else if compact {
+            VStack(alignment: .leading, spacing: NotchTokens.Spacing.s) {
+                HStack(spacing: NotchTokens.Spacing.s) {
+                    AgentButton(title: "Allow", symbol: "checkmark", prominent: true, compact: true) { hub.resolve(request, with: .allow) }
+                    if canAlwaysAllow {
+                        AgentButton(title: "Always", symbol: "checkmark.seal", compact: true) { hub.resolve(request, with: .allowAlways) }
+                            .help("Claude Code adds a rule so it does not ask again for this")
+                    }
+                    AgentButton(title: "Deny", symbol: "xmark", destructive: true, compact: true) { denying = true }
+                    Spacer(minLength: 0)
+                }
+                inWindowButton(label: "Ask in its window")
             }
         } else {
             HStack(spacing: NotchTokens.Spacing.m) {
@@ -288,19 +318,21 @@ private struct AgentButton: View {
     var symbol: String? = nil
     var prominent = false
     var destructive = false
+    var compact = false
     let action: () -> Void
     @ObservedObject private var appearance = NotchAppearanceModel.shared
     @State private var hovering = false
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 5) {
+            HStack(spacing: compact ? 4 : 5) {
                 if let symbol { Image(systemName: symbol) }
-                Text(title)
+                Text(title).lineLimit(1)
             }
-            .font(.system(size: 12, weight: .semibold))
-            .padding(.horizontal, 14)
-            .padding(.vertical, 7)
+            .font(.system(size: compact ? 11 : 12, weight: .semibold))
+            .fixedSize()
+            .padding(.horizontal, compact ? 10 : 14)
+            .padding(.vertical, compact ? 6 : 7)
             .background(Capsule().fill(fill))
             .foregroundStyle(prominent ? appearance.accentForegroundColor : (destructive ? Color.red : Color.primary))
         }
@@ -662,16 +694,12 @@ struct AgentLiveActivity: View {
                     .foregroundStyle(.white.opacity(0.85))
                     .lineLimit(1)
             } trailing: {
-                if isHovering, hub.requests.count == 1, case .permission(_, _, let risk, _) = request.kind, risk != .danger {
-                    // Answer without opening the notch. Dangerous ones always open it.
-                    ClosedApprovalButton(title: "Allow", tint: .green) { hub.resolve(request, with: .allow) }
-                    ClosedApprovalButton(title: "Deny", tint: .red) { hub.resolve(request, with: .deny("Declined in NotchFlow")) }
-                } else {
-                    Text(hub.requests.count > 1 ? "\(hub.requests.count) waiting" : label(for: request))
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(Color.orange)
-                        .lineLimit(1)
-                }
+                // Allow / Deny live on the approval card beside the notch
+                // (AgentApprovalCard): hovering here opens the notch.
+                Text(hub.requests.count > 1 ? "\(hub.requests.count) waiting" : label(for: request))
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(Color.orange)
+                    .lineLimit(1)
             }
             .onAppear { withAnimation(EnergyState.repeating(.easeInOut(duration: 0.9))) { pulse = true } }
             .accessibilityElement(children: .ignore)
@@ -757,27 +785,6 @@ struct AgentLiveActivity: View {
     private func doneLabel(_ session: AgentSession) -> String {
         if case .done(let summary) = session.state, session.agent == .script, !summary.isEmpty { return summary }
         return "Done"
-    }
-}
-
-/// A small Allow / Deny button in the closed notch.
-private struct ClosedApprovalButton: View {
-    let title: String
-    let tint: Color
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Text(title)
-                .font(.system(size: 10, weight: .bold))
-                .foregroundStyle(tint)
-                .padding(.horizontal, 7)
-                .padding(.vertical, 3)
-                .background(Capsule().fill(tint.opacity(0.18)))
-                .contentShape(Capsule())
-        }
-        .buttonStyle(.plain)
-        .help(title)
     }
 }
 
@@ -1085,7 +1092,7 @@ private struct AgentBoard: View {
                     Text("Nothing is waiting on you.").font(NotchTokens.Typography.caption).foregroundStyle(.secondary)
                 }
                 ForEach(hub.requests) { request in
-                    AgentRequestCard(request: request)
+                    AgentRequestCard(request: request, compact: true)
                         .padding(8)
                         .background(RoundedRectangle(cornerRadius: NotchTokens.Radius.card, style: .continuous)
                             .fill(request.agent.tint.opacity(0.1)))
