@@ -1408,7 +1408,6 @@ struct GeneralSettings: View {
     }
 
     @ViewBuilder
-    @ViewBuilder
     func NotchBehaviour() -> some View {
         Section {
             NotchOpensOnSettings()
