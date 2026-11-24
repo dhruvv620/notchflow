@@ -20,6 +20,48 @@
 import Defaults
 import SwiftUI
 
+/// Click to make the open tab bigger (Regular, Large, Extra large, then back);
+/// hold for the list.
+private struct TabSizeButton: View {
+    let view: NotchViews
+    @Default(.notchTabSizes) private var sizes
+    @Default(.agentPanelSize) private var agentSize
+    @Default(.cuelyPanelSize) private var cuelySize
+
+    private var current: NotchTabSize {
+        _ = (sizes, agentSize, cuelySize)  // redraw when any of them changes
+        return NotchTabSizing.size(for: view)
+    }
+
+    var body: some View {
+        Menu {
+            ForEach(NotchTabSize.allCases, id: \.rawValue) { size in
+                Button {
+                    applyNotchLayoutChange { NotchTabSizing.setSize(size, for: view) }
+                } label: {
+                    if size == current { Label(size.title, systemImage: "checkmark") } else { Text(size.title) }
+                }
+            }
+        } label: {
+            Capsule()
+                .fill(Color.white.opacity(0.055))
+                .frame(width: 30, height: 30)
+                .overlay {
+                    Image(systemName: current == .extraLarge
+                          ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
+                        .foregroundColor(.white)
+                        .imageScale(.small)
+                }
+        } primaryAction: {
+            applyNotchLayoutChange { NotchTabSizing.setSize(current.next, for: view) }
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("Tab size: \(current.title). Click for bigger, hold for sizes.")
+    }
+}
+
 struct DynamicIslandHeader: View {
     @EnvironmentObject var vm: DynamicIslandViewModel
     @EnvironmentObject var webcamManager: WebcamManager
@@ -170,6 +212,11 @@ struct DynamicIslandHeader: View {
                         }
                     }
                     
+                    // Make this tab bigger or smaller (remembered per tab).
+                    if NotchTabSizing.isResizable(coordinator.currentView) {
+                        TabSizeButton(view: coordinator.currentView)
+                    }
+
                     if Defaults[.settingsIconInNotch] {
                         Button(action: {
                             SettingsWindowController.shared.showWindow()

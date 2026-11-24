@@ -812,6 +812,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             .merge(with: Defaults.publisher(.enableLyrics, options: []).map { _ in true })
             .merge(with: Defaults.publisher(.cuelyPanelSize, options: []).map { _ in true })
             .merge(with: Defaults.publisher(.agentPanelSize, options: []).map { _ in true })
+            .merge(with: Defaults.publisher(.notchTabSizes, options: []).map { _ in true })
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.updateWindowSizeForTabSwitch() }
             .store(in: &cancellables)

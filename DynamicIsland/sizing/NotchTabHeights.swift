@@ -9,6 +9,73 @@ extension Defaults.Keys {
     static let cuelyPanelSize = Key<Int>("cuelyPanelSize", default: CuelyPanelSize.regular.rawValue)
     /// How big the AI Agents tab is (AgentPanelSize raw value).
     static let agentPanelSize = Key<Int>("agentPanelSize", default: AgentPanelSize.regular.rawValue)
+    /// Every other tab's size (NotchTabSize raw value), by tab id.
+    static let notchTabSizes = Key<[String: Int]>("notchTabSizes", default: [:])
+}
+
+/// Sizes for any tab, from the size button in the notch's top bar.
+enum NotchTabSize: Int, CaseIterable, Sendable {
+    case regular = 0
+    case large = 1
+    case extraLarge = 2
+
+    var title: String {
+        switch self {
+        case .regular: return "Regular"
+        case .large: return "Large"
+        case .extraLarge: return "Extra large"
+        }
+    }
+
+    var extraHeight: CGFloat {
+        switch self {
+        case .regular: return 0
+        case .large: return 140
+        case .extraLarge: return 280
+        }
+    }
+
+    var minimumWidth: CGFloat {
+        switch self {
+        case .regular: return 0
+        case .large: return 780
+        case .extraLarge: return 960
+        }
+    }
+
+    var next: NotchTabSize { NotchTabSize(rawValue: (rawValue + 1) % Self.allCases.count) ?? .regular }
+}
+
+/// One place to read and change a tab's size. AI Agents and Cuely keep
+/// their own sizes (their tabs use them for text size too); the rest share
+/// one table.
+@MainActor
+enum NotchTabSizing {
+    /// Music's player and the copy card have a fixed layout; bigger only adds empty space.
+    static func isResizable(_ view: NotchViews) -> Bool {
+        view != .home && view != .copyAction
+    }
+
+    private static func key(_ view: NotchViews) -> String { NotchBuiltinTab.identifier(for: view) }
+
+    static func size(for view: NotchViews) -> NotchTabSize {
+        switch view {
+        case .agents: return NotchTabSize(rawValue: Defaults[.agentPanelSize]) ?? .regular
+        case .cuely: return NotchTabSize(rawValue: Defaults[.cuelyPanelSize]) ?? .regular
+        default: return NotchTabSize(rawValue: Defaults[.notchTabSizes][key(view)] ?? 0) ?? .regular
+        }
+    }
+
+    static func setSize(_ size: NotchTabSize, for view: NotchViews) {
+        switch view {
+        case .agents: Defaults[.agentPanelSize] = size.rawValue
+        case .cuely: Defaults[.cuelyPanelSize] = size.rawValue
+        default:
+            var sizes = Defaults[.notchTabSizes]
+            sizes[key(view)] = size == .regular ? nil : size.rawValue
+            Defaults[.notchTabSizes] = sizes
+        }
+    }
 }
 
 /// Sizes for the AI Agents tab, from its size button: bigger panels show more
@@ -151,6 +218,11 @@ func tabOpenNotchSize(for view: NotchViews, preset: CGSize, screen: String?, clo
     if view == .agents, !Defaults[.enableMinimalisticUI] {
         // So can AI Agents, for reading long conversations.
         let size = AgentPanelSize(rawValue: Defaults[.agentPanelSize]) ?? .regular
+        return CGSize(width: max(preset.width, size.minimumWidth), height: height + size.extraHeight)
+    }
+    if NotchTabSizing.isResizable(view), !Defaults[.enableMinimalisticUI] {
+        // Every other tab, from the size button in the top bar.
+        let size = NotchTabSizing.size(for: view)
         return CGSize(width: max(preset.width, size.minimumWidth), height: height + size.extraHeight)
     }
     return CGSize(width: preset.width, height: height)
