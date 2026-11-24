@@ -254,6 +254,10 @@ gh release create "v$VERSION" \
 step "Installing the released copy on this Mac"
 /bin/bash "$SOURCE_DIR/install.sh" "$OUT/NotchFlow.zip" \
     || printf 'Could not install it here; run the install line below yourself.\n'
+# The packaged build was only a step; one NotchFlow should show in Spotlight.
+LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
+[ -x "$LSREGISTER" ] && "$LSREGISTER" -u "$APP" >/dev/null 2>&1 || true
+/bin/rm -rf "$APP"
 
 printf '\nNotchFlow %s is out, and this Mac now runs it. Send your friends either of these:\n\n' "$VERSION"
 printf '  Install with one line (Terminal):\n'

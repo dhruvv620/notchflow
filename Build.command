@@ -29,6 +29,8 @@ case "$CONFIGURATION" in Debug|Release) ;; *) printf 'NOTCHFLOW_CONFIGURATION mu
 BUILD_ROOT="$HOME/Library/Caches/NotchFlowFresh"
 DERIVED_DIR="$BUILD_ROOT/DerivedData"
 mkdir -p "$BUILD_ROOT"
+# Keep build output out of Spotlight, so searching "NotchFlow" finds only the installed app.
+/usr/bin/touch "$BUILD_ROOT/.metadata_never_index"
 printf 'Building %s with cached dependencies in %s\n' "$CONFIGURATION" "$BUILD_ROOT"
 
 printf '\nChecking settings (no dead switches, every page reachable, search results land)...\n'
@@ -372,6 +374,7 @@ fi
 BACKUP_ROOT="$HOME/Library/Application Support/NotchFlow/Build Backups"
 mkdir -p "$(/usr/bin/dirname "$INSTALL_APP")"
 mkdir -p "$BACKUP_ROOT"
+/usr/bin/touch "$BACKUP_ROOT/.metadata_never_index"
 
 # Never rename an application bundle while its executable is still running.
 # Doing so changes the path macOS associates with the live process (for example,
@@ -443,6 +446,13 @@ while IFS= read -r -d '' backup; do
     [ -x "$LSREGISTER" ] && "$LSREGISTER" -u "$backup" >/dev/null 2>&1 || true
     /bin/mv "$backup" "$backup.backup"
 done < <(/usr/bin/find "$BACKUP_ROOT" -maxdepth 1 -type d -name '*.app' -print0)
+# The copies Xcode built (Debug and Release) were only steps on the way: once
+# installed, remove them so Spotlight, Launchpad and "Open With" show one
+# NotchFlow. The next build makes them again (the compile cache is kept).
+while IFS= read -r -d '' product; do
+    [ -x "$LSREGISTER" ] && "$LSREGISTER" -u "$product" >/dev/null 2>&1 || true
+    /bin/rm -rf "$product"
+done < <(/usr/bin/find "$DERIVED_DIR/Build/Products" -maxdepth 2 -type d -name 'NotchFlow.app' -print0 2>/dev/null)
 [ -x "$LSREGISTER" ] && "$LSREGISTER" -f "$INSTALL_APP" >/dev/null 2>&1 || true
 
 printf '\nInstalled %s\nAny previous running copy was stopped before its bundle was backed up.\n' "$INSTALL_APP"

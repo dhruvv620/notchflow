@@ -116,6 +116,8 @@ done
 LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
 BACKUPS="$HOME/Library/Application Support/${APP_NAME}/Build Backups"
 if [ -d "$BACKUPS" ]; then
+    # Keep backups out of Spotlight.
+    touch "$BACKUPS/.metadata_never_index"
     find "$BACKUPS" -maxdepth 1 -type d -name '*.app' -print0 | while IFS= read -r -d '' backup; do
         [ -x "$LSREGISTER" ] && "$LSREGISTER" -u "$backup" >/dev/null 2>&1 || true
         mv "$backup" "$backup.backup"
