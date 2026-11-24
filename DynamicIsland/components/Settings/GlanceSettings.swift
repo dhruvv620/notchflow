@@ -30,12 +30,13 @@ struct GlanceSettings: View {
 
     var body: some View {
         Form {
-            Section {
-                Defaults.Toggle(key: .enableGlance) {
-                    Text("Use Glance")
+            if !enableGlance {
+                Section {
+                    Text("Off: nothing listens for the Glance key.")
+                        .font(.callout).foregroundStyle(.secondary)
                 }
-                .settingsHighlight(id: "glance-Use Glance")
-                if enableGlance {
+            } else {
+            Section {
                     HStack {
                         Text("Opens with")
                         Spacer()
@@ -77,13 +78,12 @@ struct GlanceSettings: View {
                             .foregroundStyle(.secondary)
                         Spacer()
                         Button("Open Glance") { glance.show(pinned: true) }
+                            .settingsPrimaryButton()
                     }
-                }
             } header: {
-                Text("Glance")
+                Text("Opening")
             }
 
-            if enableGlance {
                 layoutSection
                 displaysSection
                 panelsSection
@@ -99,20 +99,19 @@ struct GlanceSettings: View {
                         Text("NotchFlow's own pages").tag("builtIn")
                     }
                     .settingsHighlight(id: "glance-Open web pages in")
-                    Toggle("App windows as live pictures (uses Screen Recording)", isOn: $livePicture)
-                    Defaults.Toggle(key: .glanceHideAds) {
-                        Text("Hide ads and cookie banners")
+                    Toggle(isOn: $livePicture) {
+                        SettingsRowLabel(title: "App windows as live pictures",
+                                         detail: "Needs Screen Recording. Off moves the real windows instead.")
                     }
-                    .settingsHighlight(id: "glance-Hide ads and cookie banners")
-                    Defaults.Toggle(key: .glanceUnloadOnBattery) {
-                        Text("Unload web pages on battery")
-                    }
+                    SettingsToggle(key: .glanceHideAds, title: "Hide ads and cookie banners",
+                                   detail: "On NotchFlow's own pages.",
+                                   highlightID: "glance-Hide ads and cookie banners")
+                    SettingsToggle(key: .glanceUnloadOnBattery, title: "Unload web pages on battery",
+                                   detail: "Saves power. They load again when Glance opens.")
                 } header: {
                     Text("Web pages")
                 } footer: {
-                    Text("In your browser, web pages are its own windows, signed in as you: Chrome, Chrome Beta, Edge, Brave and Vivaldi show just the page; Safari shows a normal window. They move onto the board when it opens and wait just off screen in between. App windows are the apps' real windows, moved onto the board and back, so no screen recording is needed. A window on another desktop can't be moved here; set its app to All Desktops (right-click its Dock icon › Options). NotchFlow's own pages keep their own sign-ins and can hide ads and cookie banners.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    Text("Pages open in your browser, signed in as you, and move onto the board when it opens. A window on another desktop can't move here: set its app to All Desktops (right-click its Dock icon › Options).")
                 }
             }
         }
@@ -157,7 +156,8 @@ struct GlanceSettings: View {
                 Spacer()
                 Button("New") { glance.newBoard(); selectedPanel = nil }
                 Button("Duplicate") { glance.duplicateActive(); selectedPanel = nil }
-                Button("Delete", role: .destructive) { glance.deleteActive(); selectedPanel = nil }
+                Button("Delete") { glance.deleteActive(); selectedPanel = nil }
+                    .settingsDestructiveButton()
                     .disabled(glance.boards.count < 2)
             }
             .settingsHighlight(id: "glance-Layouts")

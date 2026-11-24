@@ -37,20 +37,12 @@ struct WhatsAppSettings: View {
 
     var body: some View {
         Form {
-            Section {
-                Defaults.Toggle(key: .enableWhatsAppFeature) {
-                    Text("Show my WhatsApp messages")
+            if !enableWhatsAppFeature {
+                Section {
+                    Text("Off: nothing runs and nothing connects to WhatsApp.")
+                        .font(.callout).foregroundStyle(.secondary)
                 }
-                .settingsHighlight(id: highlightID("Show my WhatsApp messages"))
-            } header: {
-                Text("WhatsApp (experimental)")
-            } footer: {
-                Text("Unofficial integration: it goes through GOWA, an open-source WhatsApp gateway NotchFlow runs on this Mac. Use it with your own account only. WhatsApp may restrict accounts that misuse it.")
-                    .font(.caption)
-                    .foregroundStyle(SettingsPalette.warn)
-            }
-
-            if enableWhatsAppFeature {
+            } else {
                 gatewaySection
                 accountSection
 
@@ -112,36 +104,34 @@ struct WhatsAppSettings: View {
                 }
             }
         } header: {
-            Text("Gateway")
+            Text("Connection")
         } footer: {
-            Text("The gateway is downloaded from GitHub (aldinokemal/go-whatsapp-web-multidevice), checked against its published checksum, and only listens on this Mac.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            Text("Experimental and unofficial: NotchFlow runs GOWA, an open-source WhatsApp helper, on this Mac only. Use your own account. WhatsApp may limit accounts that misuse it.")
         }
     }
 
     private var gatewayIcon: (name: String, color: Color) {
         switch manager.state {
-        case .notInstalled: return ("arrow.down.circle", .secondary)
+        case .notInstalled: return ("arrow.down.circle", SettingsPalette.warn)
         case .installing, .starting: return ("hourglass", .secondary)
-        case .failed: return ("xmark.octagon.fill", .red)
-        default: return ("checkmark.circle.fill", .green)
+        case .failed: return ("xmark.octagon.fill", SettingsPalette.danger)
+        default: return ("checkmark.circle.fill", SettingsPalette.ok)
         }
     }
 
     private var gatewayTitle: String {
         switch manager.state {
         case .notInstalled:
-            return String(localized: "Gateway not installed")
+            return String(localized: "Not set up yet")
         case .installing:
-            return String(localized: "Installing gateway…")
+            return String(localized: "Setting up…")
         case .starting:
-            return String(localized: "Starting gateway…")
+            return String(localized: "Starting…")
         case .failed:
-            return String(localized: "Gateway stopped")
+            return String(localized: "Stopped")
         default:
             let version = manager.installedVersion.isEmpty ? "" : " \(manager.installedVersion)"
-            return String(localized: "Gateway GOWA\(version) running")
+            return String(localized: "Running (GOWA\(version))")
         }
     }
 
@@ -150,7 +140,7 @@ struct WhatsAppSettings: View {
             return String(localized: "Version \(latest) is available.")
         }
         if case .notInstalled = manager.state {
-            return String(localized: "About 30 MB. Needed to connect to WhatsApp.")
+            return String(localized: "A 30 MB download that connects NotchFlow to WhatsApp.")
         }
         return nil
     }
@@ -162,8 +152,7 @@ struct WhatsAppSettings: View {
             Button("Install") {
                 Task { await manager.installOrUpdateGateway() }
             }
-            .buttonStyle(.borderedProminent)
-            .tint(SettingsPalette.accent)
+            .settingsPrimaryButton()
         case .installing, .starting:
             ProgressView().controlSize(.small)
         case .failed:
@@ -178,8 +167,7 @@ struct WhatsAppSettings: View {
                 Button("Update") {
                     Task { await manager.installOrUpdateGateway() }
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(SettingsPalette.accent)
+                .settingsPrimaryButton()
             } else {
                 Button(manager.isCheckingForUpdate ? "Checking…" : "Check for Updates") {
                     Task { await manager.checkForUpdate() }
@@ -200,12 +188,8 @@ struct WhatsAppSettings: View {
                 }
                 if manager.activeSlots.count == 1, manager.linkState(for: .primary).isLinked {
                     HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Another account")
-                            Text("Link a second WhatsApp, say your personal one next to business: its messages arrive here too, and replies go out from the notch.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
+                        SettingsRowLabel(title: "Another account",
+                                         detail: "Link a second WhatsApp, like personal next to business.")
                         Spacer()
                         Button("Add Account") {
                             Task { await manager.addSecondAccount() }
@@ -215,19 +199,16 @@ struct WhatsAppSettings: View {
                     .settingsHighlight(id: highlightID("Another account"))
                 }
                 if manager.state.isLinked {
-                    Text(manager.receivesLiveUpdates
-                         ? "Live: new messages arrive at once."
-                         : "New messages arrive within a minute until the first live update comes in.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    SettingsStatus(text: manager.receivesLiveUpdates
+                                   ? "Live: new messages arrive at once."
+                                   : "New messages arrive within a minute until live updates start.",
+                                   kind: manager.receivesLiveUpdates ? .ok : .neutral)
                 }
             } header: {
                 Text(manager.activeSlots.count > 1 ? "Accounts" : "Account")
             } footer: {
                 if manager.activeSlots.count > 1 {
-                    Text("Each account uses one of its phone's linked-device slots, like WhatsApp Web. With both linked, chats show which account they're on.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    Text("Each account is a linked device on its phone, like WhatsApp Web.")
                 }
             }
             .confirmationDialog("Unlink this WhatsApp account from NotchFlow?",
@@ -246,12 +227,8 @@ struct WhatsAppSettings: View {
             // say why they're not here instead of hiding the section.
             Section {
                 HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(accountsUnavailableTitle)
-                        Text("Your linked accounts (and Add Account for a second one) show here once the WhatsApp connection is running. Your links are kept.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
+                    SettingsRowLabel(title: accountsUnavailableTitle,
+                                     detail: "Your accounts show here once the connection runs. Your links are kept.")
                     Spacer()
                     if case .starting = manager.state {
                         ProgressView().controlSize(.small)
@@ -267,11 +244,11 @@ struct WhatsAppSettings: View {
 
     private var accountsUnavailableTitle: String {
         switch manager.state {
-        case .notInstalled: return String(localized: "Install the WhatsApp connection above first.")
-        case .installing: return String(localized: "Installing the WhatsApp connection…")
-        case .starting: return String(localized: "Starting the WhatsApp connection…")
-        case .failed(let message): return String(localized: "The WhatsApp connection stopped: \(message)")
-        default: return String(localized: "The WhatsApp connection isn't running.")
+        case .notInstalled: return String(localized: "Set up the connection above first.")
+        case .installing: return String(localized: "Setting up the connection…")
+        case .starting: return String(localized: "Starting the connection…")
+        case .failed(let message): return String(localized: "The connection stopped: \(message)")
+        default: return String(localized: "The connection isn't running.")
         }
     }
 
@@ -295,9 +272,10 @@ struct WhatsAppSettings: View {
                     }
                 }
                 Spacer()
-                Button("Unlink", role: .destructive) {
+                Button("Unlink…") {
                     unlinkSlot = slot
                 }
+                .settingsDestructiveButton()
             }
         case .waitingForLink:
             if slot == .second {
@@ -308,6 +286,7 @@ struct WhatsAppSettings: View {
                     Button("Remove") {
                         Task { await manager.unlink(.second) }
                     }
+                    .settingsDestructiveButton()
                 }
             }
             linkingView(slot)
@@ -367,8 +346,7 @@ struct WhatsAppSettings: View {
                     Button("Cancel") { manager.cancelLinking() }
                 } else {
                     Button("Show QR Code") { manager.beginLinking(slot) }
-                        .buttonStyle(.borderedProminent)
-                        .tint(SettingsPalette.accent)
+                        .settingsPrimaryButton()
                         .disabled(manager.isLinking)
                 }
             }
@@ -381,20 +359,17 @@ struct WhatsAppSettings: View {
 
     private var notificationSection: some View {
         Section {
-            Defaults.Toggle(key: .whatsAppShowIncomingMessages) {
-                Text("Show new messages in the notch")
-            }
+            SettingsToggle(key: .whatsAppShowIncomingMessages, title: "Show new messages in the notch",
+                           detail: "The notch opens for a moment with who wrote.")
             if showIncomingMessages {
-                Defaults.Toggle(key: .whatsAppShowMessagePreviews) {
-                    Text("Show message text")
+                Group {
+                    SettingsToggle(key: .whatsAppShowMessagePreviews, title: "Show the message text")
+                    SettingsToggle(key: .whatsAppMuteGroups, title: "Mute groups",
+                                   detail: "Unless someone mentions you.",
+                                   highlightID: highlightID("Mute groups"))
+                    SettingsToggle(key: .whatsAppQuietDuringFocus, title: "Stay quiet during a Focus")
                 }
-                Defaults.Toggle(key: .whatsAppMuteGroups) {
-                    Text("Mute groups (unless I'm mentioned)")
-                }
-                .settingsHighlight(id: highlightID("Mute groups"))
-                Defaults.Toggle(key: .whatsAppQuietDuringFocus) {
-                    Text("Stay quiet during a Focus")
-                }
+                .padding(.leading, 16)
             }
         } header: {
             Text("New messages")
@@ -403,15 +378,9 @@ struct WhatsAppSettings: View {
 
     private var readingSection: some View {
         Section {
-            Defaults.Toggle(key: .whatsAppMarkReadOnOpen) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Mark as read when I open a conversation")
-                    Text("Off: marked read only when you reply. Never when a message just arrives.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .settingsHighlight(id: highlightID("Mark as read when I open a conversation"))
+            SettingsToggle(key: .whatsAppMarkReadOnOpen, title: "Mark as read when I open a chat",
+                           detail: "Off: only when you reply. Never just because a message arrived.",
+                           highlightID: highlightID("Mark as read when I open a conversation"))
         } header: {
             Text("Read receipts")
         }
@@ -420,8 +389,8 @@ struct WhatsAppSettings: View {
     private var ignoredSection: some View {
         Section {
             if ignoredChats.isEmpty {
-                Text("Right-click a chat in the notch and choose Ignore This Chat to hide it here.")
-                    .font(.caption)
+                Text("None. Right-click a chat in the notch and choose Ignore This Chat.")
+                    .font(.callout)
                     .foregroundStyle(.secondary)
             } else {
                 ForEach(ignoredChats, id: \.self) { chatID in
@@ -438,34 +407,35 @@ struct WhatsAppSettings: View {
             Text("Ignored chats")
         } footer: {
             Text("Ignored chats are hidden from the notch and never announced.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
         }
     }
 
     private var advancedSection: some View {
         Section {
             HStack {
-                Button("Show Gateway Files in Finder") {
+                SettingsRowLabel(title: "Remove the connection",
+                                 detail: "Unlinks your accounts and deletes the local copy of your chats.")
+                Spacer()
+                Button("Show in Finder") {
                     let url = WhatsAppGatewayInstaller.rootDirectory
                     try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
                     NSWorkspace.shared.activateFileViewerSelecting([url])
                 }
-                Spacer()
-                Button("Remove Gateway…", role: .destructive) {
+                Button("Remove…") {
                     confirmRemove = true
                 }
+                .settingsDestructiveButton()
                 .disabled(!WhatsAppGatewayInstaller.isInstalled)
             }
         } header: {
-            Text("Advanced")
+            Text("Data")
         }
-        .confirmationDialog("Remove the WhatsApp gateway?", isPresented: $confirmRemove) {
+        .confirmationDialog("Remove the WhatsApp connection?", isPresented: $confirmRemove) {
             Button("Remove", role: .destructive) {
                 Task { await manager.removeGateway() }
             }
         } message: {
-            Text("This unlinks your account and deletes the gateway with its local copy of your chats.")
+            Text("Your accounts are unlinked and the local copy of your chats is deleted. Your chats on your phone stay.")
         }
     }
 }

@@ -212,6 +212,18 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         switch self {
         case .orbit: return .enableOrbit
         case .agents: return .enableAgentsFeature
+        case .timer: return .enableTimerFeature
+        case .stats: return .enableStatsFeature
+        case .notes: return .enableNotes
+        case .clipboard: return .enableClipboardManager
+        case .terminal: return .enableTerminalFeature
+        case .whatsapp: return .enableWhatsAppFeature
+        case .glance: return .enableGlance
+        case .shelf: return .dynamicShelf
+        case .colorPicker: return .enableColorPickerFeature
+        case .screenAssistant: return .enableScreenAssistant
+        case .downloads: return .enableDownloadListener
+        case .shortcuts: return .enableShortcuts
         default: return nil
         }
     }
@@ -764,14 +776,14 @@ struct SettingsView: View {
             SettingsSearchEntry(tab: .general, title: "Notch display height", keywords: ["display height", "menu bar size"], highlightID: SettingsTab.general.highlightID(for: "Notch display height")),
 
             // Live Activities
-            SettingsSearchEntry(tab: .liveActivities, title: "Enable Screen Recording Detection", keywords: ["screen recording", "indicator"], highlightID: SettingsTab.liveActivities.highlightID(for: "Enable Screen Recording Detection")),
-            SettingsSearchEntry(tab: .liveActivities, title: "Show Recording Indicator", keywords: ["recording indicator", "red dot"], highlightID: SettingsTab.liveActivities.highlightID(for: "Show Recording Indicator")),
-            SettingsSearchEntry(tab: .liveActivities, title: "Enable Focus Detection", keywords: ["focus", "do not disturb", "dnd"], highlightID: SettingsTab.liveActivities.highlightID(for: "Enable Focus Detection")),
-            SettingsSearchEntry(tab: .liveActivities, title: "Show Focus Indicator", keywords: ["focus icon", "moon"], highlightID: SettingsTab.liveActivities.highlightID(for: "Show Focus Indicator")),
-            SettingsSearchEntry(tab: .liveActivities, title: "Show Focus Label", keywords: ["focus label", "text"], highlightID: SettingsTab.liveActivities.highlightID(for: "Show Focus Label")),
-            SettingsSearchEntry(tab: .liveActivities, title: "Enable Camera Detection", keywords: ["camera", "privacy indicator"], highlightID: SettingsTab.liveActivities.highlightID(for: "Enable Camera Detection")),
-            SettingsSearchEntry(tab: .liveActivities, title: "Enable Microphone Detection", keywords: ["microphone", "privacy"], highlightID: SettingsTab.liveActivities.highlightID(for: "Enable Microphone Detection")),
-            SettingsSearchEntry(tab: .media, title: "Enable music live activity", keywords: ["music", "now playing"], highlightID: SettingsTab.media.highlightID(for: "Enable music live activity")),
+            SettingsSearchEntry(tab: .liveActivities, title: "Notice screen recording", keywords: ["screen recording", "indicator"], highlightID: SettingsTab.liveActivities.highlightID(for: "Notice screen recording")),
+            SettingsSearchEntry(tab: .liveActivities, title: "Show a recording dot", keywords: ["recording indicator", "red dot"], highlightID: SettingsTab.liveActivities.highlightID(for: "Show a recording dot")),
+            SettingsSearchEntry(tab: .liveActivities, title: "Notice Focus", keywords: ["focus", "do not disturb", "dnd"], highlightID: SettingsTab.liveActivities.highlightID(for: "Notice Focus")),
+            SettingsSearchEntry(tab: .liveActivities, title: "Show the Focus icon", keywords: ["focus icon", "moon"], highlightID: SettingsTab.liveActivities.highlightID(for: "Show the Focus icon")),
+            SettingsSearchEntry(tab: .liveActivities, title: "Show the Focus name", keywords: ["focus label", "text"], highlightID: SettingsTab.liveActivities.highlightID(for: "Show the Focus name")),
+            SettingsSearchEntry(tab: .liveActivities, title: "Camera in use", keywords: ["camera", "privacy indicator"], highlightID: SettingsTab.liveActivities.highlightID(for: "Camera in use")),
+            SettingsSearchEntry(tab: .liveActivities, title: "Microphone in use", keywords: ["microphone", "privacy"], highlightID: SettingsTab.liveActivities.highlightID(for: "Microphone in use")),
+            SettingsSearchEntry(tab: .media, title: "Show music in the closed notch", keywords: ["music", "now playing"], highlightID: SettingsTab.media.highlightID(for: "Show music in the closed notch")),
 
             // Battery (Charge)
             SettingsSearchEntry(tab: .battery, title: "Show battery indicator", keywords: ["battery hud", "charge"], highlightID: SettingsTab.battery.highlightID(for: "Show battery indicator")),
@@ -824,15 +836,15 @@ struct SettingsView: View {
             SettingsSearchEntry(tab: .hudAndOSD, title: "Enable external volume control listener", keywords: ["external volume", "ddc volume", "betterdisplay volume", "lunar volume", "disable native volume"], highlightID: SettingsTab.hudAndOSD.highlightID(for: "Enable external volume control listener")),
 
             // Media
-            SettingsSearchEntry(tab: .media, title: "Music Source", keywords: ["media source", "controller"], highlightID: SettingsTab.media.highlightID(for: "Music Source")),
+            SettingsSearchEntry(tab: .media, title: "Music source", keywords: ["media source", "controller"], highlightID: SettingsTab.media.highlightID(for: "Music source")),
             SettingsSearchEntry(tab: .media, title: "Skip buttons", keywords: ["skip", "controls", "±10"], highlightID: SettingsTab.media.highlightID(for: "Skip buttons")),
-            SettingsSearchEntry(tab: .media, title: "Sneak Peek Style", keywords: ["sneak peek", "preview"], highlightID: SettingsTab.media.highlightID(for: "Sneak Peek Style")),
-            SettingsSearchEntry(tab: .media, title: "Enable lyrics", keywords: ["lyrics", "song text"], highlightID: SettingsTab.media.highlightID(for: "Enable lyrics")),
-            SettingsSearchEntry(tab: .media, title: "Show live canvas in Dynamic Island", keywords: ["canvas", "live canvas", "album art", "dynamic island", "spotify canvas"], highlightID: SettingsTab.media.highlightID(for: "Show live canvas in Dynamic Island")),
-            SettingsSearchEntry(tab: .media, title: "Auto-hide inactive notch media player", keywords: ["auto hide", "inactive", "placeholder", "notch media"], highlightID: SettingsTab.media.highlightID(for: "Auto-hide inactive notch media player")),
-            SettingsSearchEntry(tab: .media, title: "Show Change Media Output control", keywords: ["airplay", "route picker", "media output"], highlightID: SettingsTab.media.highlightID(for: "Show Change Media Output control")),
-            SettingsSearchEntry(tab: .media, title: "Enable album art parallax", keywords: ["parallax", "lock screen", "album art"], highlightID: SettingsTab.media.highlightID(for: "Enable album art parallax")),
-            SettingsSearchEntry(tab: .media, title: "Enable album art parallax effect", keywords: ["parallax", "parallax effect", "album art"], highlightID: SettingsTab.media.highlightID(for: "Enable album art parallax effect")),
+            SettingsSearchEntry(tab: .media, title: "Sneak peek style", keywords: ["sneak peek", "preview"], highlightID: SettingsTab.media.highlightID(for: "Sneak peek style")),
+            SettingsSearchEntry(tab: .media, title: "Lyrics", keywords: ["lyrics", "song text"], highlightID: SettingsTab.media.highlightID(for: "Lyrics")),
+            SettingsSearchEntry(tab: .media, title: "Moving artwork", keywords: ["canvas", "live canvas", "album art", "dynamic island", "spotify canvas"], highlightID: SettingsTab.media.highlightID(for: "Moving artwork")),
+            SettingsSearchEntry(tab: .media, title: "Hide it when nothing plays", keywords: ["auto hide", "inactive", "placeholder", "notch media"], highlightID: SettingsTab.media.highlightID(for: "Hide it when nothing plays")),
+            SettingsSearchEntry(tab: .media, title: "Output button", keywords: ["airplay", "route picker", "media output"], highlightID: SettingsTab.media.highlightID(for: "Output button")),
+            SettingsSearchEntry(tab: .media, title: "Artwork tilt on the lock screen", keywords: ["parallax", "lock screen", "album art"], highlightID: SettingsTab.media.highlightID(for: "Artwork tilt on the lock screen")),
+            SettingsSearchEntry(tab: .media, title: "Artwork tilt", keywords: ["parallax", "parallax effect", "album art"], highlightID: SettingsTab.media.highlightID(for: "Artwork tilt")),
 
             // Calendar
             SettingsSearchEntry(tab: .calendar, title: "Enable Todos tab", keywords: ["reminders", "apple reminders", "tasks", "lists", "hide todos"], highlightID: SettingsTab.calendar.highlightID(for: "Show Reminders tab")),
@@ -853,7 +865,7 @@ struct SettingsView: View {
             SettingsSearchEntry(tab: .calendar, title: "Auto-scroll to next event", keywords: ["calendar", "scroll"], highlightID: SettingsTab.calendar.highlightID(for: "Auto-scroll to next event")),
 
             // Shelf
-            SettingsSearchEntry(tab: .shelf, title: "Enable shelf", keywords: ["shelf", "dock"], highlightID: SettingsTab.shelf.highlightID(for: "Enable shelf")),
+            SettingsSearchEntry(tab: .shelf, title: "Use Shelf", keywords: ["shelf", "dock"], highlightID: SettingsTab.shelf.highlightID(for: "Use Shelf")),
             SettingsSearchEntry(tab: .shelf, title: "Open shelf tab by default if items added", keywords: ["auto open", "shelf tab"], highlightID: SettingsTab.shelf.highlightID(for: "Open shelf tab by default if items added")),
             SettingsSearchEntry(tab: .shelf, title: "Copy items on drag", keywords: ["shelf", "drag", "copy"], highlightID: SettingsTab.shelf.highlightID(for: "Copy items on drag")),
             SettingsSearchEntry(tab: .shelf, title: "Remove from shelf after dragging", keywords: ["shelf", "drag", "remove"], highlightID: SettingsTab.shelf.highlightID(for: "Remove from shelf after dragging")),
@@ -877,7 +889,7 @@ struct SettingsView: View {
             SettingsSearchEntry(tab: .appearance, title: "Round the top corners when open", keywords: ["corner radius scaling", "corners", "rounded"], highlightID: SettingsTab.appearance.highlightID(for: "Round the top corners when open")),
             SettingsSearchEntry(tab: .appearance, title: "Use simpler close animation", keywords: ["close animation", "notch"], highlightID: SettingsTab.appearance.highlightID(for: "Use simpler close animation")),
             SettingsSearchEntry(tab: .appearance, title: "Closed notch / pill width", keywords: ["closed notch", "pill", "width"], highlightID: SettingsTab.appearance.highlightID(for: "Closed notch / pill width")),
-            SettingsSearchEntry(tab: .media, title: "Enable colored spectrograms", keywords: ["spectrogram", "audio"], highlightID: SettingsTab.media.highlightID(for: "Enable colored spectrograms")),
+            SettingsSearchEntry(tab: .media, title: "Colour it with the artwork", keywords: ["spectrogram", "audio"], highlightID: SettingsTab.media.highlightID(for: "Colour it with the artwork")),
             SettingsSearchEntry(tab: .appearance, title: "Enable Dynamic mirror", keywords: ["mirror", "reflection"], highlightID: SettingsTab.appearance.highlightID(for: "Enable Dynamic mirror")),
             SettingsSearchEntry(tab: .appearance, title: "Mirror shape", keywords: ["mirror shape", "circle", "rectangle"], highlightID: SettingsTab.appearance.highlightID(for: "Mirror shape")),
             SettingsSearchEntry(tab: .appearance, title: "Idle Animation", keywords: ["face animation", "idle", "cool face"], highlightID: SettingsTab.appearance.highlightID(for: "Idle Animation")),
@@ -917,13 +929,13 @@ struct SettingsView: View {
 
 
             // Shortcuts
-            SettingsSearchEntry(tab: .shortcuts, title: "Enable global keyboard shortcuts", keywords: ["keyboard", "shortcut"], highlightID: SettingsTab.shortcuts.highlightID(for: "Enable global keyboard shortcuts")),
+            SettingsSearchEntry(tab: .shortcuts, title: "Use Shortcuts", keywords: ["keyboard", "shortcut"], highlightID: SettingsTab.shortcuts.highlightID(for: "Use Shortcuts")),
 
             // Timer
             SettingsSearchEntry(tab: .timer, title: "Don't disturb me during focus", keywords: ["pomodoro", "focus", "do not disturb", "notifications", "quiet", "distraction"], highlightID: SettingsTab.timer.highlightID(for: "Don't disturb me during focus")),
             SettingsSearchEntry(tab: .timer, title: "Let calls through", keywords: ["pomodoro", "focus", "calls"], highlightID: SettingsTab.timer.highlightID(for: "Let calls through")),
             SettingsSearchEntry(tab: .timer, title: "Also silence macOS (Focus)", keywords: ["pomodoro", "focus", "shortcuts", "do not disturb"], highlightID: SettingsTab.timer.highlightID(for: "Also silence macOS (Focus)")),
-            SettingsSearchEntry(tab: .timer, title: "Enable timer feature", keywords: ["timer", "enable"], highlightID: SettingsTab.timer.highlightID(for: "Enable timer feature")),
+            SettingsSearchEntry(tab: .timer, title: "Use Timers", keywords: ["timer", "enable"], highlightID: SettingsTab.timer.highlightID(for: "Use Timers")),
             SettingsSearchEntry(tab: .timer, title: "Mirror macOS Clock timers", keywords: ["system timer", "clock app"], highlightID: SettingsTab.timer.highlightID(for: "Mirror macOS Clock timers")),
             SettingsSearchEntry(tab: .timer, title: "Timer tint", keywords: ["timer colour", "preset"], highlightID: SettingsTab.timer.highlightID(for: "Timer tint")),
             SettingsSearchEntry(tab: .timer, title: "Solid colour", keywords: ["timer colour", "custom"], highlightID: SettingsTab.timer.highlightID(for: "Solid colour")),
@@ -931,36 +943,36 @@ struct SettingsView: View {
             SettingsSearchEntry(tab: .timer, title: "Accent colour", keywords: ["accent", "timer"], highlightID: SettingsTab.timer.highlightID(for: "Accent colour")),
 
             // Stats
-            SettingsSearchEntry(tab: .stats, title: "Enable system stats monitoring", keywords: ["stats", "monitoring"], highlightID: SettingsTab.stats.highlightID(for: "Enable system stats monitoring")),
-            SettingsSearchEntry(tab: .stats, title: "Enable LLM Usage Monitor", keywords: ["llm", "usage", "ai", "monitor"], highlightID: SettingsTab.stats.highlightID(for: "Enable LLM Usage Monitor")),
+            SettingsSearchEntry(tab: .stats, title: "Use Stats", keywords: ["stats", "monitoring"], highlightID: SettingsTab.stats.highlightID(for: "Use Stats")),
+            SettingsSearchEntry(tab: .stats, title: "AI usage tab", keywords: ["llm", "usage", "ai", "monitor"], highlightID: SettingsTab.stats.highlightID(for: "AI usage tab")),
             SettingsSearchEntry(tab: .stats, title: "Claude Provider", keywords: ["llm", "claude", "provider", "toggle"], highlightID: SettingsTab.stats.highlightID(for: "Claude Provider")),
             SettingsSearchEntry(tab: .stats, title: "Codex Provider", keywords: ["llm", "codex", "provider", "toggle"], highlightID: SettingsTab.stats.highlightID(for: "Codex Provider")),
             SettingsSearchEntry(tab: .stats, title: "Cursor Provider", keywords: ["llm", "cursor", "provider", "toggle"], highlightID: SettingsTab.stats.highlightID(for: "Cursor Provider")),
-            SettingsSearchEntry(tab: .stats, title: "Stop monitoring after closing the notch", keywords: ["stats", "auto stop"], highlightID: SettingsTab.stats.highlightID(for: "Stop monitoring after closing the notch")),
-            SettingsSearchEntry(tab: .stats, title: "CPU Usage", keywords: ["cpu", "graph"], highlightID: SettingsTab.stats.highlightID(for: "CPU Usage")),
+            SettingsSearchEntry(tab: .stats, title: "Stop when the notch closes", keywords: ["stats", "auto stop"], highlightID: SettingsTab.stats.highlightID(for: "Stop when the notch closes")),
+            SettingsSearchEntry(tab: .stats, title: "CPU", keywords: ["cpu", "graph"], highlightID: SettingsTab.stats.highlightID(for: "CPU")),
             SettingsSearchEntry(tab: .stats, title: "Temperature unit", keywords: ["cpu", "temperature", "celsius", "fahrenheit"], highlightID: SettingsTab.stats.highlightID(for: "Temperature unit")),
-            SettingsSearchEntry(tab: .stats, title: "Memory Usage", keywords: ["memory", "ram"], highlightID: SettingsTab.stats.highlightID(for: "Memory Usage")),
-            SettingsSearchEntry(tab: .stats, title: "GPU Usage", keywords: ["gpu", "graphics"], highlightID: SettingsTab.stats.highlightID(for: "GPU Usage")),
-            SettingsSearchEntry(tab: .stats, title: "Network Activity", keywords: ["network", "graph"], highlightID: SettingsTab.stats.highlightID(for: "Network Activity")),
-            SettingsSearchEntry(tab: .stats, title: "Disk I/O", keywords: ["disk", "io"], highlightID: SettingsTab.stats.highlightID(for: "Disk I/O")),
+            SettingsSearchEntry(tab: .stats, title: "Memory", keywords: ["memory", "ram"], highlightID: SettingsTab.stats.highlightID(for: "Memory")),
+            SettingsSearchEntry(tab: .stats, title: "GPU", keywords: ["gpu", "graphics"], highlightID: SettingsTab.stats.highlightID(for: "GPU")),
+            SettingsSearchEntry(tab: .stats, title: "Network", keywords: ["network", "graph"], highlightID: SettingsTab.stats.highlightID(for: "Network")),
+            SettingsSearchEntry(tab: .stats, title: "Disk", keywords: ["disk", "io"], highlightID: SettingsTab.stats.highlightID(for: "Disk")),
 
             // Clipboard
-            SettingsSearchEntry(tab: .clipboard, title: "Enable Clipboard Manager", keywords: ["clipboard", "manager"], highlightID: SettingsTab.clipboard.highlightID(for: "Enable Clipboard Manager")),
-            SettingsSearchEntry(tab: .clipboard, title: "Display Mode", keywords: ["list", "grid", "clipboard"], highlightID: SettingsTab.clipboard.highlightID(for: "Display Mode")),
+            SettingsSearchEntry(tab: .clipboard, title: "Use Clipboard", keywords: ["clipboard", "manager"], highlightID: SettingsTab.clipboard.highlightID(for: "Use Clipboard")),
+            SettingsSearchEntry(tab: .clipboard, title: "Show it as", keywords: ["list", "grid", "clipboard"], highlightID: SettingsTab.clipboard.highlightID(for: "Show it as")),
             SettingsSearchEntry(tab: .clipboard, title: "History Size", keywords: ["history", "clipboard"], highlightID: SettingsTab.clipboard.highlightID(for: "History Size")),
 
             // Screen Assistant
-            SettingsSearchEntry(tab: .screenAssistant, title: "Enable Screen Assistant", keywords: ["screen assistant", "ai"], highlightID: SettingsTab.screenAssistant.highlightID(for: "Enable Screen Assistant")),
-            SettingsSearchEntry(tab: .screenAssistant, title: "Display Mode", keywords: ["screen assistant", "mode"], highlightID: SettingsTab.screenAssistant.highlightID(for: "Display Mode")),
+            SettingsSearchEntry(tab: .screenAssistant, title: "Use Screen Assistant", keywords: ["screen assistant", "ai"], highlightID: SettingsTab.screenAssistant.highlightID(for: "Use Screen Assistant")),
+            SettingsSearchEntry(tab: .screenAssistant, title: "Show it as", keywords: ["screen assistant", "mode"], highlightID: SettingsTab.screenAssistant.highlightID(for: "Show it as")),
 
             // Color Picker
-            SettingsSearchEntry(tab: .colorPicker, title: "Enable Color Picker", keywords: ["color picker", "eyedropper"], highlightID: SettingsTab.colorPicker.highlightID(for: "Enable Color Picker")),
-            SettingsSearchEntry(tab: .colorPicker, title: "Show Color Picker Icon", keywords: ["color icon", "toolbar"], highlightID: SettingsTab.colorPicker.highlightID(for: "Show Color Picker Icon")),
-            SettingsSearchEntry(tab: .colorPicker, title: "Display Mode", keywords: ["color", "list"], highlightID: SettingsTab.colorPicker.highlightID(for: "Display Mode")),
-            SettingsSearchEntry(tab: .colorPicker, title: "Show All Color Formats", keywords: ["hex", "hsl", "color formats"], highlightID: SettingsTab.colorPicker.highlightID(for: "Show All Color Formats")),
+            SettingsSearchEntry(tab: .colorPicker, title: "Use Color Picker", keywords: ["color picker", "eyedropper"], highlightID: SettingsTab.colorPicker.highlightID(for: "Use Color Picker")),
+            SettingsSearchEntry(tab: .colorPicker, title: "Button in the notch", keywords: ["color icon", "toolbar"], highlightID: SettingsTab.colorPicker.highlightID(for: "Button in the notch")),
+            SettingsSearchEntry(tab: .colorPicker, title: "Show it as", keywords: ["color", "list"], highlightID: SettingsTab.colorPicker.highlightID(for: "Show it as")),
+            SettingsSearchEntry(tab: .colorPicker, title: "Every colour format", keywords: ["hex", "hsl", "color formats"], highlightID: SettingsTab.colorPicker.highlightID(for: "Every colour format")),
 
             // Terminal
-            SettingsSearchEntry(tab: .terminal, title: "Enable terminal", keywords: ["terminal", "guake", "shell"], highlightID: SettingsTab.terminal.highlightID(for: "Enable terminal")),
+            SettingsSearchEntry(tab: .terminal, title: "Use Terminal", keywords: ["terminal", "guake", "shell"], highlightID: SettingsTab.terminal.highlightID(for: "Use Terminal")),
             SettingsSearchEntry(tab: .agents, title: "Command-line tools", keywords: ["cli", "claude", "codex", "gemini", "cursor", "opencode", "aider", "copilot", "ollama", "install", "start", "launcher", "terminal"], highlightID: SettingsTab.agents.highlightID(for: "Command-line tools")),
             SettingsSearchEntry(tab: .agents, title: "Approval card at the top right", keywords: ["approve", "allow", "deny", "permission", "card", "popup", "floating"], highlightID: SettingsTab.agents.highlightID(for: "Approval card at the top right")),
             SettingsSearchEntry(tab: .agents, title: "Tab size", keywords: ["agents", "size", "large", "bigger", "text"], highlightID: SettingsTab.agents.highlightID(for: "Tab size")),
@@ -1016,7 +1028,7 @@ struct SettingsView: View {
             SettingsSearchEntry(tab: .smartTools, title: "Smart replies", keywords: ["minimax", "ai", "reply", "suggestions", "api key", "hinglish"], highlightID: SettingsTab.smartTools.highlightID(for: "Smart replies")),
             SettingsSearchEntry(tab: .smartTools, title: "People pins", keywords: ["shelf", "whatsapp", "favourites", "send file"], highlightID: SettingsTab.smartTools.highlightID(for: "People pins")),
             SettingsSearchEntry(tab: .smartTools, title: "Build watcher", keywords: ["github", "actions", "ci", "deploy", "terminal", "build"], highlightID: SettingsTab.smartTools.highlightID(for: "Build watcher")),
-            SettingsSearchEntry(tab: .whatsapp, title: "Show my WhatsApp messages", keywords: ["whatsapp", "messages", "chat", "reply", "qr", "link"], highlightID: SettingsTab.whatsapp.highlightID(for: "Show my WhatsApp messages")),
+            SettingsSearchEntry(tab: .whatsapp, title: "Use WhatsApp", keywords: ["whatsapp", "messages", "chat", "reply", "qr", "link"], highlightID: SettingsTab.whatsapp.highlightID(for: "Use WhatsApp")),
             SettingsSearchEntry(tab: .whatsapp, title: "Mute groups", keywords: ["whatsapp", "groups", "mute", "mention"], highlightID: SettingsTab.whatsapp.highlightID(for: "Mute groups")),
             SettingsSearchEntry(tab: .whatsapp, title: "Mark as read when I open a conversation", keywords: ["whatsapp", "read receipts", "blue ticks"], highlightID: SettingsTab.whatsapp.highlightID(for: "Mark as read when I open a conversation")),
             SettingsSearchEntry(tab: .whatsapp, title: "Another account", keywords: ["whatsapp", "second account", "personal", "business", "two accounts", "multiple"], highlightID: SettingsTab.whatsapp.highlightID(for: "Another account")),
@@ -2928,7 +2940,7 @@ struct Media: View {
     var body: some View {
         Form {
             Section {
-                Picker("Music Source", selection: $mediaController) {
+                Picker("Music source", selection: $mediaController) {
                     ForEach(availableMediaControllers) { controller in
                         Text(controller.localizedName).tag(controller)
                     }
@@ -2939,26 +2951,19 @@ struct Media: View {
                         object: nil
                     )
                 }
-                .settingsHighlight(id: highlightID("Music Source"))
+                .settingsHighlight(id: highlightID("Music source"))
+                SpotifyConnectRow()
+                    .settingsHighlight(id: highlightID("Spotify search"))
             } header: {
-                Text("Media Source")
+                Text("Source")
             } footer: {
                 if MusicManager.shared.isNowPlayingDeprecated {
-                    HStack {
-                        Text("YouTube Music requires this third-party app to be installed: ")
-                            .foregroundStyle(.secondary)
-                            .font(.caption)
-                        Link("https://github.com/th-ch/youtube-music", destination: URL(string: "https://github.com/th-ch/youtube-music")!)
-                            .font(.caption)
-                            .foregroundColor(.blue) // Ensures it's visibly a link
+                    HStack(spacing: 4) {
+                        Text("YouTube Music needs this free app:")
+                        Link("github.com/th-ch/youtube-music", destination: URL(string: "https://github.com/th-ch/youtube-music")!)
                     }
                 } else {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(String(localized: "'Now Playing' was the only option on previous versions and works with all media apps."))
-                        Text(String(localized: "Uses macOS Now Playing when the Amazon Music app is the active media source. Playback controls follow the system Now Playing target. Scrubbing the timeline may not work if the Amazon Music app does not support remote seek."))
-                    }
-                    .foregroundStyle(.secondary)
-                    .font(.caption)
+                    Text("Now Playing works with every music app. Scrubbing may not work in apps that don't support it, like Amazon Music.")
                 }
             }
 
@@ -2967,219 +2972,158 @@ struct Media: View {
             }
 
             Section {
-                Defaults.Toggle(key: .showStandardMediaControls) {
-                    Text("Show media controls in Dynamic Island")
-                }
-                .disabled(enableMinimalisticUI)
-                .settingsHighlight(id: highlightID("Show media controls in Dynamic Island"))
-
-                Defaults.Toggle(key: .autoHideInactiveNotchMediaPlayer) {
-                    Text("Auto-hide inactive notch media player")
-                }
-                .disabled(enableMinimalisticUI || !showStandardMediaControls)
-                .settingsHighlight(id: highlightID("Auto-hide inactive notch media player"))
-
+                SettingsToggle(key: .showStandardMediaControls, title: "Music player",
+                               detail: "The player in the open notch.",
+                               highlightID: highlightID("Music player"))
+                    .disabled(enableMinimalisticUI)
                 if enableMinimalisticUI {
-                    Text("Disable Minimalistic UI to configure the standard notch media controls.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                } else if standardControlsSuppressed {
-                    Text("Standard notch media controls are hidden. Re-enable the toggle above to restore them.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                } else if !autoHideInactiveNotchMediaPlayer {
-                    Text("When disabled, the notch music player stays visible with placeholder metadata even when playback is inactive.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    SettingsStatus(text: "Minimal mode is on, so the player is hidden. Turn it off in Appearance.", kind: .warn)
+                } else if showStandardMediaControls {
+                    SettingsToggle(key: .autoHideInactiveNotchMediaPlayer, title: "Hide it when nothing plays",
+                                   detail: "Off keeps the player showing, even with nothing playing.",
+                                   highlightID: highlightID("Hide it when nothing plays"))
+                        .padding(.leading, 16)
                 }
-            } header: {
-                Text("Dynamic Island Visibility")
-            }
-            Section {
-                Defaults.Toggle(key: .showShuffleAndRepeat) {
+                SettingsToggle(key: .musicArtworkGlow, title: "Artwork glow",
+                               detail: "A soft glow of the album colours behind the art.",
+                               highlightID: highlightID("Artwork glow"))
+                SettingsToggle(key: .showLiveCanvasInDynamicIsland, title: "Moving artwork",
+                               detail: "Shows the song's video artwork when the app has one, like Spotify Canvas.",
+                               highlightID: highlightID("Moving artwork"))
+                LabeledContent {
                     HStack {
-                        Text("Enable customizable controls")
-                        customBadge(text: "Beta")
+                        Slider(value: $parallaxEffectIntensity, in: 0...12, step: 1).frame(maxWidth: 180)
+                        Text("\(Int(parallaxEffectIntensity))").foregroundStyle(.secondary).monospacedDigit().frame(width: 24, alignment: .trailing)
                     }
+                } label: {
+                    SettingsRowLabel(title: "Artwork tilt", detail: "How much the art moves with the pointer.")
                 }
+                .settingsHighlight(id: highlightID("Artwork tilt"))
+                SettingsToggle(key: .showShuffleAndRepeat, title: "Choose the buttons",
+                               detail: "Pick and order the player's buttons, like shuffle and repeat.",
+                               highlightID: highlightID("Choose the buttons"))
                 if showShuffleAndRepeat {
-                    Defaults.Toggle(key: .showMediaOutputControl) {
-                        Text("Show \"Change Media Output\" control")
-                    }
-                    .settingsHighlight(id: highlightID("Show Change Media Output control"))
-                    .help("Adds the AirPlay/route picker button back to the customizable controls palette.")
+                    SettingsToggle(key: .showMediaOutputControl, title: "Output button",
+                                   detail: "Adds the AirPlay and speaker picker to the choices.",
+                                   highlightID: highlightID("Output button"))
+                        .padding(.leading, 16)
                     MusicSlotConfigurationView()
-                } else {
-                    Text("Turn on customizable controls to rearrange media buttons.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .padding(.vertical, 4)
                 }
             } header: {
-                Text("Media controls")
+                Text("Open notch")
             }
 
-            Section(header: Text("Lock Screen Media")) {
-                Defaults.Toggle(key: .lockScreenMusicAlbumParallaxEnabled) {
-                    Text("Enable album art parallax")
-                }
-                .settingsHighlight(id: highlightID("Enable album art parallax"))
-                Text("Applies the notch-style parallax effect to the lock screen media widget album art.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            if musicControlWindowEnabled {
-                Section {
-                    Picker("Skip buttons", selection: $musicSkipBehavior) {
-                        ForEach(MusicSkipBehavior.allCases) { behavior in
-                            Text(behavior.displayName).tag(behavior)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .settingsHighlight(id: highlightID("Skip buttons"))
-
-                    Text(musicSkipBehavior.description)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                } header: {
-                    Text("Floating window panel skip behaviour")
-                }
-            }
             Section {
-                Toggle(
-                    "Enable music live activity",
-                    isOn: $coordinator.musicLiveActivityEnabled.animation()
-                )
+                Toggle(isOn: $coordinator.musicLiveActivityEnabled.animation()) {
+                    SettingsRowLabel(title: "Show music in the closed notch",
+                                     detail: "Artwork on one side, a visualizer on the other.")
+                }
                 .disabled(standardControlsSuppressed)
-                .help(standardControlsSuppressed ? "Standard notch media controls are hidden while this toggle is off." : "")
-                Toggle("Show music in the closed notch", isOn: $coordinator.musicLiveActivityEnabled.animation())
-                    .settingsHighlight(id: highlightID("Enable music live activity"))
-                Defaults.Toggle(key: .closedNotchMusicFirst) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Music first")
-                        Text("While music plays, the closed notch shows it. AI agents working, builds running, a meeting countdown and the distraction meter wait; approvals, calls and new messages still show for a moment.")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-                .disabled(!coordinator.musicLiveActivityEnabled)
-                .settingsHighlight(id: highlightID("Music first"))
-                SpotifyConnectRow()
-                    .settingsHighlight(id: highlightID("Spotify search"))
-                Defaults.Toggle(key: .musicArtworkGlow) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Artwork glow")
-                        Text("A soft glow of the album art's colors behind it in the Music tab, brighter while playing.")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-                .settingsHighlight(id: highlightID("Artwork glow"))
-                Defaults.Toggle(key: .musicControlWindowEnabled) {
-                    Text("Show floating media controls")
-                }
-                .disabled(!coordinator.musicLiveActivityEnabled || standardControlsSuppressed)
-                .help("Displays play/pause and skip buttons beside the notch while music is active. Disabled by default.")
-                Toggle("Enable sneak peek", isOn: $enableSneakPeek)
-                Toggle("Show sneak peek on playback changes", isOn: $showSneakPeekOnTrackChange)
-                    .disabled(!enableSneakPeek)
-                Defaults.Toggle(key: .enableLyrics) {
-                    Text("Enable lyrics")
-                }
-                .settingsHighlight(id: highlightID("Enable lyrics"))
-                Defaults.Toggle(key: .showLyricsUnderNotch) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Sing along under the closed notch")
-                        Text("While the lyrics button in the Music tab is on, the line being sung also shows under the closed notch, with a highlight that sweeps across it in time with the music.")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-                .disabled(!Defaults[.enableLyrics])
-                Defaults.Toggle(key: .showLiveCanvasInDynamicIsland) {
-                    Text("Show live canvas in Dynamic Island")
-                }
-                .settingsHighlight(id: highlightID("Show live canvas in Dynamic Island"))
-                .help("Replaces the artwork tile with the live canvas when the current app provides one, and reuses that moving canvas for the surrounding lighting effect.")
-                
-                //Parallax Effect Intensity to control how much parallax is wanted
-                Slider(value: $parallaxEffectIntensity, in: 0...12, step: 1.0) {
-                    HStack {
-                        Text("Parallax Effect Intensity")
-                        Spacer()
-                        Text("\(parallaxEffectIntensity, specifier: "%0.1f")")
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .settingsHighlight(id: highlightID("Enable album art parallax effect"))
-                
-                Picker("Sneak Peek Style", selection: $sneakPeekStyles){
-                    ForEach(SneakPeekStyle.allCases) { style in
-                        Text(style.localizedName).tag(style)
-                    }
-                }
-                .disabled(!enableSneakPeek)
-                .settingsHighlight(id: highlightID("Sneak Peek Style"))
-
-                HStack {
-                    Stepper(value: $waitInterval, in: 0...10, step: 1) {
-                        HStack {
-                            Text("Media inactivity timeout")
-                            Spacer()
-                            Text("\(Defaults[.waitInterval], specifier: "%.0f") seconds")
-                                .foregroundStyle(.secondary)
+                .settingsHighlight(id: highlightID("Show music in the closed notch"))
+                if coordinator.musicLiveActivityEnabled {
+                    SettingsToggle(key: .closedNotchMusicFirst, title: "Music first",
+                                   detail: "While music plays it stays in front. Approvals, calls and messages still show for a moment.",
+                                   highlightID: highlightID("Music first"))
+                        .padding(.leading, 16)
+                    SettingsToggle(key: .showSongMetadataInClosedNotch, title: "Song and artist on other displays",
+                                   detail: "On screens without a notch, the title shows too.",
+                                   highlightID: highlightID("Song and artist on other displays"))
+                        .padding(.leading, 16)
+                    SettingsToggle(key: .musicControlWindowEnabled, title: "Floating controls",
+                                   detail: "Play, pause and skip beside the notch while music plays.",
+                                   highlightID: highlightID("Floating controls"))
+                        .padding(.leading, 16)
+                        .disabled(standardControlsSuppressed)
+                    if musicControlWindowEnabled {
+                        Picker("Skip buttons", selection: $musicSkipBehavior) {
+                            ForEach(MusicSkipBehavior.allCases) { behavior in
+                                Text(behavior.displayName).tag(behavior)
+                            }
                         }
+                        .pickerStyle(.segmented)
+                        .padding(.leading, 32)
+                        .settingsHighlight(id: highlightID("Skip buttons"))
                     }
                 }
-                
-                Defaults.Toggle(key: .showSongMetadataInClosedNotch) {
-                    Text("Show song title and artist on non-notch displays")
+                LabeledContent {
+                    Stepper(value: $waitInterval, in: 0...10, step: 1) {
+                        Text("\(Int(waitInterval))s").foregroundStyle(.secondary).monospacedDigit()
+                    }
+                } label: {
+                    SettingsRowLabel(title: "Hide after pausing", detail: "How long the closed notch keeps showing music after it stops.")
                 }
-                .settingsHighlight(id: highlightID("Show song title and artist in closed notch"))
             } header: {
-                Text("Media playback live activity")
+                Text("Closed notch")
             }
 
             Section {
-                Defaults.Toggle(key: .enableRealTimeWaveform) {
-                    HStack {
-                        Text("Enable real-time waveform")
-                        customBadge(text: "Beta")
+                SettingsToggle(key: .enableSneakPeek, title: "Sneak peek",
+                               detail: "Opens the notch for a moment to show what changed.",
+                               highlightID: highlightID("Sneak peek"))
+                if enableSneakPeek {
+                    SettingsToggle(key: .showSneakPeekOnTrackChange, title: "When the song changes")
+                        .padding(.leading, 16)
+                    Picker("Style", selection: $sneakPeekStyles) {
+                        ForEach(SneakPeekStyle.allCases) { style in
+                            Text(style.localizedName).tag(style)
+                        }
                     }
+                    .padding(.leading, 16)
+                    .settingsHighlight(id: highlightID("Sneak peek style"))
                 }
-                .settingsHighlight(id: highlightID("Enable real-time waveform"))
-                Defaults.Toggle(key: .coloredSpectrogram) {
-                    Text("Color the visualizer with the album art")
-                }
-                .settingsHighlight(id: highlightID("Enable colored spectrograms"))
-                
-                Picker("Visualizer candles", selection: $visualizerBarCount) {
+            } header: {
+                Text("Sneak peek")
+            }
+
+            Section {
+                SettingsToggle(key: .enableLyrics, title: "Lyrics",
+                               detail: "A lyrics button in the Music tab.",
+                               highlightID: highlightID("Lyrics"))
+                SettingsToggle(key: .showLyricsUnderNotch, title: "Sing along under the closed notch",
+                               detail: "While lyrics are on, the line being sung shows under the notch.")
+                    .padding(.leading, 16)
+                    .disabled(!Defaults[.enableLyrics])
+            } header: {
+                Text("Lyrics")
+            }
+
+            Section {
+                SettingsToggle(key: .enableRealTimeWaveform, title: "Live visualizer",
+                               detail: "Moves with the actual sound, not a loop.",
+                               highlightID: highlightID("Live visualizer"))
+                SettingsToggle(key: .coloredSpectrogram, title: "Colour it with the artwork",
+                               highlightID: highlightID("Colour it with the artwork"))
+                SettingsToggle(key: .enableWaveformScrubber, title: "Drag the waveform to scrub")
+                Picker("Bars", selection: $visualizerBarCount) {
                     Text("4").tag(4)
                     Text("5").tag(5)
                     Text("6").tag(6)
                 }
-                
-                Picker("Color extraction", selection: $colorExtractionMode) {
-                    Text("Legacy").tag(ColorExtractionMode.legacy)
+                .pickerStyle(.segmented)
+                Picker("Artwork colours", selection: $colorExtractionMode) {
+                    Text("Classic").tag(ColorExtractionMode.legacy)
                     Text("Vibrant").tag(ColorExtractionMode.vibrant)
                 }
-                
-                Toggle("Scrubbable real-time waveform", isOn: $enableWaveformScrubber)
+                .pickerStyle(.segmented)
             } header: {
-                Text("Music Visualizer")
+                Text("Visualizer")
             } footer: {
-                Text("When enabled, the music visualizer displays real-time audio spectrum data synced to your music. Requires macOS 14.2+ and uses minimal CPU/GPU resources via the Accelerate framework.")
+                Text("The live visualizer needs macOS 14.2 or later and uses very little power.")
             }
 
-
-            Picker(selection: $hideNotchOption, label:
-                    HStack {
-                Text("Hide DynamicIsland Options")
-                customBadge(text: "Beta")
-            }) {
-                Text("Always hide in fullscreen").tag(HideNotchOption.always)
-                Text("Hide only when NowPlaying app is in fullscreen").tag(HideNotchOption.nowPlayingOnly)
-                Text("Never hide").tag(HideNotchOption.never)
-            }
-            .onChange(of: hideNotchOption) {
-                Defaults[.enableFullscreenMediaDetection] = hideNotchOption != .never
+            Section {
+                Picker("Hide the notch in full screen", selection: $hideNotchOption) {
+                    Text("Always").tag(HideNotchOption.always)
+                    Text("When the music app is full screen").tag(HideNotchOption.nowPlayingOnly)
+                    Text("Never").tag(HideNotchOption.never)
+                }
+                .onChange(of: hideNotchOption) {
+                    Defaults[.enableFullscreenMediaDetection] = hideNotchOption != .never
+                }
+                SettingsToggle(key: .lockScreenMusicAlbumParallaxEnabled, title: "Artwork tilt on the lock screen",
+                               highlightID: highlightID("Artwork tilt on the lock screen"))
+            } header: {
+                Text("More")
             }
         }
         .navigationTitle("Music")
@@ -3753,6 +3697,7 @@ struct Shelf: View {
     @Default(.quickShareProvider) var quickShareProvider
     @Default(.copyOnDrag) var copyOnDrag
     @Default(.autoRemoveShelfItems) var autoRemoveShelfItems
+    @Default(.dynamicShelf) private var shelfOn
     @StateObject private var quickShareService = QuickShareService.shared
     @ObservedObject private var fullDiskAccessPermission = FullDiskAccessPermissionStore.shared
     @ObservedObject private var shelfFolderAccessPermission = ShelfFolderAccessPermissionStore.shared
@@ -3779,107 +3724,72 @@ struct Shelf: View {
 
     var body: some View {
         Form {
-            if !canEnableShelf || !fullDiskAccessPermission.isAuthorized {
+            if !shelfOn {
                 Section {
-                    if !canEnableShelf {
-                        SettingsPermissionCallout(
-                            title: "Additional folder access required",
-                            message: "Enable Full Disk Access, or grant access to both Documents and Downloads folders to use Shelf.",
-                            icon: "folder.badge.questionmark",
-                            iconColor: .orange,
-                            requestButtonTitle: "Request Folder Access",
-                            openSettingsButtonTitle: "Open Privacy & Security",
-                            requestAction: { shelfFolderAccessPermission.requestAccessPrompt() },
-                            openSettingsAction: { shelfFolderAccessPermission.openSystemSettings() }
-                        )
+                    Text("Off: no Shelf tab, and dropping files on the notch does nothing.")
+                        .font(.callout).foregroundStyle(.secondary)
+                }
+            } else {
+                if !canEnableShelf || !fullDiskAccessPermission.isAuthorized {
+                    Section {
+                        if !canEnableShelf {
+                            SettingsStatus(text: "Shelf can't read your files yet. Allow Documents and Downloads, or Full Disk Access.", kind: .warn)
+                            HStack {
+                                SettingsRowLabel(title: "Documents and Downloads")
+                                Spacer()
+                                Button("Open Privacy & Security") { shelfFolderAccessPermission.openSystemSettings() }
+                                Button("Allow") { shelfFolderAccessPermission.requestAccessPrompt() }
+                                    .settingsPrimaryButton()
+                            }
+                        }
+                        if !fullDiskAccessPermission.isAuthorized {
+                            HStack {
+                                SettingsRowLabel(title: "Full Disk Access",
+                                                 detail: "Lets Shelf take files from anywhere, not only Documents and Downloads.")
+                                Spacer()
+                                Button("Open Privacy & Security") { fullDiskAccessPermission.openSystemSettings() }
+                                Button("Allow") { fullDiskAccessPermission.requestAccessPrompt() }
+                            }
+                        }
+                    } header: {
+                        Text("Access")
                     }
+                }
 
-                    if !fullDiskAccessPermission.isAuthorized {
-                        SettingsPermissionCallout(
-                            title: "Full Disk Access for global mode",
-                            message: "Without Full Disk Access, Shelf can only read files from Documents and Downloads. Grant Full Disk Access to make Shelf work globally.",
-                            icon: "externaldrive.fill",
-                            iconColor: .purple,
-                            requestButtonTitle: "Request Full Disk Access",
-                            openSettingsButtonTitle: "Open Privacy & Security",
-                            requestAction: { fullDiskAccessPermission.requestAccessPrompt() },
-                            openSettingsAction: { fullDiskAccessPermission.openSystemSettings() }
-                        )
-                    }
+                Section {
+                    SettingsToggle(key: .openShelfByDefault, title: "Open the Shelf when files are added",
+                                   highlightID: highlightID("Open shelf tab by default if items added"))
+                    SettingsToggle(key: .copyOnDrag, title: "Copy instead of move",
+                                   detail: "Dragging out of the Shelf leaves the original where it is.",
+                                   highlightID: highlightID("Copy items on drag"))
+                    SettingsToggle(key: .autoRemoveShelfItems, title: "Remove after dragging out",
+                                   highlightID: highlightID("Remove from shelf after dragging"))
                 } header: {
-                    Text("Permissions")
+                    Text("Shelf")
                 }
-            }
 
-            Section {
-                Defaults.Toggle(key: .dynamicShelf) {
-                    Text("Enable shelf")
-                }
-                .disabled(!canEnableShelf)
-                .settingsHighlight(id: highlightID("Enable shelf"))
-
-                Defaults.Toggle(key: .openShelfByDefault) {
-                    Text("Open shelf tab by default if items added")
-                }
-                .settingsHighlight(id: highlightID("Open shelf tab by default if items added"))
-
-                Defaults.Toggle(key: .copyOnDrag) {
-                    Text("Copy items on drag")
-                }
-                .settingsHighlight(id: highlightID("Copy items on drag"))
-
-                Defaults.Toggle(key: .autoRemoveShelfItems) {
-                    Text("Remove from shelf after dragging")
-                }
-                .settingsHighlight(id: highlightID("Remove from shelf after dragging"))
-            } header: {
-                HStack {
-                    Text("General")
-                }
-            }
-
-            Section {
-                Picker("Quick Share Service", selection: $quickShareProvider) {
-                    ForEach(quickShareService.availableProviders, id: \.id) { provider in
-                        HStack {
-                            QuickShareProviderIconImage(provider: provider, size: 16)
-                            Text(provider.id)
-                        }
-                        .tag(provider.id)
-                    }
-                }
-                .pickerStyle(.menu)
-                .settingsHighlight(id: highlightID("Quick Share Service"))
-
-                if let selectedProvider {
-                    HStack {
-                        QuickShareProviderIconImage(provider: selectedProvider, size: 16)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Currently selected: \(selectedProvider.id)")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Text("Files dropped on the shelf will be shared via this service")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
+                Section {
+                    Picker("Share with", selection: $quickShareProvider) {
+                        ForEach(quickShareService.availableProviders, id: \.id) { provider in
+                            HStack {
+                                QuickShareProviderIconImage(provider: provider, size: 16)
+                                Text(provider.id)
+                            }
+                            .tag(provider.id)
                         }
                     }
-                    .padding(.vertical, 4)
-                }
-            } header: {
-                HStack {
+                    .settingsHighlight(id: highlightID("Quick Share Service"))
+                } header: {
                     Text("Quick Share")
+                } footer: {
+                    Text("Files you drop on the share button go to \(selectedProvider?.id ?? "this service").")
                 }
-            } footer: {
-                Text("Choose which service to use when sharing files from the shelf. Drag files onto the shelf or click the shelf button to pick files.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            
-            if quickShareProvider == "LocalSend" {
-                LocalSendSettingsSection(highlightID: highlightID)
+
+                if quickShareProvider == "LocalSend" {
+                    LocalSendSettingsSection(highlightID: highlightID)
+                }
             }
         }
-        .accentColor(.effectiveAccent)
         .navigationTitle("Shelf")
         .onAppear {
             fullDiskAccessPermission.refreshStatus()
@@ -3898,28 +3808,25 @@ private struct LocalSendSettingsSection: View {
     
     var body: some View {
         Section {
-            Picker("Device Picker Style", selection: $glassMode) {
+            Picker("Device list style", selection: $glassMode) {
                 ForEach(LockScreenGlassCustomizationMode.allCases) { mode in
                     Text(mode.localizedName).tag(mode)
                 }
             }
-            .pickerStyle(.menu)
             .settingsHighlight(id: highlightID("Device Picker Style"))
             
             if glassMode == .customLiquid {
-                Picker("Liquid Glass Variant", selection: $liquidGlassVariant) {
+                Picker("Glass look", selection: $liquidGlassVariant) {
                     ForEach(LiquidGlassVariant.allCases) { variant in
                         Text("Variant \(variant.rawValue)").tag(variant)
                     }
                 }
-                .pickerStyle(.menu)
+                .padding(.leading, 16)
             }
         } header: {
-            Text("LocalSend Device Picker")
+            Text("LocalSend")
         } footer: {
-            Text("Customize the appearance of the LocalSend device selection popup that appears when you drop files.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            Text("How the list of nearby devices looks when you drop files.")
         }
     }
 }
@@ -3943,189 +3850,112 @@ struct LiveActivitiesSettings: View {
     var body: some View {
         Form {
             Section {
-                Defaults.Toggle(key: .enableScreenRecordingDetection) {
-                    Text("Enable Screen Recording Detection")
-                }
-                .settingsHighlight(id: highlightID("Enable Screen Recording Detection"))
-
-                Defaults.Toggle(key: .showRecordingIndicator) {
-                    Text("Show Recording Indicator")
-                }
-                .disabled(!enableScreenRecordingDetection)
-                .settingsHighlight(id: highlightID("Show Recording Indicator"))
-
-                if recordingManager.isMonitoring {
-                    HStack {
-                        Text("Detection Status")
-                        Spacer()
-                        if recordingManager.isRecording {
-                            HStack(spacing: 4) {
-                                Circle()
-                                    .fill(SettingsPalette.danger)
-                                    .frame(width: 8, height: 8)
-                                Text("Recording Detected")
-                                    .foregroundStyle(SettingsPalette.danger)
+                SettingsToggle(key: .enableScreenRecordingDetection, title: "Notice screen recording",
+                               detail: "Knows when this Mac's screen is being recorded.",
+                               highlightID: highlightID("Notice screen recording"))
+                if enableScreenRecordingDetection {
+                    SettingsToggle(key: .showRecordingIndicator, title: "Show a recording dot",
+                                   highlightID: highlightID("Show a recording dot"))
+                        .padding(.leading, 16)
+                    if recordingManager.isMonitoring {
+                        LabeledContent("Right now") {
+                            if recordingManager.isRecording {
+                                SettingsStatus(text: "Recording", kind: .error)
+                            } else {
+                                SettingsStatus(text: "Not recording", kind: .ok)
                             }
-                        } else {
-                            Text("Active - No Recording")
-                                .foregroundStyle(SettingsPalette.ok)
+                        }
+                        .padding(.leading, 16)
+                    }
+                }
+            } header: {
+                Text("Screen recording")
+            }
+
+            Section {
+                SettingsToggle(key: .enableDoNotDisturbDetection, title: "Notice Focus",
+                               detail: "Shows when a Focus like Do Not Disturb turns on.",
+                               highlightID: highlightID("Notice Focus"))
+                if enableDoNotDisturbDetection {
+                    SettingsToggle(key: .showDoNotDisturbIndicator, title: "Show the Focus icon",
+                                   highlightID: highlightID("Show the Focus icon"))
+                        .padding(.leading, 16)
+                    SettingsToggle(key: .showDoNotDisturbLabel, title: "Show the Focus name",
+                                   detail: focusIndicatorNonPersistent ? "Off while Focus only shows for a moment." : nil,
+                                   highlightID: highlightID("Show the Focus name"))
+                        .padding(.leading, 16)
+                        .disabled(focusIndicatorNonPersistent)
+                    SettingsToggle(key: .focusIndicatorNonPersistent, title: "Only for a moment",
+                                   detail: "Shows Focus turning on or off, then hides it.",
+                                   highlightID: highlightID("Only for a moment"))
+                        .padding(.leading, 16)
+                    if doNotDisturbManager.isMonitoring {
+                        LabeledContent("Right now") {
+                            if doNotDisturbManager.isDoNotDisturbActive {
+                                SettingsStatus(text: doNotDisturbManager.currentFocusModeName.isEmpty ? "Focus on" : doNotDisturbManager.currentFocusModeName, kind: .ok)
+                            } else {
+                                SettingsStatus(text: "No Focus")
+                            }
+                        }
+                        .padding(.leading, 16)
+                    }
+                    if !fullDiskAccessPermission.isAuthorized {
+                        HStack {
+                            SettingsRowLabel(title: "Your own Focus icons and colours",
+                                             detail: "Needs Full Disk Access. Focus works without it.")
+                            Spacer()
+                            Button("Open Privacy & Security") { fullDiskAccessPermission.openSystemSettings() }
+                            Button("Allow") { fullDiskAccessPermission.requestAccessPrompt() }
+                                .settingsPrimaryButton()
+                        }
+                        .padding(.leading, 16)
+                    }
+                }
+            } header: {
+                Text("Focus")
+            }
+
+            Section {
+                SettingsToggle(key: .enableCapsLockIndicator, title: "Show Caps Lock",
+                               detail: "A small light in the notch while Caps Lock is on.",
+                               highlightID: highlightID("Show Caps Lock"))
+                if Defaults[.enableCapsLockIndicator] {
+                    SettingsToggle(key: .showCapsLockLabel, title: "With the words \"Caps Lock\"",
+                                   highlightID: highlightID("With the words Caps Lock"))
+                        .padding(.leading, 16)
+                    Picker("Colour", selection: $capsLockTintMode) {
+                        ForEach(CapsLockIndicatorTintMode.allCases) { mode in
+                            Text(mode.displayName).tag(mode)
                         }
                     }
+                    .pickerStyle(.segmented)
+                    .padding(.leading, 16)
+                    .settingsHighlight(id: highlightID("Caps Lock colour"))
                 }
             } header: {
-                Text("Screen Recording")
-            } footer: {
-                Text("Uses event-driven private API for real-time screen recording detection")
+                Text("Caps Lock")
             }
 
             Section {
-                if !fullDiskAccessPermission.isAuthorized {
-                    SettingsPermissionCallout(
-                        title: String(localized: "Custom Focus metadata"),
-                        message: String(localized: "Full Disk Access unlocks custom Focus icons, colors, and labels. Standard Focus detection still works without it—grant access only if you need personalized indicators."),
-                        icon: "externaldrive.fill",
-                        iconColor: .purple,
-                        requestButtonTitle: String(localized: "Request Full Disk Access"),
-                        openSettingsButtonTitle: String(localized: "Open Privacy & Security"),
-                        requestAction: { fullDiskAccessPermission.requestAccessPrompt() },
-                        openSettingsAction: { fullDiskAccessPermission.openSystemSettings() }
-                    )
-                }
-
-                Defaults.Toggle(key: .enableDoNotDisturbDetection) {
-                    Text("Enable Focus Detection")
-                }
-                .settingsHighlight(id: highlightID("Enable Focus Detection"))
-
-                Defaults.Toggle(key: .showDoNotDisturbIndicator) {
-                    Text("Show Focus Indicator")
-                }
-                .disabled(!enableDoNotDisturbDetection)
-                .settingsHighlight(id: highlightID("Show Focus Indicator"))
-
-                Defaults.Toggle(key: .showDoNotDisturbLabel) {
-                    Text("Show Focus Label")
-                }
-                .disabled(!enableDoNotDisturbDetection || focusIndicatorNonPersistent)
-                .help(focusIndicatorNonPersistent ? "Labels are forced to compact on/off text while brief toast mode is enabled." : "Show the active Focus name inside the indicator.")
-                .settingsHighlight(id: highlightID("Show Focus Label"))
-
-                Defaults.Toggle(key: .focusIndicatorNonPersistent) {
-                    Text("Show Focus as brief toast")
-                }
-                .disabled(!enableDoNotDisturbDetection)
-                .settingsHighlight(id: highlightID("Show Focus as brief toast"))
-                .help("When enabled, Focus appears briefly (on/off) and then collapses instead of staying visible.")
-
-                if doNotDisturbManager.isMonitoring {
-                    HStack {
-                        Text("Focus Status")
-                        Spacer()
-                        if doNotDisturbManager.isDoNotDisturbActive {
-                            HStack(spacing: 4) {
-                                Circle()
-                                    .fill(Color.purple)
-                                    .frame(width: 8, height: 8)
-                                Text(doNotDisturbManager.currentFocusModeName.isEmpty ? "Focus Enabled" : doNotDisturbManager.currentFocusModeName)
-                                    .foregroundColor(.purple)
-                            }
-                        } else {
-                            Text("Active - No Focus")
-                                .foregroundStyle(SettingsPalette.ok)
-                        }
-                    }
-                } else {
-                    HStack {
-                        Text("Focus Status")
-                        Spacer()
-                        Text("Disabled")
-                            .foregroundColor(.secondary)
-                    }
-                }
-            } header: {
-                Text("Do Not Disturb")
-            } footer: {
-                Text("Listens for Focus session changes via distributed notifications")
-            }
-
-            Section {
-                Defaults.Toggle(key: .enableCapsLockIndicator) {
-                    Text("Show Caps Lock Indicator")
-                }
-                .settingsHighlight(id: highlightID("Show Caps Lock Indicator"))
-
-                Defaults.Toggle(key: .showCapsLockLabel) {
-                    Text("Show Caps Lock label")
-                }
-                .disabled(!Defaults[.enableCapsLockIndicator])
-                .settingsHighlight(id: highlightID("Show Caps Lock label"))
-
-                Picker("Caps Lock color", selection: $capsLockTintMode) {
-                    ForEach(CapsLockIndicatorTintMode.allCases) { mode in
-                        Text(mode.displayName).tag(mode)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .disabled(!Defaults[.enableCapsLockIndicator])
-                .settingsHighlight(id: highlightID("Caps Lock color"))
-            } header: {
-                Text("Caps Lock Indicator")
-            } footer: {
-                Text("Adds a notch HUD when Caps Lock is enabled, with optional label and tint controls.")
-            }
-
-            Section {
-                Defaults.Toggle(key: .enableCameraDetection) {
-                    Text("Enable Camera Detection")
-                }
-                .settingsHighlight(id: highlightID("Enable Camera Detection"))
-                Defaults.Toggle(key: .enableMicrophoneDetection) {
-                    Text("Enable Microphone Detection")
-                }
-                .settingsHighlight(id: highlightID("Enable Microphone Detection"))
-
+                SettingsToggle(key: .enableCameraDetection, title: "Camera in use",
+                               detail: "A green dot while an app uses the camera.",
+                               highlightID: highlightID("Camera in use"))
+                SettingsToggle(key: .enableMicrophoneDetection, title: "Microphone in use",
+                               detail: "An orange dot while an app uses the microphone.",
+                               highlightID: highlightID("Microphone in use"))
                 if privacyManager.isMonitoring {
-                    HStack {
-                        Text("Camera Status")
-                        Spacer()
-                        if privacyManager.cameraActive {
-                            HStack(spacing: 4) {
-                                Circle()
-                                    .fill(SettingsPalette.ok)
-                                    .frame(width: 8, height: 8)
-                                Text("Camera Active")
-                                    .foregroundStyle(SettingsPalette.ok)
-                            }
-                        } else {
-                            Text("Inactive")
-                                .foregroundColor(.secondary)
-                        }
-                    }
-
-                    HStack {
-                        Text("Microphone Status")
-                        Spacer()
-                        if privacyManager.microphoneActive {
-                            HStack(spacing: 4) {
-                                Circle()
-                                    .fill(SettingsPalette.warn)
-                                    .frame(width: 8, height: 8)
-                                Text("Microphone Active")
-                                    .foregroundStyle(SettingsPalette.warn)
-                            }
-                        } else {
-                            Text("Inactive")
-                                .foregroundColor(.secondary)
+                    LabeledContent("Right now") {
+                        HStack(spacing: 12) {
+                            SettingsStatus(text: privacyManager.cameraActive ? "Camera on" : "Camera off",
+                                           kind: privacyManager.cameraActive ? .ok : .neutral)
+                            SettingsStatus(text: privacyManager.microphoneActive ? "Microphone on" : "Microphone off",
+                                           kind: privacyManager.microphoneActive ? .warn : .neutral)
                         }
                     }
                 }
             } header: {
-                Text("Privacy Indicators")
-            } footer: {
-                Text("Shows green camera icon and yellow microphone icon when in use. Uses event-driven CoreAudio and CoreMediaIO APIs.")
+                Text("Camera and microphone")
             }
-
-
         }
         .navigationTitle("Live Activities")
         .onAppear {
@@ -6017,9 +5847,13 @@ struct TimerSettings: View {
 
     var body: some View {
         Form {
-            timerFeatureSection
-
-            if enableTimerFeature {
+            if !enableTimerFeature {
+                Section {
+                    Text("Off: no timers, no Pomodoro, nothing in the notch.")
+                        .font(.callout).foregroundStyle(.secondary)
+                }
+            } else {
+                timerFeatureSection
                 pomodoroFocusSection
                 timerConfigurationSections
             }
@@ -6037,34 +5871,33 @@ struct TimerSettings: View {
     @ViewBuilder
     private var pomodoroFocusSection: some View {
         Section {
-            Defaults.Toggle(key: .pomodoroHoldsInterruptions) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Don't disturb me during focus")
-                    Text("While a Pomodoro focus block runs, the notch doesn't announce notifications, WhatsApp messages, calls, finished agents or build results. They wait in their tabs, and a line under the notch says what came in when the break starts. Agents that need your approval still show, silently. The moon button in the open notch starts the same quiet without a Pomodoro.")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-            }
-            .settingsHighlight(id: highlightID("Don't disturb me during focus"))
+            SettingsToggle(key: .pomodoroHoldsInterruptions, title: "Don't disturb me during focus",
+                           detail: "Messages, calls and finished agents wait until the break. Approvals still show, quietly.",
+                           highlightID: highlightID("Don't disturb me during focus"))
             if pomodoroHoldsInterruptions {
-                Defaults.Toggle(key: .pomodoroAllowsCalls) { Text("Let calls through") }
-                    .settingsHighlight(id: highlightID("Let calls through"))
+                SettingsToggle(key: .pomodoroAllowsCalls, title: "Let calls through",
+                               highlightID: highlightID("Let calls through"))
+                    .padding(.leading, 16)
             }
-            Defaults.Toggle(key: .pomodoroControlsFocus) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Also silence macOS (Focus)")
-                    Text("macOS banners from other apps can only be silenced by a Focus. In the Shortcuts app, make two shortcuts with Set Focus (one turning Do Not Disturb on, one turning it off) named as below, and NotchFlow runs them as focus starts and ends.")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-            }
-            .settingsHighlight(id: highlightID("Also silence macOS (Focus)"))
+            SettingsToggle(key: .pomodoroControlsFocus, title: "Also silence macOS",
+                           detail: "Turns on a Focus, so other apps' banners stay quiet too.",
+                           highlightID: highlightID("Also silence macOS (Focus)"))
             if pomodoroControlsFocus {
-                TextField("Shortcut for focus", text: $pomodoroFocusOnShortcut)
-                TextField("Shortcut for breaks", text: $pomodoroFocusOffShortcut)
-                Button("Open Shortcuts") {
-                    if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.shortcuts") {
-                        NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
+                Group {
+                    TextField("Shortcut that turns Focus on", text: $pomodoroFocusOnShortcut)
+                    TextField("Shortcut that turns Focus off", text: $pomodoroFocusOffShortcut)
+                    HStack {
+                        SettingsRowLabel(title: "Make the two shortcuts",
+                                         detail: "In Shortcuts, use Set Focus, then type their names above.")
+                        Spacer()
+                        Button("Open Shortcuts") {
+                            if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.shortcuts") {
+                                NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
+                            }
+                        }
                     }
                 }
+                .padding(.leading, 16)
             }
         } header: {
             Text("Pomodoro")
@@ -6074,46 +5907,33 @@ struct TimerSettings: View {
     @ViewBuilder
     private var timerFeatureSection: some View {
         Section {
-            Defaults.Toggle(key: .enableTimerFeature) {
-                Text("Enable timer feature")
+            Toggle(isOn: $coordinator.timerLiveActivityEnabled.animation()) {
+                SettingsRowLabel(title: "Show timers in the closed notch",
+                                 detail: "The time left, without opening the notch.")
             }
-            .settingsHighlight(id: highlightID("Enable timer feature"))
-
-            if enableTimerFeature {
-                Toggle("Enable timer live activity", isOn: $coordinator.timerLiveActivityEnabled)
-                    .animation(.easeInOut, value: coordinator.timerLiveActivityEnabled)
-                Defaults.Toggle(key: .mirrorSystemTimer) {
-                    HStack(spacing: 8) {
-                        Text("Mirror macOS Clock timers")
-                        alphaBadge()
-                    }
+            .settingsHighlight(id: highlightID("Show timers in the closed notch"))
+            SettingsToggle(key: .mirrorSystemTimer, title: "Follow Clock app timers",
+                           detail: "Timers you start in the Clock app show here too. Needs Accessibility.",
+                           highlightID: highlightID("Mirror macOS Clock timers"))
+            Picker("Controls appear as", selection: $timerDisplayMode) {
+                ForEach(TimerDisplayMode.allCases) { mode in
+                    Text(mode.displayName).tag(mode)
                 }
-                .help("Shows the system Clock timer in the notch when available. Requires Accessibility permission to read the status item.")
-                .settingsHighlight(id: highlightID("Mirror macOS Clock timers"))
-
-                Picker("Timer controls appear as", selection: $timerDisplayMode) {
-                    ForEach(TimerDisplayMode.allCases) { mode in
-                        Text(mode.displayName).tag(mode)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .help(timerDisplayMode.description)
-                .settingsHighlight(id: highlightID("Timer controls appear as"))
             }
+            .pickerStyle(.segmented)
+            .help(timerDisplayMode.description)
+            .settingsHighlight(id: highlightID("Timer controls appear as"))
         } header: {
-            Text("Timer Feature")
-        } footer: {
-            Text("Control timer availability, live activity behaviour, and whether the app mirrors timers started from the macOS Clock app.")
+            Text("Timers")
         }
     }
 
     @ViewBuilder
     private var timerConfigurationSections: some View {
         Group {
-            lockScreenIntegrationSection
-            customTimerSection
             appearanceSection
             timerPresetsSection
+            customTimerSection
             timerSoundSection
         }
         .onAppear {
@@ -6129,44 +5949,28 @@ struct TimerSettings: View {
     }
 
     @ViewBuilder
-    private var lockScreenIntegrationSection: some View {
-    }
-
-    @ViewBuilder
     private var customTimerSection: some View {
         Section {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Default Custom Timer")
-                    .font(.headline)
-
-                TimerDurationStepperRow(title: String(localized: "Hours"), value: $customHours, range: 0...23)
-                TimerDurationStepperRow(title: String(localized: "Minutes"), value: $customMinutes, range: 0...59)
-                TimerDurationStepperRow(title: String(localized: "Seconds"), value: $customSeconds, range: 0...59)
-
-                HStack {
-                    Text("Current default:")
-                        .foregroundStyle(.secondary)
-                    Text(customDurationDisplay)
-                        .font(.system(.body, design: .monospaced))
-                        .fontWeight(.medium)
-                    Spacer()
-                }
+            TimerDurationStepperRow(title: String(localized: "Hours"), value: $customHours, range: 0...23)
+            TimerDurationStepperRow(title: String(localized: "Minutes"), value: $customMinutes, range: 0...59)
+            TimerDurationStepperRow(title: String(localized: "Seconds"), value: $customSeconds, range: 0...59)
+            LabeledContent("Custom is") {
+                Text(customDurationDisplay).monospacedDigit().foregroundStyle(.secondary)
             }
-            .padding(.vertical, 4)
-            .onChange(of: customHours) { _, _ in updateCustomDuration() }
-            .onChange(of: customMinutes) { _, _ in updateCustomDuration() }
-            .onChange(of: customSeconds) { _, _ in updateCustomDuration() }
         } header: {
-            Text("Custom Timer")
+            Text("Custom timer")
         } footer: {
-            Text("This duration powers the \"Custom\" option inside the timer popover for quick access.")
+            Text("How long the Custom choice in the timer menu runs.")
         }
+        .onChange(of: customHours) { _, _ in updateCustomDuration() }
+        .onChange(of: customMinutes) { _, _ in updateCustomDuration() }
+        .onChange(of: customSeconds) { _, _ in updateCustomDuration() }
     }
 
     @ViewBuilder
     private var appearanceSection: some View {
         Section {
-            Picker("Timer tint", selection: $colorMode) {
+            Picker("Colour", selection: $colorMode) {
                 ForEach(TimerIconColorMode.allCases) { mode in
                     Text(mode.displayName).tag(mode)
                 }
@@ -6175,30 +5979,31 @@ struct TimerSettings: View {
             .settingsHighlight(id: highlightID("Timer tint"))
 
             if colorMode == .solid {
-                ColorPicker("Solid colour", selection: $solidColor, supportsOpacity: false)
+                ColorPicker("Pick a colour", selection: $solidColor, supportsOpacity: false)
+                    .padding(.leading, 16)
                     .settingsHighlight(id: highlightID("Solid colour"))
             }
 
-            Toggle("Show timer name", isOn: $showsLabel)
-            Toggle("Show countdown", isOn: $showsCountdown)
+            Toggle("Show the timer's name", isOn: $showsLabel)
+            Toggle("Show the time left", isOn: $showsCountdown)
             Toggle("Show progress", isOn: $showsProgress)
-
-            Toggle("Show floating pause/stop controls", isOn: $controlWindowEnabled)
-                .disabled(showsLabel)
-                .help("These controls sit beside the notch while a timer runs. They require the timer name to stay hidden for spacing.")
-
-            Picker("Progress style", selection: $progressStyle) {
-                ForEach(TimerProgressStyle.allCases) { style in
-                    Text(style.localizedName).tag(style)
+            if showsProgress {
+                Picker("Progress as", selection: $progressStyle) {
+                    ForEach(TimerProgressStyle.allCases) { style in
+                        Text(style.localizedName).tag(style)
+                    }
                 }
+                .pickerStyle(.segmented)
+                .padding(.leading, 16)
+                .settingsHighlight(id: highlightID("Progress style"))
             }
-            .pickerStyle(.segmented)
-            .disabled(!showsProgress)
-            .settingsHighlight(id: highlightID("Progress style"))
+            Toggle(isOn: $controlWindowEnabled) {
+                SettingsRowLabel(title: "Floating pause and stop",
+                                 detail: showsLabel ? "Hide the timer's name to use these." : "Buttons beside the notch while a timer runs.")
+            }
+            .disabled(showsLabel)
         } header: {
-            Text("Appearance")
-        } footer: {
-            Text("Configure how the timer looks inside the closed notch. Progress can render as a ring around the icon or as horizontal bars.")
+            Text("In the closed notch")
         }
     }
 
@@ -6206,10 +6011,9 @@ struct TimerSettings: View {
     private var timerPresetsSection: some View {
         Section {
             if timerPresets.isEmpty {
-                Text("No presets configured. Add a preset to make it appear in the timer popover.")
-                    .font(.system(size: 12))
+                Text("No presets yet. Add one to see it in the timer menu.")
+                    .font(.callout)
                     .foregroundStyle(.secondary)
-                    .padding(.vertical, 4)
             } else {
                 TimerPresetListView(
                     presets: $timerPresets,
@@ -6224,57 +6028,46 @@ struct TimerSettings: View {
                 Button(action: addPreset) {
                     Label("Add Preset", systemImage: "plus")
                 }
-                .buttonStyle(.bordered)
+                .settingsPrimaryButton()
 
                 Spacer()
 
-                Button(role: .destructive, action: { showingResetConfirmation = true }) {
-                    Label("Restore Defaults", systemImage: "arrow.counterclockwise")
-                }
-                .buttonStyle(.bordered)
-                .confirmationDialog("Restore default timer presets?", isPresented: $showingResetConfirmation, titleVisibility: .visible) {
-                    Button("Restore", role: .destructive, action: resetPresets)
-                }
+                Button("Restore Defaults…") { showingResetConfirmation = true }
+                    .settingsDestructiveButton()
+                    .confirmationDialog("Restore the default presets?", isPresented: $showingResetConfirmation, titleVisibility: .visible) {
+                        Button("Restore", role: .destructive, action: resetPresets)
+                    } message: {
+                        Text("Your own presets are removed.")
+                    }
             }
         } header: {
-            Text("Timer Presets")
+            Text("Presets")
         } footer: {
-            Text("Presets show up inside the timer popover with the configured name, duration, and accent colour. Reorder them to change the display order.")
+            Text("They show in the timer menu in this order.")
         }
     }
 
     @ViewBuilder
     private var timerSoundSection: some View {
         Section {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    Text("Timer Sound")
-                        .font(.system(size: 16, weight: .medium))
-                    Spacer()
-                    Button("Choose File", action: selectCustomTimerSound)
-                        .buttonStyle(.bordered)
-                }
-
+            HStack {
                 if let customTimerSoundPath = UserDefaults.standard.string(forKey: "customTimerSoundPath") {
-                    Text("Custom: \(URL(fileURLWithPath: customTimerSoundPath).lastPathComponent)")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    SettingsRowLabel(title: "Sound", detail: URL(fileURLWithPath: customTimerSoundPath).lastPathComponent)
                 } else {
-                    Text("Default: dynamic.m4a")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    SettingsRowLabel(title: "Sound", detail: "The NotchFlow sound")
                 }
-
-                Button("Reset to Default") {
-                    UserDefaults.standard.removeObject(forKey: "customTimerSoundPath")
+                Spacer()
+                if UserDefaults.standard.string(forKey: "customTimerSoundPath") != nil {
+                    Button("Use Default") {
+                        UserDefaults.standard.removeObject(forKey: "customTimerSoundPath")
+                    }
                 }
-                .buttonStyle(.bordered)
-                .disabled(UserDefaults.standard.string(forKey: "customTimerSoundPath") == nil)
+                Button("Choose…", action: selectCustomTimerSound)
             }
         } header: {
-            Text("Timer Sound")
+            Text("When a timer ends")
         } footer: {
-            Text("Select a custom sound to play when a timer ends. Supported formats include MP3, M4A, WAV, and AIFF.")
+            Text("MP3, M4A, WAV or AIFF.")
         }
     }
 
@@ -6579,258 +6372,127 @@ struct StatsSettings: View {
 
     var body: some View {
         Form {
-            Section {
-                Defaults.Toggle(key: .enableStatsFeature) {
-                    Text("Enable system stats monitoring")
-                }
-                .settingsHighlight(id: highlightID("Enable system stats monitoring"))
-                .onChange(of: enableStatsFeature) { _, newValue in
-                    if !newValue {
-                        statsManager.stopMonitoring()
-                    }
-                    // Note: Smart monitoring will handle starting when switching to stats tab
-                }
-
-                Defaults.Toggle(key: .enableLLMUsageFeature) {
-                    Text("Enable LLM Usage Monitor")
-                }
-                .settingsHighlight(id: highlightID("Enable LLM Usage Monitor"))
-
-            } header: {
-                Text("General")
-            } footer: {
-                Text("When enabled, the Stats tab will display real-time system performance graphs. This feature requires system permissions and may use additional battery. Enabling LLM Usage Monitor adds a Usage tab that tracks token usage and spend across your configured AI providers.")
-                    .multilineTextAlignment(.trailing)
-                    .foregroundStyle(.secondary)
-                    .font(.caption)
-            }
-
-            if enableLLMUsageFeature {
+            if !enableStatsFeature {
                 Section {
-                    Defaults.Toggle(key: .enableClaudeProvider) {
-                        Text("Claude")
-                    }
-                    .settingsHighlight(id: highlightID("Claude Provider"))
-
-                    Defaults.Toggle(key: .enableCodexProvider) {
-                        Text("Codex")
-                    }
-                    .settingsHighlight(id: highlightID("Codex Provider"))
-
-                    Defaults.Toggle(key: .enableCursorProvider) {
-                        Text("Cursor")
-                    }
-                    .settingsHighlight(id: highlightID("Cursor Provider"))
-                } header: {
-                    Text("LLM Providers")
-                } footer: {
-                    Text("Choose which AI providers appear in the Usage tab.")
-                        .multilineTextAlignment(.trailing)
-                        .foregroundStyle(.secondary)
-                        .font(.caption)
+                    Text("Off: no Stats tab, and nothing is measured.")
+                        .font(.callout).foregroundStyle(.secondary)
                 }
-            }
-
-            if enableStatsFeature {
+            } else {
                 Section {
-                    Defaults.Toggle(key: .statsStopWhenNotchCloses) {
-                        Text("Stop monitoring after closing the notch")
-                    }
-                    .settingsHighlight(id: highlightID("Stop monitoring after closing the notch"))
-                    .help("When enabled, stats monitoring stops a few seconds after the notch closes.")
-
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text("Update interval")
-                            Spacer()
-                            Text(formattedUpdateInterval)
-                                .foregroundStyle(.secondary)
-                        }
-
-                        Slider(value: $statsUpdateInterval, in: 1...60, step: 1)
-                            .accessibilityLabel("Stats update interval")
-
-                        Text("Controls how often system metrics refresh while monitoring is active.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    if shouldShowStatsBatteryWarning {
-                        Label {
-                            Text("High-frequency updates without a timeout can increase battery usage.")
-                        } icon: {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                        }
-                        .font(.caption)
-                        .foregroundStyle(SettingsPalette.warn)
-                        .padding(.top, 4)
-                    }
-                } header: {
-                    Text("Monitoring Behavior")
-                } footer: {
-                    Text("Sampling can continue while the notch is closed when the timeout is disabled.")
-                        .multilineTextAlignment(.trailing)
-                        .foregroundStyle(.secondary)
-                        .font(.caption)
-                }
-
-                Section {
-                    Defaults.Toggle(key: .showCpuGraph) {
-                        Text("CPU Usage")
-                    }
-                    .settingsHighlight(id: highlightID("CPU Usage"))
-
+                    SettingsToggle(key: .showCpuGraph, title: "CPU", highlightID: highlightID("CPU"))
                     if showCpuGraph {
-                        Picker("Temperature unit", selection: $cpuTemperatureUnit) {
+                        Picker("Temperature in", selection: $cpuTemperatureUnit) {
                             ForEach(LockScreenWeatherTemperatureUnit.allCases) { unit in
                                 Text(unit.localizedName).tag(unit)
                             }
                         }
                         .pickerStyle(.segmented)
+                        .padding(.leading, 16)
                         .settingsHighlight(id: highlightID("Temperature unit"))
                     }
-                    Defaults.Toggle(key: .showMemoryGraph) {
-                        Text("Memory Usage")
-                    }
-                    .settingsHighlight(id: highlightID("Memory Usage"))
-                    Defaults.Toggle(key: .showGpuGraph) {
-                        Text("GPU Usage")
-                    }
-                    .settingsHighlight(id: highlightID("GPU Usage"))
-                    Defaults.Toggle(key: .showNetworkGraph) {
-                        Text("Network Activity")
-                    }
-                    .settingsHighlight(id: highlightID("Network Activity"))
-                    Defaults.Toggle(key: .showDiskGraph) {
-                        Text("Disk I/O")
-                    }
-                    .settingsHighlight(id: highlightID("Disk I/O"))
+                    SettingsToggle(key: .showMemoryGraph, title: "Memory", highlightID: highlightID("Memory"))
+                    SettingsToggle(key: .showGpuGraph, title: "GPU", highlightID: highlightID("GPU"))
+                    SettingsToggle(key: .showNetworkGraph, title: "Network", detail: "Download and upload speed.",
+                                   highlightID: highlightID("Network"))
+                    SettingsToggle(key: .showDiskGraph, title: "Disk", detail: "Read and write speed.",
+                                   highlightID: highlightID("Disk"))
                 } header: {
-                    Text("Graph Visibility")
+                    Text("Graphs")
                 } footer: {
                     if enabledGraphsCount >= 4 {
-                        Text("With \(enabledGraphsCount) graphs enabled, the Dynamic Island will expand horizontally to accommodate all graphs in a single row.")
-                            .multilineTextAlignment(.trailing)
-                            .foregroundStyle(.secondary)
-                            .font(.caption)
-                    } else {
-                        Text("Each graph can be individually enabled or disabled. Network activity shows download/upload speeds, and disk I/O shows read/write speeds.")
-                            .multilineTextAlignment(.trailing)
-                            .foregroundStyle(.secondary)
-                            .font(.caption)
+                        Text("With \(enabledGraphsCount) graphs the notch gets wider to fit them in one row.")
                     }
                 }
 
                 Section {
-                    HStack {
-                        Text("Monitoring Status")
-                        Spacer()
-                        HStack(spacing: 4) {
-                            Circle()
-                                .fill(statsManager.isMonitoring ? .green : .red)
-                                .frame(width: 8, height: 8)
-                            Text(statsManager.isMonitoring ? "Active" : "Stopped")
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-
-                    if statsManager.isMonitoring {
-                        if showCpuGraph {
-                            HStack {
-                                Text("CPU Usage")
-                                Spacer()
-                                Text(statsManager.cpuUsageString)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-
-                        if showMemoryGraph {
-                            HStack {
-                                Text("Memory Usage")
-                                Spacer()
-                                Text(statsManager.memoryUsageString)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-
-                        if showGpuGraph {
-                            HStack {
-                                Text("GPU Usage")
-                                Spacer()
-                                Text(statsManager.gpuUsageString)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-
-                        if showNetworkGraph {
-                            HStack {
-                                Text("Network Download")
-                                Spacer()
-                                Text(String(format: "%.1f MB/s", statsManager.networkDownload))
-                                    .foregroundStyle(.secondary)
-                            }
-
-                            HStack {
-                                Text("Network Upload")
-                                Spacer()
-                                Text(String(format: "%.1f MB/s", statsManager.networkUpload))
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-
-                        if showDiskGraph {
-                            HStack {
-                                Text("Disk Read")
-                                Spacer()
-                                Text(String(format: "%.1f MB/s", statsManager.diskRead))
-                                    .foregroundStyle(.secondary)
-                            }
-
-                            HStack {
-                                Text("Disk Write")
-                                Spacer()
-                                Text(String(format: "%.1f MB/s", statsManager.diskWrite))
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-
+                    SettingsToggle(key: .statsStopWhenNotchCloses, title: "Stop when the notch closes",
+                                   detail: "Saves battery. Measuring starts again when you open the Stats tab.",
+                                   highlightID: highlightID("Stop when the notch closes"))
+                    LabeledContent {
                         HStack {
-                            Text("Last Updated")
-                            Spacer()
-                            Text(statsManager.lastUpdated, style: .relative)
-                                .foregroundStyle(.secondary)
+                            Slider(value: $statsUpdateInterval, in: 1...60, step: 1)
+                                .frame(maxWidth: 180)
+                                .accessibilityLabel("How often")
+                            Text(formattedUpdateInterval).foregroundStyle(.secondary).monospacedDigit()
+                                .frame(width: 44, alignment: .trailing)
+                        }
+                    } label: {
+                        SettingsRowLabel(title: "How often", detail: "How often the numbers refresh.")
+                    }
+                    if shouldShowStatsBatteryWarning {
+                        SettingsStatus(text: "Refreshing this often all the time uses more battery.", kind: .warn)
+                    }
+                } header: {
+                    Text("Measuring")
+                }
+
+                Section {
+                    LabeledContent("Measuring") {
+                        HStack(spacing: 10) {
+                            SettingsStatus(text: statsManager.isMonitoring ? "On" : "Stopped",
+                                           kind: statsManager.isMonitoring ? .ok : .neutral)
+                            Button(statsManager.isMonitoring ? "Stop" : "Start") {
+                                if statsManager.isMonitoring {
+                                    statsManager.stopMonitoring()
+                                } else {
+                                    statsManager.startMonitoring()
+                                }
+                            }
+                        }
+                    }
+                    if statsManager.isMonitoring {
+                        if showCpuGraph { LabeledContent("CPU", value: statsManager.cpuUsageString) }
+                        if showMemoryGraph { LabeledContent("Memory", value: statsManager.memoryUsageString) }
+                        if showGpuGraph { LabeledContent("GPU", value: statsManager.gpuUsageString) }
+                        if showNetworkGraph {
+                            LabeledContent("Network", value: String(format: "↓ %.1f MB/s  ↑ %.1f MB/s", statsManager.networkDownload, statsManager.networkUpload))
+                        }
+                        if showDiskGraph {
+                            LabeledContent("Disk", value: String(format: "Read %.1f MB/s  Write %.1f MB/s", statsManager.diskRead, statsManager.diskWrite))
+                        }
+                        LabeledContent("Updated") {
+                            Text(statsManager.lastUpdated, style: .relative).foregroundStyle(.secondary)
                         }
                     }
                 } header: {
-                    Text("Live Performance Data")
+                    Text("Right now")
                 }
 
                 Section {
                     HStack {
-                        Button(statsManager.isMonitoring ? "Stop Monitoring" : "Start Monitoring") {
-                            if statsManager.isMonitoring {
-                                statsManager.stopMonitoring()
-                            } else {
-                                statsManager.startMonitoring()
-                            }
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .foregroundColor(statsManager.isMonitoring ? .red : .blue)
-
+                        SettingsRowLabel(title: "Clear the history", detail: "Empties the graphs. Stop measuring first.")
                         Spacer()
-
-                        Button("Clear Data") {
-                            statsManager.clearHistory()
-                        }
-                        .buttonStyle(.bordered)
-                        .disabled(statsManager.isMonitoring)
+                        Button("Clear") { statsManager.clearHistory() }
+                            .settingsDestructiveButton()
+                            .disabled(statsManager.isMonitoring)
                     }
                 } header: {
-                    Text("Controls")
+                    Text("Data")
                 }
+            }
+
+            Section {
+                SettingsToggle(key: .enableLLMUsageFeature, title: "AI usage tab",
+                               detail: "A Usage tab with your tokens and spend for AI tools.",
+                               highlightID: highlightID("AI usage tab"))
+                if enableLLMUsageFeature {
+                    SettingsToggle(key: .enableClaudeProvider, title: "Claude", highlightID: highlightID("Claude Provider"))
+                        .padding(.leading, 16)
+                    SettingsToggle(key: .enableCodexProvider, title: "Codex", highlightID: highlightID("Codex Provider"))
+                        .padding(.leading, 16)
+                    SettingsToggle(key: .enableCursorProvider, title: "Cursor", highlightID: highlightID("Cursor Provider"))
+                        .padding(.leading, 16)
+                }
+            } header: {
+                Text("AI usage")
             }
         }
         .navigationTitle("Stats")
+        .onChange(of: enableStatsFeature) { _, newValue in
+            if !newValue {
+                statsManager.stopMonitoring()
+            }
+        }
     }
 }
 
@@ -6843,128 +6505,86 @@ struct ClipboardSettings: View {
         SettingsTab.clipboard.highlightID(for: title)
     }
 
+    @State private var confirmClearHistory = false
+    @State private var confirmClearPinned = false
+
     var body: some View {
         Form {
-            Section {
-                Defaults.Toggle(key: .enableClipboardManager) {
-                    Text("Enable Clipboard Manager")
-                }
-                .settingsHighlight(id: highlightID("Enable Clipboard Manager"))
-                .onChange(of: enableClipboardManager) { _, enabled in
-                    if enabled {
-                        clipboardManager.startMonitoring()
-                    } else {
-                        clipboardManager.stopMonitoring()
-                    }
-                }
-            } header: {
-                Text("Clipboard Manager")
-            } footer: {
-                Text("Monitor clipboard changes and keep a history of recent copies. Use Cmd+Shift+V to quickly access clipboard history.")
-            }
-
-            if enableClipboardManager {
+            if !enableClipboardManager {
                 Section {
-                    HStack {
-                        Text("Display Mode")
-                        Spacer()
-                        Picker("", selection: $clipboardDisplayMode) {
-                            ForEach(ClipboardDisplayMode.allCases.filter { $0 != .popover }, id: \.self) { mode in
-                                Text(mode.displayName).tag(mode)
-                            }
+                    Text("Off: nothing you copy is kept.")
+                        .font(.callout).foregroundStyle(.secondary)
+                }
+            } else {
+                Section {
+                    Picker("Show it as", selection: $clipboardDisplayMode) {
+                        ForEach(ClipboardDisplayMode.allCases.filter { $0 != .popover }, id: \.self) { mode in
+                            Text(mode.displayName).tag(mode)
                         }
-                        .pickerStyle(.menu)
-                        .frame(minWidth: 100)
                     }
-                    .settingsHighlight(id: highlightID("Display Mode"))
-
-                    HStack {
-                        Text("History Size")
-                        Spacer()
-                        Text("20 recent items").foregroundStyle(.secondary)
+                    .settingsHighlight(id: highlightID("Show it as"))
+                    LabeledContent("Keeps") {
+                        Text("The last 20 copies").foregroundStyle(.secondary)
                     }
                     .settingsHighlight(id: highlightID("History Size"))
-
-                    HStack {
-                        Text("Current Items")
-                        Spacer()
-                        Text("\(clipboardManager.clipboardHistory.count)")
-                            .foregroundColor(.secondary)
-                    }
-
-                    HStack {
-                        Text("Pinned Items")
-                        Spacer()
-                        Text("\(clipboardManager.pinnedItems.count)")
-                            .foregroundColor(.secondary)
-                    }
-
-                    HStack {
-                        Text("Monitoring Status")
-                        Spacer()
-                        Text(clipboardManager.isMonitoring ? "Active" : "Stopped")
-                            .foregroundColor(clipboardManager.isMonitoring ? .green : .secondary)
+                    LabeledContent("Right now") {
+                        SettingsStatus(text: clipboardManager.isMonitoring
+                                       ? "\(clipboardManager.clipboardHistory.count) copies, \(clipboardManager.pinnedItems.count) pinned"
+                                       : "Stopped",
+                                       kind: clipboardManager.isMonitoring ? .ok : .warn)
                     }
                 } header: {
-                    Text("Settings")
+                    Text("Clipboard")
                 } footer: {
                     switch clipboardDisplayMode {
                     case .panel:
-                        Text("Panel mode shows clipboard in a floating window near the notch.")
+                        Text("A floating window by the notch. Open it with ⌘⇧V.")
                     case .separateTab, .popover:
-                        Text("Separate Tab mode integrates Copied Items and Notes into a single view. If both are enabled, Notes appear on the right and Clipboard on the left.")
+                        Text("Its own tab in the notch, next to Notes if that's on. Open it with ⌘⇧V.")
                     }
                 }
 
                 Section {
-                    Button("Clear Clipboard History") {
-                        clipboardManager.clearHistory()
+                    HStack {
+                        SettingsRowLabel(title: "Clear the history", detail: "Your pinned copies stay.")
+                        Spacer()
+                        Button("Clear…") { confirmClearHistory = true }
+                            .settingsDestructiveButton()
+                            .disabled(clipboardManager.clipboardHistory.isEmpty)
                     }
-                    .foregroundStyle(SettingsPalette.danger)
-                    .disabled(clipboardManager.clipboardHistory.isEmpty)
-
-                    Button("Clear Pinned Items") {
-                        clipboardManager.pinnedItems.removeAll()
-                        clipboardManager.savePinnedItemsToDefaults()
+                    HStack {
+                        SettingsRowLabel(title: "Clear pinned copies")
+                        Spacer()
+                        Button("Clear…") { confirmClearPinned = true }
+                            .settingsDestructiveButton()
+                            .disabled(clipboardManager.pinnedItems.isEmpty)
                     }
-                    .foregroundStyle(SettingsPalette.danger)
-                    .disabled(clipboardManager.pinnedItems.isEmpty)
                 } header: {
-                    Text("Actions")
-                } footer: {
-                    Text("Clear clipboard history removes recent copies. Clear pinned items removes your favorites. Both actions are permanent.")
-                }
-
-                if !clipboardManager.clipboardHistory.isEmpty {
-                    Section {
-                        ForEach(clipboardManager.clipboardHistory) { item in
-                            VStack(alignment: .leading, spacing: 4) {
-                                HStack {
-                                    Image(systemName: item.type.icon)
-                                        .foregroundColor(.blue)
-                                        .frame(width: 16)
-                                    Text(item.type.displayName)
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                    Spacer()
-                                    Text(timeAgoString(from: item.timestamp))
-                                        .font(.caption2)
-                                        .foregroundColor(.secondary)
-                                }
-                                Text(item.preview)
-                                    .font(.system(.body, design: .monospaced))
-                                    .lineLimit(2)
-                            }
-                            .padding(.vertical, 2)
-                        }
-                    } header: {
-                        Text("Current History")
-                    }
+                    Text("Data")
                 }
             }
         }
-        .formStyle(.grouped)
         .navigationTitle("Clipboard")
+        .confirmationDialog("Clear the clipboard history?", isPresented: $confirmClearHistory) {
+            Button("Clear History", role: .destructive) { clipboardManager.clearHistory() }
+        } message: {
+            Text("This can't be undone.")
+        }
+        .confirmationDialog("Clear your pinned copies?", isPresented: $confirmClearPinned) {
+            Button("Clear Pinned", role: .destructive) {
+                clipboardManager.pinnedItems.removeAll()
+                clipboardManager.savePinnedItemsToDefaults()
+            }
+        } message: {
+            Text("This can't be undone.")
+        }
+        .onChange(of: enableClipboardManager) { _, enabled in
+            if enabled {
+                clipboardManager.startMonitoring()
+            } else {
+                clipboardManager.stopMonitoring()
+            }
+        }
         .onAppear {
             if enableClipboardManager && !clipboardManager.isMonitoring {
                 clipboardManager.startMonitoring()
@@ -7002,152 +6622,93 @@ struct ScreenAssistantSettings: View {
         SettingsTab.screenAssistant.highlightID(for: title)
     }
 
+    @State private var confirmClearFiles = false
+
     var body: some View {
         Form {
-            Section {
-                Defaults.Toggle(key: .enableScreenAssistant) {
-                    Text("Enable Screen Assistant")
-                }
-                .settingsHighlight(id: highlightID("Enable Screen Assistant"))
-            } header: {
-                Text("AI Assistant")
-            } footer: {
-                Text("AI-powered assistant that can analyze files, images, and provide conversational help. Use Cmd+Shift+A to quickly access the assistant.")
-            }
-
-            if enableScreenAssistant {
+            if !enableScreenAssistant {
                 Section {
-                    HStack {
-                        Text("Gemini API Key")
-                        Spacer()
-                        if geminiApiKey.isEmpty {
-                            Text("Not Set")
-                                .foregroundStyle(SettingsPalette.danger)
-                        } else {
-                            Text("••••••••")
-                                .foregroundStyle(SettingsPalette.ok)
-                        }
-
-                        Button(showingApiKey ? "Hide" : (geminiApiKey.isEmpty ? "Set" : "Change")) {
-                            if showingApiKey {
-                                showingApiKey = false
-                                if !apiKeyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                                    Defaults[.geminiApiKey] = apiKeyText
-                                }
-                                apiKeyText = ""
-                            } else {
-                                showingApiKey = true
-                                apiKeyText = geminiApiKey
-                            }
+                    Text("Off: no AI button, and nothing is sent anywhere.")
+                        .font(.callout).foregroundStyle(.secondary)
+                }
+            } else {
+                Section {
+                    Picker("Show it as", selection: $screenAssistantDisplayMode) {
+                        ForEach(ScreenAssistantDisplayMode.allCases, id: \.self) { mode in
+                            Text(mode.displayName).tag(mode)
                         }
                     }
-
-                    if showingApiKey {
-                        VStack(alignment: .leading, spacing: 8) {
-                            SecureField("Enter your Gemini API Key", text: $apiKeyText)
-                                .textFieldStyle(.roundedBorder)
-
-                            Text("Get your free API key from Google AI Studio")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-
-                            HStack {
-                                Button("Open Google AI Studio") {
-                                    NSWorkspace.shared.open(URL(string: "https://aistudio.google.com/app/apikey")!)
-                                }
-                                .buttonStyle(.link)
-
-                                Spacer()
-
-                                Button("Save") {
-                                    Defaults[.geminiApiKey] = apiKeyText
-                                    showingApiKey = false
-                                    apiKeyText = ""
-                                }
-                                .disabled(apiKeyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                            }
-                        }
-                    }
-
-                    HStack {
-                        Text("Display Mode")
-                        Spacer()
-                        Picker("", selection: $screenAssistantDisplayMode) {
-                            ForEach(ScreenAssistantDisplayMode.allCases, id: \.self) { mode in
-                                Text(mode.displayName).tag(mode)
-                            }
-                        }
-                        .pickerStyle(.menu)
-                        .frame(minWidth: 100)
-                    }
-                    .settingsHighlight(id: highlightID("Display Mode"))
-
-                    HStack {
-                        Text("Attached Files")
-                        Spacer()
-                        Text("\(screenAssistantManager.attachedFiles.count)")
-                            .foregroundColor(.secondary)
-                    }
-
-                    HStack {
-                        Text("Recording Status")
-                        Spacer()
-                        Text(screenAssistantManager.isRecording ? "Recording" : "Ready")
-                            .foregroundColor(screenAssistantManager.isRecording ? .red : .secondary)
+                    .settingsHighlight(id: highlightID("Show it as"))
+                    LabeledContent("Right now") {
+                        SettingsStatus(text: screenAssistantManager.isRecording
+                                       ? "Recording"
+                                       : "Ready · \(screenAssistantManager.attachedFiles.count) files attached",
+                                       kind: screenAssistantManager.isRecording ? .warn : .neutral)
                     }
                 } header: {
-                    Text("Configuration")
+                    Text("Assistant")
                 } footer: {
                     switch screenAssistantDisplayMode {
                     case .popover:
-                        Text("Popover mode shows the assistant as a dropdown attached to the AI button. Panel mode shows the assistant in a floating window near the notch.")
+                        Text("Drops down from the AI button. Open it with ⌘⇧A.")
                     case .panel:
-                        Text("Panel mode shows the assistant in a floating window near the notch. Popover mode shows the assistant as a dropdown attached to the AI button.")
+                        Text("A floating window by the notch. Open it with ⌘⇧A.")
                     }
                 }
 
                 Section {
-                    Button("Clear All Files") {
-                        screenAssistantManager.clearAllFiles()
+                    HStack {
+                        SettingsRowLabel(title: "Gemini API key",
+                                         detail: geminiApiKey.isEmpty ? nil : "Saved")
+                        Spacer()
+                        if geminiApiKey.isEmpty {
+                            SettingsStatus(text: "Not set", kind: .warn)
+                        }
+                        Button(showingApiKey ? "Cancel" : (geminiApiKey.isEmpty ? "Add…" : "Change…")) {
+                            showingApiKey.toggle()
+                            apiKeyText = ""
+                        }
                     }
-                    .foregroundStyle(SettingsPalette.danger)
-                    .disabled(screenAssistantManager.attachedFiles.isEmpty)
+                    if showingApiKey {
+                        HStack {
+                            SecureField("Paste your Gemini API key", text: $apiKeyText)
+                                .textFieldStyle(.roundedBorder)
+                            Button("Save") {
+                                Defaults[.geminiApiKey] = apiKeyText.trimmingCharacters(in: .whitespacesAndNewlines)
+                                showingApiKey = false
+                                apiKeyText = ""
+                            }
+                            .settingsPrimaryButton()
+                            .disabled(apiKeyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        }
+                        Link("Get a free key from Google AI Studio", destination: URL(string: "https://aistudio.google.com/app/apikey")!)
+                            .font(.callout)
+                    }
                 } header: {
-                    Text("Actions")
+                    Text("Connection")
                 } footer: {
-                    Text("Clear all files removes all attached files and audio recordings. This action is permanent.")
+                    Text("What you ask, with any files you attach, goes to Google's Gemini.")
                 }
 
-                if !screenAssistantManager.attachedFiles.isEmpty {
-                    Section {
-                        ForEach(screenAssistantManager.attachedFiles) { file in
-                            VStack(alignment: .leading, spacing: 4) {
-                                HStack {
-                                    Image(systemName: file.type.iconName)
-                                        .foregroundColor(.blue)
-                                        .frame(width: 16)
-                                    Text(file.type.displayName)
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                    Spacer()
-                                    Text(timeAgoString(from: file.timestamp))
-                                        .font(.caption2)
-                                        .foregroundColor(.secondary)
-                                }
-                                Text(file.name)
-                                    .font(.system(.body, design: .monospaced))
-                                    .lineLimit(2)
-                            }
-                            .padding(.vertical, 2)
-                        }
-                    } header: {
-                        Text("Attached Files")
+                Section {
+                    HStack {
+                        SettingsRowLabel(title: "Remove attached files", detail: "Files and voice recordings you gave the assistant.")
+                        Spacer()
+                        Button("Remove…") { confirmClearFiles = true }
+                            .settingsDestructiveButton()
+                            .disabled(screenAssistantManager.attachedFiles.isEmpty)
                     }
+                } header: {
+                    Text("Data")
                 }
             }
         }
-        .formStyle(.grouped)
         .navigationTitle("Screen Assistant")
+        .confirmationDialog("Remove all attached files?", isPresented: $confirmClearFiles) {
+            Button("Remove Files", role: .destructive) { screenAssistantManager.clearAllFiles() }
+        } message: {
+            Text("This can't be undone.")
+        }
     }
 
     private func timeAgoString(from date: Date) -> String {
@@ -7179,99 +6740,68 @@ struct ColorPickerSettings: View {
         SettingsTab.colorPicker.highlightID(for: title)
     }
 
+    @State private var confirmClearColors = false
+
     var body: some View {
         Form {
-            Section {
-                Defaults.Toggle(key: .enableColorPickerFeature) {
-                    Text("Enable Color Picker")
-                }
-                .settingsHighlight(id: highlightID("Enable Color Picker"))
-            } header: {
-                Text("Color Picker")
-            } footer: {
-                Text("Enable screen color picking functionality. Use Cmd+Shift+P to quickly access the color picker.")
-            }
-
-            if enableColorPickerFeature {
+            if !enableColorPickerFeature {
                 Section {
-                    Defaults.Toggle(key: .showColorPickerIcon) {
-                        Text("Show Color Picker Icon")
-                    }
-                    .settingsHighlight(id: highlightID("Show Color Picker Icon"))
-
-                    HStack {
-                        Text("Display Mode")
-                        Spacer()
-                        Picker("", selection: $colorPickerDisplayMode) {
-                            ForEach(ColorPickerDisplayMode.allCases, id: \.self) { mode in
-                                Text(mode.displayName).tag(mode)
-                            }
+                    Text("Off: no colour picker in the notch.")
+                        .font(.callout).foregroundStyle(.secondary)
+                }
+            } else {
+                Section {
+                    SettingsToggle(key: .showColorPickerIcon, title: "Button in the notch",
+                                   detail: "An eyedropper button next to the tabs.",
+                                   highlightID: highlightID("Button in the notch"))
+                    Picker("Show it as", selection: $colorPickerDisplayMode) {
+                        ForEach(ColorPickerDisplayMode.allCases, id: \.self) { mode in
+                            Text(mode.displayName).tag(mode)
                         }
-                        .pickerStyle(.menu)
-                        .frame(minWidth: 100)
                     }
-                    .settingsHighlight(id: highlightID("Display Mode"))
-
-                    Defaults.Toggle(key: .showColorFormats) {
-                        Text("Show All Color Formats")
-                    }
-                    .settingsHighlight(id: highlightID("Show All Color Formats"))
-
+                    .settingsHighlight(id: highlightID("Show it as"))
+                    SettingsToggle(key: .showColorFormats, title: "Every colour format",
+                                   detail: "HEX, RGB, HSL and more, not only HEX.",
+                                   highlightID: highlightID("Every colour format"))
                 } header: {
-                    Text("Settings")
+                    Text("Colour picker")
                 } footer: {
-                    switch colorPickerDisplayMode {
-                    case .popover:
-                        Text("Popover mode shows color picker as a dropdown attached to the color picker button. Panel mode shows color picker in a floating window.")
-                    case .panel:
-                        Text("Panel mode shows color picker in a floating window. Popover mode shows color picker as a dropdown attached to the color picker button.")
-                    }
+                    Text("Open it with ⌘⇧P.")
                 }
 
                 Section {
                     HStack {
-                        Text("Color History")
+                        SettingsRowLabel(title: "Pick a colour now",
+                                         detail: colorPickerManager.isPickingColor ? "Picking…" : "\(colorPickerManager.colorHistory.count) colours picked so far")
                         Spacer()
-                        Text("\(colorPickerManager.colorHistory.count)")
-                            .foregroundColor(.secondary)
+                        Button("Show Panel") { ColorPickerPanelManager.shared.showColorPickerPanel() }
+                        Button("Pick") { colorPickerManager.startColorPicking() }
+                            .settingsPrimaryButton()
+                            .disabled(colorPickerManager.isPickingColor)
                     }
-
-                    HStack {
-                        Text("Picking Status")
-                        Spacer()
-                        Text(colorPickerManager.isPickingColor ? "Active" : "Ready")
-                            .foregroundColor(colorPickerManager.isPickingColor ? .green : .secondary)
-                    }
-
-                    Button("Show Color Picker Panel") {
-                        ColorPickerPanelManager.shared.showColorPickerPanel()
-                    }
-                    .disabled(!enableColorPickerFeature)
-
                 } header: {
-                    Text("Status & Actions")
+                    Text("Try it")
                 }
 
                 Section {
-                    Button("Clear Color History") {
-                        colorPickerManager.clearHistory()
+                    HStack {
+                        SettingsRowLabel(title: "Clear picked colours")
+                        Spacer()
+                        Button("Clear…") { confirmClearColors = true }
+                            .settingsDestructiveButton()
+                            .disabled(colorPickerManager.colorHistory.isEmpty)
                     }
-                    .foregroundStyle(SettingsPalette.danger)
-                    .disabled(colorPickerManager.colorHistory.isEmpty)
-
-                    Button("Start Color Picking") {
-                        colorPickerManager.startColorPicking()
-                    }
-                    .disabled(!enableColorPickerFeature || colorPickerManager.isPickingColor)
-
                 } header: {
-                    Text("Quick Actions")
-                } footer: {
-                    Text("Clear color history removes all picked colors. Start color picking begins screen color capture mode.")
+                    Text("Data")
                 }
             }
         }
         .navigationTitle("Color Picker")
+        .confirmationDialog("Clear every picked colour?", isPresented: $confirmClearColors) {
+            Button("Clear Colours", role: .destructive) { colorPickerManager.clearHistory() }
+        } message: {
+            Text("This can't be undone.")
+        }
     }
 }
 
@@ -7558,82 +7088,57 @@ struct NotesSettingsView: View {
 
     var body: some View {
         Form {
-            Section {
-                Defaults.Toggle(key: .enableNotes) {
-                    Text("Enable Notes")
-                }
-                if enableNotes {
-                    Defaults.Toggle(key: .enableNotePinning) {
-                        Text("Enable Note Pinning")
-                    }
-                    Defaults.Toggle(key: .enableNoteSearch) {
-                        Text("Enable Note Search")
-                    }
-                    Defaults.Toggle(key: .enableNoteColorFiltering) {
-                        Text("Enable Color Filtering")
-                    }
-                    Defaults.Toggle(key: .enableCreateFromClipboard) {
-                        Text("Enable Create from Clipboard")
-                    }
-                    Defaults.Toggle(key: .enableNoteCharCount) {
-                        Text("Show Character Count")
-                    }
-                }
-            } header: {
-                Text("General")
-            } footer: {
-                Text("Customize how you organize and create notes. Enabling color filtering and search helps manage large lists.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            if enableNotes {
+            if !enableNotes {
                 Section {
-                    Defaults.Toggle(key: .enableAppleNotesSync) {
-                        Text("Sync with Apple Notes")
-                    }
-                    .settingsHighlight(id: highlightID("Sync with Apple Notes"))
+                    Text("Off: no Notes tab.")
+                        .font(.callout).foregroundStyle(.secondary)
+                }
+            } else {
+                Section {
+                    SettingsToggle(key: .enableNotePinning, title: "Pin notes", detail: "Keep the ones you need at the top.")
+                    SettingsToggle(key: .enableNoteSearch, title: "Search")
+                    SettingsToggle(key: .enableNoteColorFiltering, title: "Colours", detail: "Colour notes and show only one colour.")
+                    SettingsToggle(key: .enableCreateFromClipboard, title: "New note from what you copied")
+                    SettingsToggle(key: .enableNoteCharCount, title: "Character count")
+                } header: {
+                    Text("Notes")
+                }
 
+                Section {
+                    SettingsToggle(key: .enableAppleNotesSync, title: "Sync with Apple Notes",
+                                   detail: "Both ways. NotchFlow's notes go in a NotchFlow folder in Notes.",
+                                   highlightID: highlightID("Sync with Apple Notes"))
                     if enableAppleNotesSync {
-                        Button {
-                            Task {
-                                let notes = Defaults[.savedNotes]
-                                if let merged = await appleNotesSync.sync(localNotes: notes) {
-                                    Defaults[.savedNotes] = merged
+                        HStack {
+                            if let error = appleNotesSync.lastError {
+                                SettingsStatus(text: error, kind: .error)
+                            } else if let lastSync = appleNotesLastSyncDate {
+                                SettingsStatus(text: "Synced \(lastSync.formatted(.relative(presentation: .named)))", kind: .ok)
+                            } else {
+                                SettingsStatus(text: "Not synced yet")
+                            }
+                            Spacer()
+                            if appleNotesSync.isSyncing {
+                                ProgressView().controlSize(.small)
+                            }
+                            Button("Sync Now") {
+                                Task {
+                                    let notes = Defaults[.savedNotes]
+                                    if let merged = await appleNotesSync.sync(localNotes: notes) {
+                                        Defaults[.savedNotes] = merged
+                                    }
                                 }
                             }
-                        } label: {
-                            HStack {
-                                Text("Sync Now")
-                                Spacer()
-                                if appleNotesSync.isSyncing {
-                                    ProgressView()
-                                        .controlSize(.small)
-                                }
-                            }
+                            .settingsPrimaryButton()
+                            .disabled(appleNotesSync.isSyncing)
                         }
-                        .disabled(appleNotesSync.isSyncing)
+                        .padding(.leading, 16)
                         .settingsHighlight(id: highlightID("Sync Now"))
-
-                        if let lastSync = appleNotesLastSyncDate {
-                            LabeledContent("Last synced") {
-                                Text(lastSync, style: .relative)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-
-                        if let error = appleNotesSync.lastError {
-                            Text(error)
-                                .font(.caption)
-                                .foregroundStyle(SettingsPalette.danger)
-                        }
                     }
                 } header: {
                     Text("Apple Notes")
                 } footer: {
-                    Text("Two-way sync with the macOS Notes app. Notes created in NotchFlow appear in the NotchFlow folder in Notes, and your existing Apple Notes are imported into the notch. Grant Automation permission for Notes when prompted.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    Text("macOS asks once to let NotchFlow use Notes.")
                 }
             }
         }
@@ -7662,6 +7167,7 @@ struct TerminalSettings: View {
     @Default(.terminalNotifyWhenDone) var terminalNotifyWhenDone
     @Default(.terminalNotifyAfterSeconds) var terminalNotifyAfterSeconds
     @Default(.terminalExternalApp) var terminalExternalApp
+    @State private var confirmRestartShell = false
 
     private func highlightID(_ title: String) -> String {
         SettingsTab.terminal.highlightID(for: title)
@@ -7700,43 +7206,31 @@ struct TerminalSettings: View {
 
     var body: some View {
         Form {
-            Section {
-                Defaults.Toggle(key: .enableTerminalFeature) {
-                    Text("Enable terminal")
-                }
-                .settingsHighlight(id: highlightID("Enable terminal"))
-
-                if enableTerminalFeature {
-                    Defaults.Toggle(key: .terminalStickyMode) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Keep terminal open until clicked outside")
-                            Text("Prevents the terminal from closing when the cursor accidentally leaves the notch area.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .settingsHighlight(id: highlightID("Keep terminal open"))
-                }
-            } header: {
-                Text("General")
-            } footer: {
-                Text("Adds a Guake-style dropdown terminal tab. The terminal session persists across notch open/close cycles.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            if enableTerminalFeature {
+            if !enableTerminalFeature {
                 Section {
-                    Defaults.Toggle(key: .terminalNotifyWhenDone) {
-                        Text("Tell me when a command finishes")
-                    }
-                    .settingsHighlight(id: highlightID("Tell me when a command finishes"))
+                    Text("Off: no Terminal tab, and no shell running.")
+                        .font(.callout).foregroundStyle(.secondary)
+                }
+            } else {
+                Section {
+                    SettingsToggle(key: .terminalStickyMode, title: "Stay open until I click outside",
+                                   detail: "The notch doesn't close if the pointer slips away.",
+                                   highlightID: highlightID("Keep terminal open"))
+                    SettingsToggle(key: .terminalNotifyWhenDone, title: "Tell me when a command finishes",
+                                   detail: "When you're looking elsewhere. Its tab gets a green dot too.",
+                                   highlightID: highlightID("Tell me when a command finishes"))
                     if terminalNotifyWhenDone {
-                        Stepper(value: $terminalNotifyAfterSeconds, in: 0...600, step: 5) {
-                            Text(terminalNotifyAfterSeconds == 0 ? "For every command" : "If it ran at least \(terminalNotifyAfterSeconds) seconds")
+                        LabeledContent {
+                            Stepper(value: $terminalNotifyAfterSeconds, in: 0...600, step: 5) {
+                                Text(terminalNotifyAfterSeconds == 0 ? "Every command" : "\(terminalNotifyAfterSeconds)s or longer")
+                                    .foregroundStyle(.secondary).monospacedDigit()
+                            }
+                        } label: {
+                            Text("Only for commands that ran")
                         }
+                        .padding(.leading, 16)
                     }
-                    Picker("Open in", selection: $terminalExternalApp) {
+                    Picker("Open folders in", selection: $terminalExternalApp) {
                         ForEach(installedTerminalApps, id: \.bundleID) { app in
                             Text(app.name).tag(app.bundleID)
                         }
@@ -7746,33 +7240,13 @@ struct TerminalSettings: View {
                     }
                     .settingsHighlight(id: highlightID("Open in"))
                 } header: {
-                    Text("Tabs and notifications")
+                    Text("Terminal")
                 } footer: {
-                    Text("Click + at the top of the terminal for another one; each keeps running in its own tab. When a command finishes while you're looking elsewhere, the notch tells you (with Notifications turned on) and its tab gets a green dot. Editors, ssh and agents you quit yourself don't count. The arrow opens the folder you're in, in the app chosen here (iTerm2, Terminal, Ghostty…).")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            if enableTerminalFeature {
-                // MARK: Shell
-                Section {
-                    HStack {
-                        Text("Shell path")
-                        Spacer()
-                        TextField("", text: $terminalShellPath)
-                            .textFieldStyle(.roundedBorder)
-                            .frame(width: 200)
-                            .multilineTextAlignment(.trailing)
-                    }
-                    .settingsHighlight(id: highlightID("Shell path"))
-                } header: {
-                    Text("Shell")
+                    Text("Click + in the terminal for another tab. Each keeps running while the notch is closed.")
                 }
 
-                // MARK: Appearance
                 Section {
-                    Picker("Font family", selection: $terminalFontFamily) {
+                    Picker("Font", selection: $terminalFontFamily) {
                         Text("System Monospaced").tag("")
                         Divider()
                         ForEach(monospacedFontFamilies, id: \.self) { family in
@@ -7786,91 +7260,26 @@ struct TerminalSettings: View {
                     }
                     .settingsHighlight(id: highlightID("Font family"))
 
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text("Font size")
-                            Spacer()
-                            Text("\(Int(terminalFontSize)) pt")
-                                .foregroundStyle(.secondary)
-                                .monospacedDigit()
+                    SettingsSlider(title: "Font size", value: $terminalFontSize, range: 8...24, step: 1,
+                                   valueText: "\(Int(terminalFontSize)) pt")
+                        .onChange(of: terminalFontSize) { _, newValue in
+                            terminalManager.applyFontSize(newValue)
                         }
-                        Slider(value: $terminalFontSize, in: 8...24, step: 1)
-                            .onChange(of: terminalFontSize) { _, newValue in
-                                terminalManager.applyFontSize(newValue)
-                            }
-                    }
-                    .settingsHighlight(id: highlightID("Font size"))
+                        .settingsHighlight(id: highlightID("Font size"))
 
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text("Terminal opacity")
-                            Spacer()
-                            Text("\(Int(terminalOpacity * 100))%")
-                                .foregroundStyle(.secondary)
-                                .monospacedDigit()
+                    SettingsSlider(title: "Background opacity", detail: "Text always stays solid.",
+                                   value: $terminalOpacity, range: 0.3...1.0, step: 0.05,
+                                   valueText: "\(Int(terminalOpacity * 100))%")
+                        .onChange(of: terminalOpacity) { _, newValue in
+                            terminalManager.applyOpacity(newValue)
                         }
-                        Slider(value: $terminalOpacity, in: 0.3...1.0, step: 0.05)
-                            .onChange(of: terminalOpacity) { _, newValue in
-                                terminalManager.applyOpacity(newValue)
-                            }
-                    }
-                    .settingsHighlight(id: highlightID("Terminal opacity"))
+                        .settingsHighlight(id: highlightID("Terminal opacity"))
 
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text("Maximum height")
-                            Spacer()
-                            Text(formattedMaxHeight)
-                                .foregroundStyle(.secondary)
-                                .monospacedDigit()
-                        }
-                        Slider(value: $terminalMaxHeightFraction, in: 0.2...0.5, step: 0.05)
-                    }
-                    .settingsHighlight(id: highlightID("Maximum height"))
-                } header: {
-                    Text("Appearance")
-                } footer: {
-                    Text("Terminal opacity only affects the terminal backdrop; text stays fully opaque. Blur uses the system material behind the window.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+                    SettingsSlider(title: "Tallest it gets", value: $terminalMaxHeightFraction, range: 0.2...0.5, step: 0.05,
+                                   valueText: "\(Int(terminalMaxHeightFraction * 100))%")
+                        .settingsHighlight(id: highlightID("Maximum height"))
 
-                // MARK: Colors
-                Section {
-                    ColorPicker("Background", selection: $terminalBackgroundColor, supportsOpacity: false)
-                        .onChange(of: terminalBackgroundColor) { _, newValue in
-                            terminalManager.applyBackgroundColor(newValue)
-                        }
-                        .settingsHighlight(id: highlightID("Background color"))
-
-                    ColorPicker("Foreground", selection: $terminalForegroundColor, supportsOpacity: false)
-                        .onChange(of: terminalForegroundColor) { _, newValue in
-                            terminalManager.applyForegroundColor(newValue)
-                        }
-                        .settingsHighlight(id: highlightID("Foreground color"))
-
-                    ColorPicker("Cursor", selection: $terminalCursorColor, supportsOpacity: false)
-                        .onChange(of: terminalCursorColor) { _, newValue in
-                            terminalManager.applyCursorColor(newValue)
-                        }
-                        .settingsHighlight(id: highlightID("Cursor color"))
-
-                    Toggle("Bold text as bright colors", isOn: $terminalBoldAsBright)
-                        .onChange(of: terminalBoldAsBright) { _, newValue in
-                            terminalManager.applyBoldAsBright(newValue)
-                        }
-                        .settingsHighlight(id: highlightID("Bold as bright"))
-                } header: {
-                    Text("Colors")
-                } footer: {
-                    Text("When bold-as-bright is off, bold text uses a heavier font weight instead of bright ANSI colors.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                // MARK: Cursor
-                Section {
-                    Picker("Cursor style", selection: cursorStyleBinding) {
+                    Picker("Cursor", selection: cursorStyleBinding) {
                         ForEach(TerminalCursorStyleOption.allCases, id: \.self) { style in
                             Text(style.displayName).tag(style)
                         }
@@ -7882,77 +7291,96 @@ struct TerminalSettings: View {
                     }
                     .settingsHighlight(id: highlightID("Cursor style"))
                 } header: {
-                    Text("Cursor")
+                    Text("Look")
                 }
 
-                // MARK: Scrollback
                 Section {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text("Scrollback lines")
-                            Spacer()
-                            Text("\(terminalScrollbackLines)")
-                                .foregroundStyle(.secondary)
-                                .monospacedDigit()
+                    ColorPicker("Background", selection: $terminalBackgroundColor, supportsOpacity: false)
+                        .onChange(of: terminalBackgroundColor) { _, newValue in
+                            terminalManager.applyBackgroundColor(newValue)
                         }
-                        Slider(
-                            value: Binding(
-                                get: { Double(terminalScrollbackLines) },
-                                set: { terminalScrollbackLines = Int($0) }
-                            ),
-                            in: 100...10000,
-                            step: 100
-                        )
+                        .settingsHighlight(id: highlightID("Background color"))
+
+                    ColorPicker("Text", selection: $terminalForegroundColor, supportsOpacity: false)
+                        .onChange(of: terminalForegroundColor) { _, newValue in
+                            terminalManager.applyForegroundColor(newValue)
+                        }
+                        .settingsHighlight(id: highlightID("Foreground color"))
+
+                    ColorPicker("Cursor", selection: $terminalCursorColor, supportsOpacity: false)
+                        .onChange(of: terminalCursorColor) { _, newValue in
+                            terminalManager.applyCursorColor(newValue)
+                        }
+                        .settingsHighlight(id: highlightID("Cursor color"))
+
+                    Toggle(isOn: $terminalBoldAsBright) {
+                        SettingsRowLabel(title: "Bold text in bright colours", detail: "Off makes bold text heavier instead.")
+                    }
+                    .onChange(of: terminalBoldAsBright) { _, newValue in
+                        terminalManager.applyBoldAsBright(newValue)
+                    }
+                    .settingsHighlight(id: highlightID("Bold as bright"))
+                } header: {
+                    Text("Colours")
+                }
+
+                Section {
+                    HStack {
+                        Text("Shell")
+                        Spacer()
+                        TextField("", text: $terminalShellPath, prompt: Text("/bin/zsh"))
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 200)
+                            .multilineTextAlignment(.trailing)
+                    }
+                    .settingsHighlight(id: highlightID("Shell path"))
+
+                    SettingsSlider(title: "Lines to keep", detail: "More lines use more memory.",
+                                   value: Binding(
+                                       get: { Double(terminalScrollbackLines) },
+                                       set: { terminalScrollbackLines = Int($0) }
+                                   ),
+                                   range: 100...10000, step: 100,
+                                   valueText: "\(terminalScrollbackLines)")
                         .onChange(of: terminalScrollbackLines) { _, newValue in
                             terminalManager.applyScrollback(newValue)
                         }
+                        .settingsHighlight(id: highlightID("Scrollback lines"))
+
+                    Toggle(isOn: $terminalOptionAsMeta) {
+                        SettingsRowLabel(title: "Option key as Meta", detail: "Option+key sends Esc+key, for shells and editors.")
                     }
-                    .settingsHighlight(id: highlightID("Scrollback lines"))
-                } header: {
-                    Text("Scrollback")
-                } footer: {
-                    Text("Number of lines kept in the scrollback buffer. Higher values use more memory.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                // MARK: Input
-                Section {
-                    Toggle("Option as Meta key", isOn: $terminalOptionAsMeta)
-                        .onChange(of: terminalOptionAsMeta) { _, newValue in
-                            terminalManager.applyOptionAsMeta(newValue)
-                        }
-                        .settingsHighlight(id: highlightID("Option as Meta"))
-
-                    Toggle("Allow mouse reporting", isOn: $terminalMouseReporting)
-                        .onChange(of: terminalMouseReporting) { _, newValue in
-                            terminalManager.applyMouseReporting(newValue)
-                        }
-                        .settingsHighlight(id: highlightID("Mouse reporting"))
-                } header: {
-                    Text("Input")
-                } footer: {
-                    Text("Option as Meta sends Esc+key instead of macOS special characters. Mouse reporting forwards mouse events to terminal applications like vim or tmux.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                // MARK: Actions
-                Section {
-                    Button("Restart Shell") {
-                        terminalManager.restartShell()
+                    .onChange(of: terminalOptionAsMeta) { _, newValue in
+                        terminalManager.applyOptionAsMeta(newValue)
                     }
-                    .disabled(!terminalManager.isProcessRunning)
+                    .settingsHighlight(id: highlightID("Option as Meta"))
+
+                    Toggle(isOn: $terminalMouseReporting) {
+                        SettingsRowLabel(title: "Mouse in terminal apps", detail: "Clicks and scrolling go to apps like vim or tmux.")
+                    }
+                    .onChange(of: terminalMouseReporting) { _, newValue in
+                        terminalManager.applyMouseReporting(newValue)
+                    }
+                    .settingsHighlight(id: highlightID("Mouse reporting"))
+
+                    HStack {
+                        SettingsRowLabel(title: "Restart the shell", detail: "Whatever is running in it stops.")
+                        Spacer()
+                        Button("Restart…") { confirmRestartShell = true }
+                            .settingsDestructiveButton()
+                            .disabled(!terminalManager.isProcessRunning)
+                    }
                 } header: {
-                    Text("Actions")
-                } footer: {
-                    Text("Restarts the shell process. Any unsaved work in the terminal will be lost.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    Text("Advanced")
                 }
             }
         }
         .navigationTitle("Terminal")
+        .confirmationDialog("Restart the shell?", isPresented: $confirmRestartShell) {
+            Button("Restart Shell", role: .destructive) { terminalManager.restartShell() }
+        } message: {
+            Text("Anything running in the terminal stops.")
+        }
     }
 }
 
@@ -8099,6 +7527,18 @@ private struct SettingsTabSwitchHeader: View {
         switch tab {
         case .orbit: return "orbit-Use Orbit"
         case .agents: return "agents-AI Agents"
+        case .timer: return "timer-Use Timers"
+        case .stats: return "stats-Use Stats"
+        case .notes: return "notes-Use Notes"
+        case .clipboard: return "clipboard-Use Clipboard"
+        case .terminal: return "terminal-Use Terminal"
+        case .whatsapp: return "whatsapp-Use WhatsApp"
+        case .glance: return "glance-Use Glance"
+        case .shelf: return "shelf-Use Shelf"
+        case .colorPicker: return "colorPicker-Use Color Picker"
+        case .screenAssistant: return "screenAssistant-Use Screen Assistant"
+        case .downloads: return "downloads-Use Download Alerts"
+        case .shortcuts: return "shortcuts-Use Shortcuts"
         default: return tab.highlightID(for: tab.title)
         }
     }

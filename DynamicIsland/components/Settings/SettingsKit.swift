@@ -145,3 +145,31 @@ extension View {
         buttonStyle(.bordered).tint(SettingsPalette.danger)
     }
 }
+
+/// A slider row: the title (and one line) on the left, the slider and its
+/// value on the right ("60%", "0.3s").
+struct SettingsSlider<Value: BinaryFloatingPoint>: View where Value.Stride: BinaryFloatingPoint {
+    let title: String
+    var detail: String? = nil
+    @Binding var value: Value
+    let range: ClosedRange<Value>
+    var step: Value.Stride = 1
+    let valueText: String
+
+    var body: some View {
+        LabeledContent {
+            HStack(spacing: 10) {
+                Slider(value: $value, in: range, step: step)
+                    .frame(minWidth: 120, maxWidth: 200)
+                    .labelsHidden()
+                    .accessibilityLabel(title)
+                Text(valueText)
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+                    .frame(minWidth: 44, alignment: .trailing)
+            }
+        } label: {
+            SettingsRowLabel(title: title, detail: detail)
+        }
+    }
+}
