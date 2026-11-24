@@ -73,6 +73,13 @@ Form {
 - Short and plain, like talking to a friend. No jargon where a plain word works. No em dashes.
 - Say what happens, not how it's built ("Your files aren't touched", not "uses a git worktree").
 
+## The window
+
+- A normal title bar (`SettingsWindowController`): no `.fullSizeContentView`, no transparent title
+  bar, no `NavigationSplitView`. The sidebar and page are a plain `HStack` in `SettingsView`, so nothing
+  is ever drawn under the window buttons. Don't change this to get a "seamless" look; it caused pages
+  to slide under the title bar.
+
 ## The sidebar
 
 - Groups: **General**, **In the notch**, **Work**, **System**, then About. Membership and order:

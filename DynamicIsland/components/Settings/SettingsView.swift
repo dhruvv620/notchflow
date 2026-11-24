@@ -336,12 +336,6 @@ extension View {
     }
 }
 
-/// Fixed measurements of the Settings window.
-enum SettingsLayout {
-    /// The title bar strip holding the window buttons (the window has no toolbar).
-    static let titleBarHeight: CGFloat = 28
-}
-
 private struct SettingsForm<Content: View>: View {
     let tab: SettingsTab
     @ViewBuilder var content: () -> Content
@@ -350,13 +344,12 @@ private struct SettingsForm<Content: View>: View {
 
     var body: some View {
         // The same header on every page (docs/SETTINGS_DESIGN.md), fixed above the
-        // page's form; only the form scrolls. The window has no toolbar, so the
-        // header keeps clear of the title bar itself.
+        // page's form; only the form scrolls.
         VStack(spacing: 0) {
             SettingsTabHeader(tab: tab)
                 .padding(.horizontal, 28)
-                .padding(.top, SettingsLayout.titleBarHeight + 6)
-                .padding(.bottom, 8)
+                .padding(.top, 14)
+                .padding(.bottom, 10)
                 .frame(maxWidth: .infinity, alignment: .leading)
             Divider().opacity(0.6)
             pageContent
@@ -365,7 +358,6 @@ private struct SettingsForm<Content: View>: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .background(Color(nsColor: .windowBackgroundColor))
-        .ignoresSafeArea(.container, edges: .top)
     }
 
     private var pageContent: some View {
@@ -400,24 +392,24 @@ struct SettingsView: View {
     }
 
     var body: some View {
-        NavigationSplitView {
-            VStack(spacing: 12) {
+        // A plain two-column layout in a window with a normal title bar: nothing
+        // is ever drawn under the window buttons, and every page starts below it.
+        HStack(spacing: 0) {
+            VStack(spacing: 10) {
                 SettingsSidebarSearchBar(
                     text: $searchText,
                     suggestions: searchSuggestions,
                     onSuggestionSelected: handleSearchSuggestionSelection
                 )
                 .padding(.horizontal, 12)
-                // Clear the window's close/minimize/zoom buttons.
-                .padding(.top, SettingsLayout.titleBarHeight + 10)
+                .padding(.top, 12)
 
-                List(selection: selectionBinding) {
+                List(selection: sidebarSelection) {
                     ForEach(groupedFilteredTabs, id: \.group) { section in
                         Section {
                             ForEach(section.tabs) { tab in
-                                NavigationLink(value: tab) {
-                                    sidebarRow(for: tab)
-                                }
+                                sidebarRow(for: tab)
+                                    .tag(Optional(tab))
                             }
                         } header: {
                             if let title = section.group.title {
@@ -426,12 +418,9 @@ struct SettingsView: View {
                         }
                     }
                 }
-                .listStyle(SidebarListStyle())
-                .frame(minWidth: 200)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .toolbar(removing: .sidebarToggle)
-                .navigationSplitViewColumnWidth(min: 200, ideal: 210, max: 240)
-                .environment(\.defaultMinListRowHeight, 44)
+                .listStyle(.sidebar)
+                .scrollContentBackground(.hidden)
+                .environment(\.defaultMinListRowHeight, 40)
 
                 VStack(spacing: 0) {
                     Divider()
@@ -439,19 +428,15 @@ struct SettingsView: View {
                         .padding(12)
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-            // The window has no toolbar, so lay out from the very top ourselves
-            // instead of relying on a safe area that differs between pages.
-            .ignoresSafeArea(.container, edges: .top)
-        } detail: {
+            .frame(width: 230)
+            .frame(maxHeight: .infinity, alignment: .top)
+            .background(Color(nsColor: .underPageBackgroundColor))
+
+            Divider()
+
             detailView(for: resolvedSelection)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .navigationSplitViewStyle(.balanced)
-        .toolbar(removing: .sidebarToggle)
-        // No toolbar band: a clear title bar with just the window buttons, like
-        // System Settings, and every page starts right below it.
-        .toolbar(.hidden, for: .windowToolbar)
         .environmentObject(highlightCoordinator)
         .formStyle(.grouped)
         // One accent and one background for every page.
@@ -474,11 +459,11 @@ struct SettingsView: View {
         tabsMatchingSearch(searchText)
     }
 
-    private var selectionBinding: Binding<SettingsTab> {
+    private var sidebarSelection: Binding<SettingsTab?> {
         Binding(
             get: { resolvedSelection },
             set: { newValue in
-                selectedTab = newValue
+                if let newValue { selectedTab = newValue }
             }
         )
     }

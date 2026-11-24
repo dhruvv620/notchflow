@@ -32,9 +32,9 @@ class SettingsWindowController: NSWindowController {
     private init() {
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 860, height: 680),
-            // A clear title bar over the sidebar (like System Settings); pages keep
-            // below it through the safe area.
-            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
+            // A normal title bar: the content starts below it, so nothing is
+            // ever drawn under the window buttons.
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
         )
@@ -58,11 +58,9 @@ class SettingsWindowController: NSWindowController {
         guard let window = window else { return }
         
         window.title = "NotchFlow Settings"
-        window.titlebarAppearsTransparent = true
-        // Each page shows its own title in its header.
-        window.titleVisibility = .hidden
-        window.toolbarStyle = .unifiedCompact
-        window.isMovableByWindowBackground = true
+        window.titlebarAppearsTransparent = false
+        window.titleVisibility = .visible
+        window.isMovableByWindowBackground = false
         window.minSize = NSSize(width: 760, height: 560)
         window.level = .normal
         
