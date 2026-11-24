@@ -253,7 +253,7 @@ struct GlanceSettings: View {
                     glance.startEditing()
                     glance.launcherDisplay = NSScreen.main.map(GlanceManager.key(for:))
                 }
-                .buttonStyle(.borderedProminent)
+                .settingsPrimaryButton()
                 Button("Add Web Page") {
                     glance.updateActive { GlancePolicy.adding(.web, to: $0) }
                     selectedPanel = glance.activeBoard.panels.last?.id

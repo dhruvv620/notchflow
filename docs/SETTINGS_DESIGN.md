@@ -12,6 +12,8 @@ in `DynamicIsland/components/Settings/SettingsKit.swift`; use them instead of dr
    (`SettingsTab.masterKey`). Pages **don't draw their own header**; set those three things instead.
 2. **Off state**: when the main switch is off, show one short line ("Off: … does nothing at all")
    and hide every other section.
+   Pages are always one `Form` (grouped). No `GroupBox`, no `ScrollView` of boxes, no second `Form`
+   inside a page: put shared parts in a `Group` of `Section`s so they join the page's form.
 3. **Sections** in this order: the parts of the feature, how it behaves, connections (accounts,
    API keys, folders), then **Data** (reset, forget, delete) last.
 
@@ -35,7 +37,7 @@ Form {
 |---|---|---|
 | Switch | on/off | `SettingsToggle(key:title:detail:highlightID:)` |
 | Choice | pick one | `Picker("Title", selection:)`; a long list as a menu, 2–4 short options `.segmented` |
-| Slider | a number | `LabeledContent` with the slider and its value on the right (`0.3s`, `60%`) |
+| Slider | a number | `SettingsSlider(title:detail:value:range:step:valueText:)`: the slider and its value on the right (`0.3s`, `60%`) |
 | Action | do something | `SettingsRowLabel` on the left, the button on the right |
 | Status | how it's going | `SettingsStatus(text:kind:)` |
 | Link | go elsewhere | a plain `Link`/button with the destination's name |

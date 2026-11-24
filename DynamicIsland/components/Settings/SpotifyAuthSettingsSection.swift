@@ -42,7 +42,7 @@ struct SpotifyAuthSettingsSection: View {
                 } label: {
                     Label("Sign in with Spotify", systemImage: "person.crop.circle.badge.checkmark")
                 }
-                .buttonStyle(.borderedProminent)
+                .settingsPrimaryButton()
 
                 TextField("sp_dc cookie", text: $spotifySPDCCookie, axis: .vertical)
                     .textFieldStyle(.roundedBorder)
@@ -106,7 +106,7 @@ struct SpotifyAuthSettingsSection: View {
             .font(.caption)
             .foregroundStyle(.secondary)
         } header: {
-            Text("Spotify Canvas Session")
+            Text("Spotify moving artwork")
         } footer: {
             Text("NotchFlow uses the local `sp_dc` cookie only to request Spotify's internal web-player token and fetch the matching Canvas for the current track.")
                 .foregroundStyle(.secondary)

@@ -79,16 +79,16 @@ struct MusicSlotConfigurationView: View {
             VStack(spacing: 8) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 10)
-                        .fill(trashDropIsTargeted ? Color.red.opacity(0.2) : Color(nsColor: .controlBackgroundColor))
+                        .fill(trashDropIsTargeted ? SettingsPalette.danger.opacity(0.2) : Color(nsColor: .controlBackgroundColor))
                         .overlay(
                             RoundedRectangle(cornerRadius: 10)
-                                .stroke(trashDropIsTargeted ? Color.red : .clear, lineWidth: trashDropIsTargeted ? 2 : 0)
+                                .stroke(trashDropIsTargeted ? SettingsPalette.danger : .clear, lineWidth: trashDropIsTargeted ? 2 : 0)
                         )
                         .frame(width: 56, height: 56)
 
                     Image(systemName: "trash")
                         .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(trashDropIsTargeted ? Color.red : Color.primary)
+                        .foregroundStyle(trashDropIsTargeted ? SettingsPalette.danger : Color.primary)
                 }
                 .onDrop(of: [UTType.plainText.identifier], isTargeted: $trashDropIsTargeted) { providers in
                     return handleDropOnTrash(providers)

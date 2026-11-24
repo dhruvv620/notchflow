@@ -434,7 +434,7 @@ struct AnimationEditorView: View {
                             }
                         }
                         .buttonStyle(.bordered)
-                        .tint(.red)
+                        .tint(SettingsPalette.danger)
                     }
                 }
             }
