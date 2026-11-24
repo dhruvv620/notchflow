@@ -1899,26 +1899,28 @@ struct ContentView: View {
         let announced = visibleCommunicationCall == nil ? visibleCommunicationNotification : nil
         // Open on the tab that fits the moment, unless an alert decides it.
         // Something just copied wins: its tab holds the one-tap actions.
-        if announced == nil, visibleCommunicationCall == nil, AgentHub.hasPendingRequest, Defaults[.enableAgentsFeature] {
+        // "Something that needs you comes first" (Settings > General) can be turned off.
+        let urgentFirst = Defaults[.notchOpenUrgentFirst]
+        if urgentFirst, announced == nil, visibleCommunicationCall == nil, AgentHub.hasPendingRequest, Defaults[.enableAgentsFeature] {
             // An agent waiting on you comes first.
             coordinator.currentView = .agents
-        } else if announced == nil, visibleCommunicationCall == nil, promiseKeeper.nudge != nil {
+        } else if urgentFirst, announced == nil, visibleCommunicationCall == nil, promiseKeeper.nudge != nil {
             // A promise nudge opens the Promises list.
             promiseKeeper.showListRequested = true
             coordinator.currentView = .reminders
             promiseKeeper.dismissNudge()
-        } else if announced == nil, visibleCommunicationCall == nil, timeTracker.weeklyReportReady {
+        } else if urgentFirst, announced == nil, visibleCommunicationCall == nil, timeTracker.weeklyReportReady {
             timeTracker.showWeekRequested = true
             coordinator.currentView = .flow
             timeTracker.dismissWeeklyReport()
-        } else if announced == nil, visibleCommunicationCall == nil, focusQuiet.summary != nil {
+        } else if urgentFirst, announced == nil, visibleCommunicationCall == nil, focusQuiet.summary != nil {
             // Right after a focus block: where the things that came in are.
             coordinator.currentView = focusQuiet.summaryDestination
             focusQuiet.dismissSummary()
-        } else if announced == nil, visibleCommunicationCall == nil, CopyActionManager.hasLiveSuggestion {
+        } else if urgentFirst, announced == nil, visibleCommunicationCall == nil, CopyActionManager.hasLiveSuggestion {
             coordinator.currentView = .copyAction
         } else if announced == nil, visibleCommunicationCall == nil,
-           let contextView = NotchContextTabResolver.preferredView() {
+           let contextView = NotchOpenTab.viewOnOpen() {
             coordinator.currentView = contextView
         }
         if let announced {

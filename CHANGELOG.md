@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **YouTube Music without opening tabs**: a song picked in the notch's search now plays without a new tab or anything coming forward. With the YouTube Music desktop app installed (with its API Server plugin on), it goes next in the app's queue and plays, the app started hidden if needed. Otherwise it plays in one YouTube Music window of your browser (Chrome Beta, Chrome, Edge, Brave, Vivaldi or Safari, signed in as you), kept just off screen and reused for every song; after 15 minutes without playing that window closes to free its memory.
 
 ### Changed
+- **Choose which tab the notch opens on**: Settings > General > Opens on replaces "Remember last tab" and "Open on the tab that fits the moment" with one choice: Music, Always this tab (pick any tab), The last tab I used, or Smart. Smart now has a checkbox for each reason, so it can stop jumping to WhatsApp for unread messages while still showing Calendar before a meeting. A separate switch decides whether something that needs you (an agent waiting, a promise due) opens its tab first.
 - **Orbit People is pinned-only**: People no longer fills up with everyone who messages you. Right-click a message or promise in Loops and choose "Pin to People" to give someone a page; only then are their messages and promises kept there. Unpin from their page. People added automatically before are cleared once (their old notes in the vault stay; delete the vault's Orbit/People folder if you don't want them).
 
 ### Fixed

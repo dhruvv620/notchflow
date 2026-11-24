@@ -408,8 +408,9 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
         // Otherwise, if the user has not enabled openLastShelfByDefault, set the view to home
         if !ShelfStateViewModel.shared.isEmpty && Defaults[.openShelfByDefault] && !Defaults[.enableMinimalisticUI] {
             coordinator.currentView = .shelf
-        } else if !coordinator.openLastTabByDefault {
-            coordinator.currentView = .home
+        } else if let next = NotchOpenTab.viewAfterClose() {
+            // Settings > General > Opens on.
+            coordinator.currentView = next
         }
     }
 

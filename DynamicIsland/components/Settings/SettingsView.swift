@@ -726,6 +726,7 @@ struct SettingsView: View {
             // General
             SettingsSearchEntry(tab: .general, title: "Enable Minimalistic UI", keywords: ["minimalistic", "ui mode", "general"], highlightID: SettingsTab.general.highlightID(for: "Enable Minimalistic UI")),
             SettingsSearchEntry(tab: .general, title: "Menubar icon", keywords: ["menu bar", "status bar", "icon"], highlightID: SettingsTab.general.highlightID(for: "Menubar icon")),
+            SettingsSearchEntry(tab: .general, title: "Opens on", keywords: ["tab", "home tab", "default tab", "last tab", "remember", "smart tab", "open on", "whatsapp", "music", "start"], highlightID: SettingsTab.general.highlightID(for: "Opens on")),
             SettingsSearchEntry(tab: .general, title: "Launch at login", keywords: ["autostart", "startup"], highlightID: SettingsTab.general.highlightID(for: "Launch at login")),
             SettingsSearchEntry(tab: .general, title: "Show on all displays", keywords: ["multi-display", "external monitor"], highlightID: SettingsTab.general.highlightID(for: "Show on all displays")),
             SettingsSearchEntry(tab: .general, title: "Show on a specific display", keywords: ["preferred screen", "display picker"], highlightID: SettingsTab.general.highlightID(for: "Show on a specific display")),
@@ -1431,16 +1432,8 @@ struct GeneralSettings: View {
                 }
             }
             .settingsHighlight(id: highlightID("Peek before opening"))
-            Toggle("Remember last tab", isOn: $coordinator.openLastTabByDefault)
-            Defaults.Toggle(key: .notchContextAwareTab) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Open on the tab that fits the moment")
-                    Text("Calendar five minutes before a meeting, Timers while one runs, WhatsApp or Notifications when something new arrived, Music while something plays.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .settingsHighlight(id: highlightID("Open on the tab that fits the moment"))
+            NotchOpensOnSettings()
+                .settingsHighlight(id: highlightID("Opens on"))
             if openNotchOnHover {
                 Slider(value: $minimumHoverDuration, in: 0...1, step: 0.1) {
                     HStack {
