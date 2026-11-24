@@ -423,7 +423,9 @@ struct SettingsView: View {
         }
         .navigationSplitViewStyle(.balanced)
         .toolbar(removing: .sidebarToggle)
-        .toolbar { toolbarSpacingShim }
+        // No toolbar band: a clear title bar with just the window buttons, like
+        // System Settings, and every page starts right below it.
+        .toolbar(.hidden, for: .windowToolbar)
         .environmentObject(highlightCoordinator)
         .formStyle(.grouped)
         // One accent and one background for every page.
@@ -440,28 +442,6 @@ struct SettingsView: View {
 
     private var resolvedSelection: SettingsTab {
         availableTabs.contains(selectedTab) ? selectedTab : (availableTabs.first ?? .general)
-    }
-
-    @ToolbarContentBuilder
-    private var toolbarSpacingShim: some ToolbarContent {
-        if #available(macOS 26.0, *) {
-            ToolbarItem(placement: .primaryAction) {
-                toolbarSpacerView
-            }
-            .sharedBackgroundVisibility(.hidden)
-        } else {
-            ToolbarItem(placement: .primaryAction) {
-                toolbarSpacerView
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var toolbarSpacerView: some View {
-        Color.clear
-            .frame(width: 96, height: 32)
-            .allowsHitTesting(false)
-            .accessibilityHidden(true)
     }
 
     private var filteredTabs: [SettingsTab] {
