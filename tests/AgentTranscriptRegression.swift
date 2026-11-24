@@ -40,6 +40,12 @@ struct AgentTranscriptRegression {
         try require(codexItems[1].text == "Ran swift build" && codexItems[2].text == "Added the loop.", "Codex text: \(codexItems.map(\.text))")
         let codexSummary = AgentTranscriptPolicy.codexSummary(from: Data(codex.utf8), fileURL: URL(fileURLWithPath: "/t/rollout-x.jsonl"), modified: Date())
         try require(codexSummary?.id == "0199a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b" && codexSummary?.project == "anti-gravity" && codexSummary?.title == "Add a physics loop", "Codex summary")
+        let metaOnly = #"{"type":"session_meta","payload":{"id":"0199a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5c","cwd":"/Users/d/notchflow","instructions":"long"}}"#
+        let early = AgentTranscriptPolicy.codexSummary(from: Data(metaOnly.utf8), fileURL: URL(fileURLWithPath: "/t/rollout-y.jsonl"), modified: Date())
+        try require(early?.id == "0199a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5c" && early?.title == "Codex session" && early?.project == "notchflow",
+                    "A Codex session whose first message isn't in the head still lists")
+        try require(AgentTranscriptPolicy.codexSummary(from: Data("{}".utf8), fileURL: URL(fileURLWithPath: "/t/other.jsonl"), modified: Date()) == nil,
+                    "Not a Codex session")
         try require(AgentTranscriptPolicy.codexID(fromFileName: "rollout-2026-11-18T10-00-00-0199a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b.jsonl") == "0199a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b", "Codex id from file name")
 
         // Commands

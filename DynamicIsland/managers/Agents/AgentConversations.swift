@@ -159,17 +159,32 @@ final class AgentConversations: ObservableObject {
     }
 
     /// Opens the conversation of a live session, by its id.
-    func select(sessionID: String) {
+    /// `cwd` and `agent` let a session be found by its folder when its id
+    /// isn't in any file name (the newest file there, changed in the last 10 minutes).
+    func select(sessionID: String, cwd: String? = nil, agent: AgentSessionSummary.Agent? = nil) {
+        func match(_ list: [AgentSessionSummary]) -> AgentSessionSummary? {
+            if let exact = list.first(where: { $0.id == sessionID }) { return exact }
+            guard let cwd, let agent else { return nil }
+            return list.filter { $0.agent == agent && $0.cwd == cwd && Date().timeIntervalSince($0.updatedAt) < 600 }
+                .max { $0.updatedAt < $1.updatedAt }
+        }
         if let summary = recent.first(where: { $0.id == sessionID }) {
             select(summary)
             return
         }
-        Task.detached(priority: .userInitiated) {
-            let found = Self.scan()
-            await MainActor.run {
-                let conversations = AgentConversations.shared
-                conversations.recent = found
-                conversations.select(found.first { $0.id == sessionID })
+        // A session that just started may not have written its file yet:
+        // look again for a little while, unless you pick something else.
+        let before = selected?.id
+        Task { @MainActor in
+            for attempt in 0..<8 {
+                if attempt > 0 { try? await Task.sleep(nanoseconds: 2_000_000_000) }
+                guard selected?.id == before else { return }
+                let found = await Task.detached(priority: .userInitiated) { Self.scan() }.value
+                recent = found
+                if let summary = match(found) {
+                    select(summary)
+                    return
+                }
             }
         }
     }

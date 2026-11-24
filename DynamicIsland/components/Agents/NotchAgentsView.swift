@@ -97,7 +97,7 @@ struct NotchAgentsView: View {
         let agent: AgentSessionSummary.Agent = kind == .codex ? .codex : .claude
         if conversations.selected?.agent == agent { return }
         if let live = hub.sessions.first(where: { $0.agent == kind }) {
-            conversations.select(sessionID: live.id)
+            conversations.select(sessionID: live.id, cwd: live.cwd, agent: agent)
         } else if let recent = conversations.recent.first(where: { $0.agent == agent }) {
             conversations.select(recent)
         }
@@ -108,7 +108,8 @@ struct NotchAgentsView: View {
         if session.agent.readsTranscripts {
             filter = session.agent.rawValue
             composing = false
-            conversations.select(sessionID: session.id)
+            conversations.select(sessionID: session.id, cwd: session.cwd,
+                                 agent: session.agent == .codex ? .codex : .claude)
         } else {
             hub.openWindow(bundleID: session.appBundleID)
         }
@@ -401,7 +402,7 @@ private struct AgentSessionList: View {
                                          selected: conversations.selected?.id == session.id) {
                                 composing = false
                                 if session.agent == .claudeCode || session.agent == .codex {
-                                    conversations.select(sessionID: session.id)
+                                    conversations.select(sessionID: session.id, cwd: session.cwd, agent: session.agent == .codex ? .codex : .claude)
                                 } else {
                                     hub.openWindow(bundleID: session.appBundleID)
                                 }
@@ -1193,6 +1194,12 @@ private struct AgentWorkCard: View {
             Text(activity).font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary).lineLimit(1)
             HStack(spacing: 6) {
                 NotchPillButton(title: session.agent.readsTranscripts ? "Open" : "Show window", symbol: "arrow.up.right") { onOpen() }
+                if session.appBundleID == Bundle.main.bundleIdentifier {
+                    // Started from a Start icon: it runs in the notch's Terminal tab.
+                    NotchPillButton(title: "Terminal", symbol: "apple.terminal") {
+                        DynamicIslandViewCoordinator.shared.currentView = .terminal
+                    }
+                }
                 if !session.isWorking && !session.isWaiting {
                     NotchPillButton(title: "Dismiss", symbol: "xmark") { hub.dismiss(session) }
                 }

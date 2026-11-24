@@ -197,9 +197,12 @@ enum AgentTranscriptPolicy {
         let all = lines(data)
         let meta = all.first { $0["type"] as? String == "session_meta" }?["payload"] as? [String: Any]
         guard let id = meta?["id"] as? String ?? codexID(fromFileName: fileURL.lastPathComponent) else { return nil }
+        // Codex writes long instructions first: the first message can be past
+        // the part read here, or not written yet. The session still counts.
         let title = codexItems(from: data).first { $0.role == .user }?.text ?? ""
-        guard !title.isEmpty else { return nil }
-        return AgentSessionSummary(id: id, agent: .codex, cwd: meta?["cwd"] as? String ?? "", title: oneLine(title),
+        guard meta != nil || !title.isEmpty else { return nil }
+        return AgentSessionSummary(id: id, agent: .codex, cwd: meta?["cwd"] as? String ?? "",
+                                   title: title.isEmpty ? "Codex session" : oneLine(title),
                                    updatedAt: modified, fileURL: fileURL)
     }
 
