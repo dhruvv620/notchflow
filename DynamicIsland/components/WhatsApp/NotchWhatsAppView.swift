@@ -25,6 +25,11 @@ extension Color {
     static let whatsAppGreen = Color(red: 0.145, green: 0.827, blue: 0.4)
 }
 
+extension Defaults.Keys {
+    /// The WhatsApp tab's account filter: "" for all accounts, else a slot ("notchflow", "notchflow-2").
+    static let whatsAppTabAccount = Key<String>("whatsAppTabAccount", default: "")
+}
+
 /// The WhatsApp tab: chats on the left, the open conversation and a reply
 /// field on the right.
 struct NotchWhatsAppView: View {
@@ -90,6 +95,58 @@ struct NotchWhatsAppView: View {
 
 private struct WhatsAppChatListColumn: View {
     @ObservedObject private var manager = WhatsAppManager.shared
+    @Default(.whatsAppTabAccount) private var accountFilter
+
+    /// The account picked in the tabs above the list (nil: all of them).
+    private var filterSlot: WhatsAppAccountSlot? {
+        guard manager.hasTwoLinkedAccounts else { return nil }
+        return WhatsAppAccountSlot(rawValue: accountFilter)
+    }
+
+    private var shownChats: [WhatsAppChat] {
+        guard let slot = filterSlot else { return manager.visibleChats }
+        return manager.visibleChats.filter { WhatsAppAccountSlot.of($0.id) == slot }
+    }
+
+    private func unread(_ slot: WhatsAppAccountSlot?) -> Int {
+        manager.visibleChats
+            .filter { slot == nil || WhatsAppAccountSlot.of($0.id) == slot }
+            .reduce(0) { $0 + $1.unreadCount }
+    }
+
+    /// One tab per linked account, plus All.
+    private var accountTabs: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 4) {
+                accountTab(title: String(localized: "All"), value: "", unread: unread(nil))
+                ForEach(manager.activeSlots, id: \.self) { slot in
+                    accountTab(title: manager.accountName(slot), value: slot.rawValue, unread: unread(slot))
+                }
+            }
+        }
+    }
+
+    private func accountTab(title: String, value: String, unread: Int) -> some View {
+        let selected = (filterSlot?.rawValue ?? "") == value
+        return Button {
+            withAnimation(.smooth(duration: 0.2)) { accountFilter = value }
+        } label: {
+            HStack(spacing: 4) {
+                Text(title).font(.system(size: 10, weight: .semibold)).lineLimit(1)
+                if unread > 0 {
+                    Text("\(unread)")
+                        .font(.system(size: 9, weight: .bold).monospacedDigit())
+                        .foregroundStyle(Color.whatsAppGreen)
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(Capsule().fill(selected ? Color.whatsAppGreen.opacity(0.22) : Color.white.opacity(0.06)))
+            .overlay(Capsule().strokeBorder(selected ? Color.whatsAppGreen.opacity(0.5) : Color.clear, lineWidth: 0.5))
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -129,7 +186,11 @@ private struct WhatsAppChatListColumn: View {
                     .padding(.horizontal, 4)
             }
 
-            if manager.visibleChats.isEmpty {
+            if manager.hasTwoLinkedAccounts {
+                accountTabs
+            }
+
+            if shownChats.isEmpty {
                 Spacer()
                 Text("No chats yet")
                     .font(.system(size: 11))
@@ -139,8 +200,10 @@ private struct WhatsAppChatListColumn: View {
             } else {
                 ScrollView(.vertical, showsIndicators: false) {
                     LazyVStack(spacing: 3) {
-                        ForEach(manager.visibleChats) { chat in
-                            WhatsAppChatRow(chat: chat, accountLabel: manager.accountLabel(for: chat.id), isSelected: manager.selectedChatID == chat.id) {
+                        ForEach(shownChats) { chat in
+                            // The account tag only matters when all accounts are mixed.
+                            WhatsAppChatRow(chat: chat, accountLabel: filterSlot == nil ? manager.accountLabel(for: chat.id) : nil,
+                                            isSelected: manager.selectedChatID == chat.id) {
                                 manager.openChat(chat.id)
                             }
                             .contextMenu {
