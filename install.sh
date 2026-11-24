@@ -116,8 +116,11 @@ done
 LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
 BACKUPS="$HOME/Library/Application Support/${APP_NAME}/Build Backups"
 if [ -d "$BACKUPS" ]; then
-    # Keep backups out of Spotlight.
+    # Keep backups out of Spotlight, and only the three newest.
     touch "$BACKUPS/.metadata_never_index"
+    ls -1dt "$BACKUPS"/*.app.backup 2>/dev/null | tail -n +4 | while IFS= read -r old_backup; do
+        rm -rf "$old_backup"
+    done
     find "$BACKUPS" -maxdepth 1 -type d -name '*.app' -print0 | while IFS= read -r -d '' backup; do
         [ -x "$LSREGISTER" ] && "$LSREGISTER" -u "$backup" >/dev/null 2>&1 || true
         mv "$backup" "$backup.backup"

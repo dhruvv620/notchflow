@@ -446,6 +446,11 @@ while IFS= read -r -d '' backup; do
     [ -x "$LSREGISTER" ] && "$LSREGISTER" -u "$backup" >/dev/null 2>&1 || true
     /bin/mv "$backup" "$backup.backup"
 done < <(/usr/bin/find "$BACKUP_ROOT" -maxdepth 1 -type d -name '*.app' -print0)
+# Keep the three newest backups; older ones only take space (each is a whole app).
+/bin/ls -1dt "$BACKUP_ROOT"/*.app.backup 2>/dev/null | /usr/bin/tail -n +4 | while IFS= read -r old_backup; do
+    /bin/rm -rf "$old_backup"
+done
+
 # The copies Xcode built (Debug and Release) were only steps on the way: once
 # installed, remove them so Spotlight, Launchpad and "Open With" show one
 # NotchFlow. The next build makes them again (the compile cache is kept).
