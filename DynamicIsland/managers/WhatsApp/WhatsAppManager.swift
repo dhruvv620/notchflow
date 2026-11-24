@@ -145,6 +145,9 @@ final class WhatsAppManager: ObservableObject {
 
     private var monitorTask: Task<Void, Never>?
     private var linkTask: Task<Void, Never>?
+    /// Group names (scoped chat id → name): the chat list often leaves them out.
+    private var groupNames: [String: String] = [:]
+    private var groupNamesFetchedAt: [WhatsAppAccountSlot: Date] = [:]
     /// The current QR session, so a cancelled one doesn't tidy up the next.
     private var linkToken = UUID()
     private var bannerTask: Task<Void, Never>?
@@ -649,14 +652,25 @@ final class WhatsAppManager: ObservableObject {
                 updated += chats.filter { WhatsAppAccountSlot.of($0.id) == slot && seen.insert($0.id).inserted }
                 continue
             }
+            // Groups without a name in the list: ask for this account's group
+            // names (at most every 10 minutes).
+            let unnamedGroup = remote.contains { WhatsAppJID.isGroup($0.jid) && ($0.name ?? "").trimmingCharacters(in: .whitespaces).isEmpty
+                && groupNames[slot.scope($0.jid)] == nil }
+            if unnamedGroup, Date().timeIntervalSince(groupNamesFetchedAt[slot] ?? .distantPast) > 600 {
+                groupNamesFetchedAt[slot] = Date()
+                if let names = try? await client.groupNames() {
+                    for (jid, name) in names { groupNames[slot.scope(jid)] = name }
+                }
+            }
             for item in remote where !WhatsAppJID.isHidden(item.jid) {
                 let id = slot.scope(item.jid)
                 guard seen.insert(id).inserted else { continue }
                 let old = previous[id]
                 let remoteName = item.name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                let known = groupNames[id] ?? old?.name ?? ""
                 updated.append(WhatsAppChat(
                     id: id,
-                    name: remoteName.isEmpty ? (old?.name ?? "") : remoteName,
+                    name: remoteName.isEmpty ? known : remoteName,
                     lastMessageTime: WhatsAppDateParser.parse(item.lastMessageTime) ?? old?.lastMessageTime,
                     archived: item.archived ?? false,
                     preview: old?.preview,

@@ -288,6 +288,20 @@ struct WhatsAppGatewayClient {
         return response.results?.messageID
     }
 
+    /// The names of the groups this account is in (the chat list often has none).
+    func groupNames() async throws -> [String: String] {
+        let request = try makeRequest("/user/my/groups")
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await Self.session.data(for: request)
+        } catch let error as URLError where error.code == .cannotConnectToHost || error.code == .networkConnectionLost {
+            throw WhatsAppGatewayError.notRunning
+        }
+        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else { return [:] }
+        return WhatsAppGroupNames.parse(data)
+    }
+
     func markRead(messageID: String, chatJID: String) async throws {
         try await call("/message/\(Self.pathComponent(messageID))/read", method: "POST", body: ["phone": chatJID])
     }

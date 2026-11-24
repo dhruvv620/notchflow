@@ -487,3 +487,31 @@ struct WhatsAppWebhookEvent {
         )
     }
 }
+
+
+// MARK: - Group names
+
+/// Group names from the gateway's `GET /user/my/groups`, by bare group JID.
+/// The chat list leaves many group names out; this fills them in. Lenient
+/// about the reply's shape (`results.data` or `results` as a list, and
+/// `JID`/`jid`, `Name`/`name` keys) so a gateway update doesn't break it.
+enum WhatsAppGroupNames {
+    static func parse(_ data: Data) -> [String: String] {
+        guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return [:] }
+        let results = object["results"]
+        let list: [[String: Any]]
+        if let dict = results as? [String: Any] {
+            list = dict["data"] as? [[String: Any]] ?? dict["groups"] as? [[String: Any]] ?? []
+        } else {
+            list = results as? [[String: Any]] ?? []
+        }
+        var names: [String: String] = [:]
+        for group in list {
+            guard let jid = (group["JID"] ?? group["jid"] ?? group["id"]) as? String, WhatsAppJID.isGroup(jid) else { continue }
+            let nameValue = group["Name"] ?? group["name"] ?? (group["GroupName"] as? [String: Any])?["Name"]
+            let name = (nameValue as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            if !name.isEmpty { names[WhatsAppJID.bare(jid)] = name }
+        }
+        return names
+    }
+}

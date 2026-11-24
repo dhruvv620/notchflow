@@ -93,6 +93,21 @@ struct WhatsAppRegression {
         try require(WhatsAppTimeFormatter.short(now.addingTimeInterval(-22 * 3600), now: now) == "22h", "Hours label wrong")
         try require(WhatsAppTimeFormatter.short(now.addingTimeInterval(-86_400), now: now) == "1d", "Days label wrong")
 
+        // Group names
+        let groups = WhatsAppGroupNames.parse(Data(#"""
+        {"code":"SUCCESS","results":{"data":[
+          {"JID":"120363012345678901@g.us","Name":"  Family  ","OwnerJID":"x"},
+          {"JID":"120363999@g.us","GroupName":{"Name":"Old style"}},
+          {"jid":"919081@g.us","name":"Flat Hunting"},
+          {"JID":"120363000@g.us","Name":""},
+          {"JID":"628123@s.whatsapp.net","Name":"Not a group"}
+        ]}}
+        """#.utf8))
+        try require(groups == ["120363012345678901@g.us": "Family", "120363999@g.us": "Old style", "919081@g.us": "Flat Hunting"],
+                    "Group names: \(groups)")
+        try require(WhatsAppGroupNames.parse(Data(#"{"results":[{"JID":"1@g.us","Name":"List"}]}"#.utf8)) == ["1@g.us": "List"], "List results")
+        try require(WhatsAppGroupNames.parse(Data("oops".utf8)).isEmpty, "Garbage")
+
         print("WhatsApp parsing checks passed")
     }
 }
