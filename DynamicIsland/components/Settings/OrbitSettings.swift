@@ -60,7 +60,7 @@ struct OrbitSettings: View {
                     Defaults.Toggle(key: .orbitTrackPeople) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("People")
-                            Text("From messages and promises. Message text is kept only when it names one of your projects.")
+                            Text("Only people you pin (right-click a message or promise in Loops). Their messages and promises are kept on their page; message text only when it names one of your projects.")
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                     }
@@ -94,6 +94,27 @@ struct OrbitSettings: View {
                         }
                         Defaults.Toggle(key: .orbitDailyNotes) {
                             Text("Daily notes")
+                        }
+                        if orbit.hasObsidian {
+                            if orbit.obsidianKnowsVault {
+                                Label("Obsidian has this vault open", systemImage: "checkmark.circle.fill")
+                                    .font(.caption).foregroundStyle(.green)
+                            } else {
+                                HStack(alignment: .top) {
+                                    Label("Obsidian hasn't opened this folder yet. In Obsidian, choose Open folder as vault and pick the folder above. Links from the notch work after that.",
+                                          systemImage: "exclamationmark.triangle.fill")
+                                        .font(.caption).foregroundStyle(.orange)
+                                    Spacer()
+                                    Button("Show Folder") {
+                                        try? FileManager.default.createDirectory(at: orbit.vaultURL, withIntermediateDirectories: true)
+                                        NSWorkspace.shared.activateFileViewerSelecting([orbit.vaultURL])
+                                    }
+                                }
+                            }
+                        } else {
+                            Label("Obsidian isn't installed. The notes are plain markdown files; get Obsidian at obsidian.md to browse them as linked pages.",
+                                  systemImage: "info.circle")
+                                .font(.caption).foregroundStyle(.secondary)
                         }
                         HStack {
                             Button("Write Now") { orbit.writeVaultNow() }.disabled(!orbit.isRunning)

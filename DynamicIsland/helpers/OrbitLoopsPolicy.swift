@@ -43,6 +43,8 @@ struct OrbitLoop: Identifiable, Equatable, Sendable {
     var due: Date?
     var project: String?
     var person: String?
+    /// The person's name as shown, for pinning them.
+    var personName: String?
     var url: String?
     /// The Linear issue (its GraphQL id), for loops that are issues.
     var issueID: String?
@@ -109,7 +111,7 @@ enum OrbitLoopsPolicy {
             let more = count > 1 ? " (\(count) messages)" : ""
             return OrbitLoop(id: "msg:\(key)", kind: .message, title: "Reply to \(name)\(more)",
                              detail: "\(message.app): \(OrbitPolicy.clip(message.text, to: 90))",
-                             date: message.date, person: key)
+                             date: message.date, person: key, personName: name)
         }
     }
 

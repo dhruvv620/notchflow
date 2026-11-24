@@ -14,8 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **YouTube Music without opening tabs**: a song picked in the notch's search now plays without a new tab or anything coming forward. With the YouTube Music desktop app installed (with its API Server plugin on), it goes next in the app's queue and plays, the app started hidden if needed. Otherwise it plays in one YouTube Music window of your browser (Chrome Beta, Chrome, Edge, Brave, Vivaldi or Safari, signed in as you), kept just off screen and reused for every song; after 15 minutes without playing that window closes to free its memory.
 
 ### Changed
+- **Orbit People is pinned-only**: People no longer fills up with everyone who messages you. Right-click a message or promise in Loops and choose "Pin to People" to give someone a page; only then are their messages and promises kept there. Unpin from their page. People added automatically before are cleared once (their old notes in the vault stay; delete the vault's Orbit/People folder if you don't want them).
 
 ### Fixed
+- **"Vault not found" in Obsidian**: Orbit now checks which folders Obsidian has opened as vaults before sending a note there. If the vault folder isn't one yet, it shows the folder in Finder and says how to add it (Open folder as vault), and Settings > Orbit shows whether Obsidian has the vault open.
 - **YouTube Music no longer opens tabs**: songs song.link has no YouTube Music link for are now matched by their YouTube video (the same id plays on YouTube Music), and a song that can't be matched at all opens YouTube Music's search in the same player window, brought forward to pick, instead of a new tab. If macOS blocks NotchFlow from controlling your browser, the search says so (System Settings > Privacy & Security > Automation) instead of opening a tab.
 - **The music search closes with the notch**: clicking anywhere outside the notch closes the search and the notch, and the notch closing for any reason closes the search. It only keeps the notch open while you're typing in it.
 

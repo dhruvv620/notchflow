@@ -64,8 +64,8 @@ struct NotchOrbitView: View {
                 }
             } else {
                 if people.isEmpty {
-                    NotchEmptyState(symbol: "person.2", title: "No people yet",
-                                    detail: "People appear when they message you or you make them a promise.")
+                    NotchEmptyState(symbol: "pin", title: "No pinned people",
+                                    detail: "Only people you pin get a page. In Loops, right-click a message or promise and choose Pin to People.")
                 } else {
                     split(list: peopleList, detail: personDetail)
                 }
@@ -206,6 +206,13 @@ struct NotchOrbitView: View {
         .onTapGesture { Orbit.shared.open(loop) }
         .contextMenu {
             Button("Open") { Orbit.shared.open(loop) }
+            if trackPeople, let name = loop.personName {
+                if orbit.isPinned(name) {
+                    Button("Unpin \(name)") { orbit.unpin(OrbitPolicy.key(name)) }
+                } else {
+                    Button("Pin \(name) to People") { orbit.pin(name, app: loop.kind == .message ? loop.detail.components(separatedBy: ":").first : nil) }
+                }
+            }
             if showTeam, let folder = orbit.folder(forProject: loop.project) ?? agents.recentProjects.first {
                 Menu("Hand Off in \((folder as NSString).lastPathComponent)") {
                     ForEach(AgentHookPolicy.LaunchAgent.allCases, id: \.self) { agent in
@@ -438,9 +445,12 @@ struct NotchOrbitView: View {
     private var peopleList: some View {
         LazyVStack(alignment: .leading, spacing: 2) {
             ForEach(people) { person in
-                listRow(title: person.name, detail: relative(person.lastSeen), symbol: "person.crop.circle",
+                listRow(title: person.name, detail: relative(person.lastSeen), symbol: "pin.fill",
                         selected: person.id == currentPerson?.id) {
                     selectedPerson = person.id
+                }
+                .contextMenu {
+                    Button("Unpin \(person.name)") { orbit.unpin(person.id) }
                 }
             }
         }
@@ -453,6 +463,7 @@ struct NotchOrbitView: View {
                     Text(person.name).font(NotchTokens.Typography.headline).lineLimit(1)
                     if let app = person.lastApp { NotchBadge(text: app) }
                     Spacer(minLength: 0)
+                    NotchIconButton(symbol: "pin.slash", help: "Unpin") { orbit.unpin(person.id) }
                     if writeVault {
                         NotchIconButton(symbol: "book.closed", help: "Open the note in Obsidian") {
                             orbit.openInObsidian(orbit.noteURL(forPerson: person))

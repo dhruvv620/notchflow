@@ -214,6 +214,36 @@ struct OrbitRegression {
         let briefDecoded = try JSONDecoder().decode(OrbitState.self, from: briefData)
         try require(briefDecoded == briefState, "Brief round trip")
 
+        // People: pinned only
+        var pins = OrbitState.empty
+        let pp = P.upsertProject(name: "NotchFlow", root: "/r", at: now, in: &pins)
+        P.record(OrbitEvent(date: now, kind: .message, text: "hi", person: "stranger"), in: &pins)
+        try require(pins.events.last?.person == nil && pins.people.isEmpty, "Unpinned senders get no link or page")
+        try require(P.pinnedPerson(named: "Ron", in: pins) == nil, "Not pinned yet")
+        let ron = P.pinPerson(name: "Ron", app: "WhatsApp", at: now, in: &pins)
+        try require(P.pinnedPerson(named: " ron ", in: pins) == ron, "Pinned")
+        P.record(OrbitEvent(date: now, kind: .message, text: "Message on WhatsApp", person: ron), in: &pins)
+        P.record(OrbitEvent(date: now, kind: .message, text: "the NotchFlow build", project: pp, person: ron), in: &pins)
+        try require(pins.projects[pp]?.people[ron] == 1, "Project link")
+        P.unpinPerson(ron, in: &pins)
+        try require(pins.people.isEmpty && pins.projects[pp]?.people.isEmpty == true, "Unpinned")
+        try require(!pins.events.contains { $0.text == "Message on WhatsApp" } && pins.events.contains { $0.text == "the NotchFlow build" && $0.person == nil },
+                    "Unpin drops bare messages, keeps project history")
+        var v1 = small
+        v1.version = 1
+        let v2 = P.migrated(v1)
+        try require(v2.people.isEmpty && v2.version == 2, "Old automatic people cleared")
+        try require(P.migrated(v2) == v2, "Migrates once")
+        try require(OrbitState.empty.version == 2, "New state is current")
+
+        // Obsidian vaults
+        let vaults = P.obsidianVaults(from: Data(#"{"vaults":{"a1":{"path":"/Users/dv/Notes","ts":1,"open":true},"b2":{"path":"/Users/dv/Orbit/Obsidian/"}}}"#.utf8))
+        try require(vaults.sorted() == ["/Users/dv/Notes", "/Users/dv/Orbit/Obsidian"], "Vaults: \(vaults)")
+        try require(P.vault(containing: "/Users/dv/Orbit/Obsidian/Orbit/People/Ron.md", vaults: vaults) == "/Users/dv/Orbit/Obsidian", "Inside")
+        try require(P.vault(containing: "/Users/dv/Orbit/Other/x.md", vaults: vaults) == nil, "Outside")
+        try require(P.vault(containing: "/Users/dv/NotesOld/x.md", vaults: vaults) == nil, "Prefix is not enough")
+        try require(P.obsidianVaults(from: Data("nope".utf8)).isEmpty, "Bad file")
+
         print("Orbit: all checks passed")
     }
 }

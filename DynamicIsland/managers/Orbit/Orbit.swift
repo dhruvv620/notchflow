@@ -221,10 +221,16 @@ final class Orbit: ObservableObject {
         seenNotifications = Set(items.map(\.id))
         for item in fresh where OrbitPolicy.isMessagingApp(item.appName) {
             guard let name = OrbitPolicy.personName(fromTitle: item.title) else { continue }
-            let person = OrbitPolicy.upsertPerson(name: name, app: item.appName, at: item.date, in: &state)
-            // Message text stays out of the log unless it ties to a project.
+            // Only people you pinned get a page; others just show in Loops.
+            let person = OrbitPolicy.pinnedPerson(named: name, in: state)
             let project = projectID(mentionedIn: item.body)
-            let text = project != nil ? item.body : "Message on \(item.appName)"
+            guard person != nil || project != nil else { continue }
+            if let person, var entry = state.people[person] {
+                entry.lastApp = item.appName
+                state.people[person] = entry
+            }
+            // Message text stays out of the log unless it ties to a project.
+            let text = project != nil ? "\(name): \(item.body)" : "Message on \(item.appName)"
             add(OrbitEvent(date: item.date, kind: .message, text: text, project: project, person: person))
         }
     }
@@ -233,11 +239,10 @@ final class Orbit: ObservableObject {
         guard tracksPeople else { return }
         for promise in promises where !seenPromises.contains(promise.id) {
             seenPromises.insert(promise.id)
-            let person = OrbitPolicy.personName(fromTitle: promise.person).map {
-                OrbitPolicy.upsertPerson(name: $0, app: promise.sourceName, at: promise.created, in: &state)
-            }
-            add(OrbitEvent(date: promise.created, kind: .promise, text: promise.title,
-                           project: projectID(mentionedIn: promise.title + " " + promise.quote), person: person))
+            let person = OrbitPolicy.personName(fromTitle: promise.person).flatMap { OrbitPolicy.pinnedPerson(named: $0, in: state) }
+            let project = projectID(mentionedIn: promise.title + " " + promise.quote)
+            guard person != nil || project != nil else { continue }
+            add(OrbitEvent(date: promise.created, kind: .promise, text: promise.title, project: project, person: person))
         }
     }
 
@@ -308,7 +313,8 @@ final class Orbit: ObservableObject {
             all.append(OrbitLoop(id: "promise:\(promise.id.uuidString)", kind: mine ? .promise : .theirPromise,
                                  title: mine ? "You promised \(promise.person): \(promise.title)" : "\(promise.person) promised: \(promise.title)",
                                  detail: "Due " + promise.due.formatted(date: .abbreviated, time: promise.hasExplicitTime ? .shortened : .omitted),
-                                 date: promise.created, due: promise.due, person: OrbitPolicy.key(promise.person)))
+                                 date: promise.created, due: promise.due, person: OrbitPolicy.key(promise.person),
+                                 personName: OrbitPolicy.personName(fromTitle: promise.person)))
         }
         for run in BuildWatchManager.shared.runs where run.state == .failure {
             all.append(OrbitLoop(id: "build:\(run.id)", kind: .build, title: "\(run.title) failed", detail: run.detail,
@@ -461,6 +467,28 @@ final class Orbit: ObservableObject {
         return brief
     }
 
+    // MARK: People
+
+    func isPinned(_ name: String) -> Bool {
+        OrbitPolicy.personName(fromTitle: name).flatMap { OrbitPolicy.pinnedPerson(named: $0, in: state) } != nil
+    }
+
+    /// Gives someone a People page; their messages and promises are kept from now on.
+    func pin(_ name: String, app: String? = nil) {
+        guard isRunning, let clean = OrbitPolicy.personName(fromTitle: name) else { return }
+        let id = OrbitPolicy.pinPerson(name: clean, app: app, at: Date(), in: &state)
+        dirtyPeople.insert(id)
+        scheduleSave()
+        if Defaults[.orbitWriteVault] { scheduleVaultWrite(all: false) }
+    }
+
+    /// Removes someone's page (their note in the vault stays).
+    func unpin(_ id: String) {
+        guard isRunning else { return }
+        OrbitPolicy.unpinPerson(id, in: &state)
+        scheduleSave()
+    }
+
     // MARK: Editing from the UI
 
     func togglePin(_ id: String) {
@@ -502,7 +530,7 @@ final class Orbit: ObservableObject {
     private static func load() -> OrbitState {
         guard let data = try? Data(contentsOf: storeURL),
               let state = try? JSONDecoder().decode(OrbitState.self, from: data) else { return .empty }
-        return state
+        return OrbitPolicy.migrated(state)
     }
 
     nonisolated private static func write(_ state: OrbitState) {
@@ -607,17 +635,39 @@ final class Orbit: ObservableObject {
         vaultStatus = failed.map { "Couldn't write the vault: \($0)" } ?? "Vault updated at \(time)"
     }
 
-    /// Opens a note (or the vault) in Obsidian, or in Finder without Obsidian.
+    var hasObsidian: Bool { NSWorkspace.shared.urlForApplication(withBundleIdentifier: "md.obsidian") != nil }
+
+    /// The vaults Obsidian has opened (it only opens links inside one of them).
+    private var obsidianVaults: [String] {
+        let file = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Application Support/obsidian/obsidian.json")
+        guard let data = try? Data(contentsOf: file) else { return [] }
+        return OrbitPolicy.obsidianVaults(from: data)
+    }
+
+    /// Whether Obsidian has this vault (or a folder around it) open as a vault.
+    var obsidianKnowsVault: Bool {
+        OrbitPolicy.vault(containing: orbitFolder.path, vaults: obsidianVaults) != nil
+    }
+
+    /// Opens a note (or the vault) in Obsidian. If Obsidian hasn't opened the
+    /// vault yet, shows the folder in Finder and says how to add it.
     func openInObsidian(_ url: URL?) {
         let target = url ?? orbitFolder
-        let hasObsidian = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "md.obsidian") != nil
-        if hasObsidian, FileManager.default.fileExists(atPath: target.path),
+        let manager = FileManager.default
+        guard manager.fileExists(atPath: target.path) else {
+            vaultStatus = "Nothing written yet. Press Write Now in Settings › Orbit."
+            NSWorkspace.shared.open(vaultURL.deletingLastPathComponent())
+            return
+        }
+        if hasObsidian, OrbitPolicy.vault(containing: target.path, vaults: obsidianVaults) != nil,
            let link = OrbitPolicy.obsidianURL(forFile: target.path) {
             NSWorkspace.shared.open(link)
-        } else if FileManager.default.fileExists(atPath: target.path) {
-            NSWorkspace.shared.activateFileViewerSelecting([target])
-        } else {
-            NSWorkspace.shared.open(vaultURL.deletingLastPathComponent())
+            return
+        }
+        NSWorkspace.shared.activateFileViewerSelecting([target])
+        if hasObsidian {
+            vaultStatus = "Obsidian doesn't know this vault yet: in Obsidian, choose Open folder as vault and pick \(vaultURL.path.replacingOccurrences(of: NSHomeDirectory(), with: "~"))."
         }
     }
 }

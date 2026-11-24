@@ -75,7 +75,7 @@ struct OrbitState: Codable, Equatable, Sendable {
     var snoozedLoops: [String: Date] = [:]
     var scenes: [OrbitScene] = []
     var lastBrief: OrbitBrief?
-    var version = 1
+    var version = 2
 
     static let empty = OrbitState()
 
@@ -225,6 +225,8 @@ enum OrbitPolicy {
             if let person = event.person { project.people[person, default: 0] += 1 }
             state.projects[id] = project
         }
+        // Only pinned people are kept; others never get a person link.
+        if let id = event.person, state.people[id] == nil { event.person = nil }
         if let id = event.person, var person = state.people[id] {
             person.lastSeen = max(person.lastSeen, event.date)
             if event.kind == .message { person.messages += 1 }
@@ -252,6 +254,40 @@ enum OrbitPolicy {
             state.projects[id] = OrbitProject(id: id, name: name, root: root, created: date, lastActive: date)
         }
         return id
+    }
+
+    // MARK: People (pinned only)
+
+    /// Pins a person: they get a page from now on. Returns their id.
+    @discardableResult
+    static func pinPerson(name: String, app: String?, at date: Date, in state: inout OrbitState) -> String {
+        upsertPerson(name: name, app: app, at: date, in: &state)
+    }
+
+    /// Unpins a person: their page goes, and nothing points at them any more.
+    static func unpinPerson(_ id: String, in state: inout OrbitState) {
+        state.people[id] = nil
+        state.events.removeAll { $0.person == id && $0.project == nil && $0.kind == .message }
+        for index in state.events.indices where state.events[index].person == id {
+            state.events[index].person = nil
+        }
+        for key in state.projects.keys { state.projects[key]?.people[id] = nil }
+    }
+
+    /// The person for a sender name, only when they're pinned.
+    static func pinnedPerson(named name: String, in state: OrbitState) -> String? {
+        let id = key(name)
+        return state.people[id] == nil ? nil : id
+    }
+
+    /// Version 1 added everyone who messaged; from version 2 People holds
+    /// only who you pinned, so the old automatic entries are cleared once.
+    static func migrated(_ state: OrbitState) -> OrbitState {
+        guard state.version < 2 else { return state }
+        var state = state
+        for id in Array(state.people.keys) { unpinPerson(id, in: &state) }
+        state.version = 2
+        return state
     }
 
     @discardableResult
@@ -428,6 +464,22 @@ enum OrbitPolicy {
             out.append("")
         }
         return out.joined(separator: "\n").trimmingCharacters(in: .newlines)
+    }
+
+    /// Folders Obsidian has opened as vaults, from its obsidian.json
+    /// (~/Library/Application Support/obsidian/obsidian.json).
+    static func obsidianVaults(from data: Data) -> [String] {
+        guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let vaults = object["vaults"] as? [String: Any] else { return [] }
+        return vaults.values.compactMap { ($0 as? [String: Any])?["path"] as? String }
+            .map { ($0 as NSString).standardizingPath }
+    }
+
+    /// The vault (from `vaults`) that holds `path`, if Obsidian knows one.
+    static func vault(containing path: String, vaults: [String]) -> String? {
+        let path = (path as NSString).standardizingPath
+        return vaults.filter { path == $0 || path.hasPrefix($0.hasSuffix("/") ? $0 : $0 + "/") }
+            .max { $0.count < $1.count }
     }
 
     /// `obsidian://open?path=...` for a note, so it opens in Obsidian.
