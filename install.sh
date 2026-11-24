@@ -118,7 +118,10 @@ BACKUPS="$HOME/Library/Application Support/${APP_NAME}/Build Backups"
 if [ -d "$BACKUPS" ]; then
     # Keep backups out of Spotlight, and only the three newest.
     touch "$BACKUPS/.metadata_never_index"
-    ls -1dt "$BACKUPS"/*.app.backup 2>/dev/null | tail -n +4 | while IFS= read -r old_backup; do
+    # Newest by the date in the name; a moved bundle keeps its old modification date.
+    find "$BACKUPS" -maxdepth 1 -type d -name '*.app.backup' 2>/dev/null \
+        | awk '{ n = split($0, p, " "); print p[n] "\t" $0 }' | sort -r | cut -f2- \
+        | tail -n +4 | while IFS= read -r old_backup; do
         rm -rf "$old_backup"
     done
     find "$BACKUPS" -maxdepth 1 -type d -name '*.app' -print0 | while IFS= read -r -d '' backup; do

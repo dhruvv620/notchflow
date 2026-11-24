@@ -447,7 +447,11 @@ while IFS= read -r -d '' backup; do
     /bin/mv "$backup" "$backup.backup"
 done < <(/usr/bin/find "$BACKUP_ROOT" -maxdepth 1 -type d -name '*.app' -print0)
 # Keep the three newest backups; older ones only take space (each is a whole app).
-/bin/ls -1dt "$BACKUP_ROOT"/*.app.backup 2>/dev/null | /usr/bin/tail -n +4 | while IFS= read -r old_backup; do
+# Newest by the date in the name ("… 20261123-183432.app.backup"): a moved
+# bundle keeps its old modification date, so ls -t can't be trusted here.
+/usr/bin/find "$BACKUP_ROOT" -maxdepth 1 -type d -name '*.app.backup' 2>/dev/null \
+    | /usr/bin/awk '{ n = split($0, p, " "); print p[n] "\t" $0 }' | /usr/bin/sort -r | /usr/bin/cut -f2- \
+    | /usr/bin/tail -n +4 | while IFS= read -r old_backup; do
     /bin/rm -rf "$old_backup"
 done
 
