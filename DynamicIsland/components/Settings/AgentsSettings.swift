@@ -18,24 +18,11 @@ struct AgentsSettings: View {
     @State private var pendingConnect: AgentSetup.Connector?
     @State private var copiedPath = false
 
-    private var headerStatus: SettingsStatus? {
-        guard enabled else { return nil }
-        if hub.isBridgeRunning { return SettingsStatus(text: "Listening for agents on this Mac only", kind: .ok) }
-        if let error = hub.bridgeError { return SettingsStatus(text: error, kind: .error) }
-        return SettingsStatus(text: "Starting…", kind: .neutral)
-    }
-
     // SettingsTab is private to SettingsView.swift; ids follow its "<tab>-<title>" form.
     private func highlightID(_ title: String) -> String { "agents-\(title)" }
 
     var body: some View {
         Form {
-            Section {
-                SettingsPageHeader(symbol: "sparkles", tint: SettingsPalette.work, title: "AI Agents",
-                                   detail: "Start, watch and approve Claude Code, Codex, Gemini and Cursor from the notch.",
-                                   status: headerStatus, isOn: $enabled)
-                    .settingsHighlight(id: highlightID("AI Agents"))
-            }
             if !enabled {
                 Section {
                     Text("Off: no agent connection is open and nothing runs.")

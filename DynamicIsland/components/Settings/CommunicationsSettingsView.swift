@@ -61,7 +61,7 @@ struct CommunicationsSettingsView: View {
                                 Text(accessibilityPermission.recoveryMessage ?? "Accessibility is tied to the exact signed app copy. Duplicate NotchFlow rows usually belong to older local builds; reveal this copy or reset the stale entries before approving it again.")
                                     .font(.caption).foregroundStyle(.secondary)
                             }
-                            if let error = manager.lastError { Text(error).font(.caption).foregroundStyle(.orange) }
+                            if let error = manager.lastError { Text(error).font(.caption).foregroundStyle(SettingsPalette.warn) }
                         }.padding(6)
                     }
                     if section == .notifications { notificationSettings } else { callSettings }
@@ -199,12 +199,12 @@ struct CommunicationsSettingsView: View {
                                            @ViewBuilder controls: () -> Controls) -> some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: ready ? "checkmark.circle.fill" : "circle.dashed")
-                .foregroundStyle(ready ? Color.green : Color.secondary)
+                .foregroundStyle(ready ? SettingsPalette.ok : Color.secondary)
                 .font(.system(size: 14))
             VStack(alignment: .leading, spacing: 3) {
                 Text(title).font(.system(size: 12, weight: .medium))
                 Text(detail).font(.caption).foregroundStyle(.secondary)
-                Text(status).font(.caption2).foregroundStyle(ready ? Color.green : Color.orange)
+                Text(status).font(.caption2).foregroundStyle(ready ? SettingsPalette.ok : SettingsPalette.warn)
             }
             Spacer(minLength: 8)
             HStack(spacing: 6, content: controls).controlSize(.small)

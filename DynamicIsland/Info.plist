@@ -7,6 +7,10 @@
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
+	<key>NSSupportsAutomaticTermination</key>
+	<false/>
+	<key>NSSupportsSuddenTermination</key>
+	<false/>
 	<key>NSAppleMusicUsageDescription</key>
 	<string>NotchFlow uses Apple Music to fetch animated artwork for the lock screen wallpaper.</string>
 	<key>NSAudioCaptureUsageDescription</key>

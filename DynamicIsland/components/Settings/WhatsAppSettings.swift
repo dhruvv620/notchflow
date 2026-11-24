@@ -47,7 +47,7 @@ struct WhatsAppSettings: View {
             } footer: {
                 Text("Unofficial integration: it goes through GOWA, an open-source WhatsApp gateway NotchFlow runs on this Mac. Use it with your own account only. WhatsApp may restrict accounts that misuse it.")
                     .font(.caption)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(SettingsPalette.warn)
             }
 
             if enableWhatsAppFeature {
@@ -104,7 +104,7 @@ struct WhatsAppSettings: View {
             if let error = manager.lastError {
                 HStack(alignment: .top, spacing: 6) {
                     Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(SettingsPalette.warn)
                     Text(error)
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -163,7 +163,7 @@ struct WhatsAppSettings: View {
                 Task { await manager.installOrUpdateGateway() }
             }
             .buttonStyle(.borderedProminent)
-            .tint(.whatsAppGreen)
+            .tint(SettingsPalette.accent)
         case .installing, .starting:
             ProgressView().controlSize(.small)
         case .failed:
@@ -179,7 +179,7 @@ struct WhatsAppSettings: View {
                     Task { await manager.installOrUpdateGateway() }
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(.whatsAppGreen)
+                .tint(SettingsPalette.accent)
             } else {
                 Button(manager.isCheckingForUpdate ? "Checking…" : "Check for Updates") {
                     Task { await manager.checkForUpdate() }
@@ -282,7 +282,7 @@ struct WhatsAppSettings: View {
         case .connected, .reconnecting:
             HStack(spacing: 8) {
                 Circle()
-                    .fill(state.isConnected ? Color.whatsAppGreen : Color.orange)
+                    .fill(state.isConnected ? SettingsPalette.ok : SettingsPalette.warn)
                     .frame(width: 8, height: 8)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(state.isConnected
@@ -368,7 +368,7 @@ struct WhatsAppSettings: View {
                 } else {
                     Button("Show QR Code") { manager.beginLinking(slot) }
                         .buttonStyle(.borderedProminent)
-                        .tint(.whatsAppGreen)
+                        .tint(SettingsPalette.accent)
                         .disabled(manager.isLinking)
                 }
             }

@@ -172,6 +172,50 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
     /// Pages take their group's colour (docs/SETTINGS_DESIGN.md).
     var tint: Color { group.tint }
 
+    /// The one plain sentence under the page's title.
+    var summary: String {
+        switch self {
+        case .general: return "How NotchFlow starts, opens and behaves."
+        case .appearance: return "The notch's shape, colours, glass and motion."
+        case .tabsAndFeatures: return "Which tabs the notch has, their order, and which features are on."
+        case .shortcuts: return "Keyboard shortcuts for the notch and its tools."
+        case .media: return "The music player in the notch, lyrics, and the sources it follows."
+        case .communications: return "Notifications and calls in the notch, with replies."
+        case .whatsapp: return "Your WhatsApp chats in the notch: read, reply and get alerts."
+        case .calendar: return "Your calendar, meetings and todos in the notch."
+        case .timer: return "Timers and Pomodoro in the notch."
+        case .shelf: return "A place in the notch to drop files and keep them handy."
+        case .liveActivities: return "What shows under the closed notch: recording, Focus, camera and more."
+        case .stats: return "Your Mac's CPU, memory, network and more in the notch."
+        case .orbit: return "Projects, people and loose ends that keep track of themselves. Everything stays on this Mac."
+        case .agents: return "Start, watch and approve Claude Code, Codex, Gemini and Cursor from the notch."
+        case .productivity: return "Time tracking, workspaces, promises and the window stash."
+        case .glance: return "A board of panels over your screen, one key away."
+        case .terminal: return "A terminal in the notch, with tabs."
+        case .notes: return "Quick notes in the notch."
+        case .clipboard: return "Everything you copied, in the notch."
+        case .smartTools: return "Copy-to-action, smart replies, build watching and focus guard."
+        case .screenAssistant: return "Ask AI about what's on your screen."
+        case .colorPicker: return "Pick any colour on screen and copy it."
+        case .hudAndOSD: return "Volume, brightness and keyboard controls, shown in the notch."
+        case .battery: return "Charging and battery alerts."
+        case .devices: return "Headphones and other Bluetooth devices."
+        case .downloads: return "See downloads finish in the notch."
+        case .lockScreen: return "Widgets on the lock screen: music, timers, weather and more."
+        case .optimizer: return "Keep NotchFlow light on CPU, memory and battery."
+        case .about: return "Version, updates and credits."
+        }
+    }
+
+    /// The feature's main switch, shown in its page's header.
+    var masterKey: Defaults.Key<Bool>? {
+        switch self {
+        case .orbit: return .enableOrbit
+        case .agents: return .enableAgentsFeature
+        default: return nil
+        }
+    }
+
     func highlightID(for title: String) -> String {
         "\(rawValue)-\(title)"
     }
@@ -286,6 +330,17 @@ private struct SettingsForm<Content: View>: View {
     @EnvironmentObject private var highlightCoordinator: SettingsHighlightCoordinator
 
     var body: some View {
+        VStack(spacing: 0) {
+            // The same header on every page (docs/SETTINGS_DESIGN.md).
+            SettingsTabHeader(tab: tab)
+                .padding(.horizontal, 24)
+                .padding(.top, 16)
+                .padding(.bottom, 2)
+            pageContent
+        }
+    }
+
+    private var pageContent: some View {
         ScrollViewReader { proxy in
             content()
                 .onReceive(highlightCoordinator.$pendingScrollRequest.compactMap { request -> SettingsHighlightCoordinator.ScrollRequest? in
@@ -351,6 +406,10 @@ struct SettingsView: View {
                 .toolbar(removing: .sidebarToggle)
                 .navigationSplitViewColumnWidth(min: 200, ideal: 210, max: 240)
                 .environment(\.defaultMinListRowHeight, 44)
+
+                SettingsAppControls()
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 12)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         } detail: {
@@ -360,17 +419,11 @@ struct SettingsView: View {
         .navigationSplitViewStyle(.balanced)
         .toolbar(removing: .sidebarToggle)
         .toolbar { toolbarSpacingShim }
-        .toolbar {
-            // On every page (docs/SETTINGS_DESIGN.md).
-            ToolbarItemGroup(placement: .primaryAction) {
-                Button("Restart") { AppRelauncher.restart() }
-                    .help("Quit NotchFlow and open it again")
-                Button("Quit") { NSApp.terminate(nil) }
-                    .help("Quit NotchFlow")
-            }
-        }
         .environmentObject(highlightCoordinator)
         .formStyle(.grouped)
+        // One accent and one background for every page.
+        .tint(SettingsPalette.accent)
+        .scrollContentBackground(.hidden)
         .frame(width: 760)
         .onChange(of: searchText) { _, newValue in
             let matches = tabsMatchingSearch(newValue)
@@ -491,7 +544,7 @@ struct SettingsView: View {
                     .padding(.vertical, 2)
                     .background(
                         Capsule()
-                            .fill(Color.blue)
+                            .fill(SettingsPalette.accent)
                     )
             }
         }
@@ -1194,10 +1247,6 @@ struct GeneralSettings: View {
 
     var body: some View {
         Form {
-            Section {
-                SettingsPageHeader(symbol: "gearshape.fill", tint: SettingsPalette.general, title: "General",
-                                   detail: "How NotchFlow starts, opens and behaves.")
-            }
             Section {
                 Defaults.Toggle(key: .enableMinimalisticUI) {
                     Text("Enable Minimalistic UI")
@@ -2138,7 +2187,7 @@ private struct HUDAndOSDSettingsView: View {
                     VStack(spacing: 16) {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .font(.system(size: 48))
-                            .foregroundStyle(.orange)
+                            .foregroundStyle(SettingsPalette.warn)
 
                         Text("macOS 15 or later required")
                             .font(.headline)
@@ -3300,7 +3349,7 @@ struct CalendarSettings: View {
 
             if !calendarManager.hasCalendarAccess || !calendarManager.hasReminderAccess {
                 Text("Calendar or Reminder access is denied. Please enable it in System Settings.")
-                    .foregroundColor(.red)
+                    .foregroundStyle(SettingsPalette.danger)
                     .multilineTextAlignment(.center)
                     .padding()
 
@@ -3993,14 +4042,14 @@ struct LiveActivitiesSettings: View {
                         if recordingManager.isRecording {
                             HStack(spacing: 4) {
                                 Circle()
-                                    .fill(Color.red)
+                                    .fill(SettingsPalette.danger)
                                     .frame(width: 8, height: 8)
                                 Text("Recording Detected")
-                                    .foregroundColor(.red)
+                                    .foregroundStyle(SettingsPalette.danger)
                             }
                         } else {
                             Text("Active - No Recording")
-                                .foregroundColor(.green)
+                                .foregroundStyle(SettingsPalette.ok)
                         }
                     }
                 }
@@ -4063,7 +4112,7 @@ struct LiveActivitiesSettings: View {
                             }
                         } else {
                             Text("Active - No Focus")
-                                .foregroundColor(.green)
+                                .foregroundStyle(SettingsPalette.ok)
                         }
                     }
                 } else {
@@ -4123,10 +4172,10 @@ struct LiveActivitiesSettings: View {
                         if privacyManager.cameraActive {
                             HStack(spacing: 4) {
                                 Circle()
-                                    .fill(Color.green)
+                                    .fill(SettingsPalette.ok)
                                     .frame(width: 8, height: 8)
                                 Text("Camera Active")
-                                    .foregroundColor(.green)
+                                    .foregroundStyle(SettingsPalette.ok)
                             }
                         } else {
                             Text("Inactive")
@@ -4140,10 +4189,10 @@ struct LiveActivitiesSettings: View {
                         if privacyManager.microphoneActive {
                             HStack(spacing: 4) {
                                 Circle()
-                                    .fill(Color.yellow)
+                                    .fill(SettingsPalette.warn)
                                     .frame(width: 8, height: 8)
                                 Text("Microphone Active")
-                                    .foregroundColor(.yellow)
+                                    .foregroundStyle(SettingsPalette.warn)
                             }
                         } else {
                             Text("Inactive")
@@ -5977,7 +6026,7 @@ func alphaBadge() -> some View {
         .padding(.vertical, 2)
         .background(
             Capsule()
-                .fill(Color.orange.opacity(0.9))
+                .fill(SettingsPalette.warn)
         )
 }
 
@@ -5986,7 +6035,7 @@ func warningBadge(_ text: String, _ description: String) -> some View {
         HStack(spacing: 12) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .font(.system(size: 22))
-                .foregroundStyle(.yellow)
+                .foregroundStyle(SettingsPalette.warn)
             VStack(alignment: .leading) {
                 Text(text)
                     .font(.headline)
@@ -6694,7 +6743,7 @@ struct StatsSettings: View {
                             Image(systemName: "exclamationmark.triangle.fill")
                         }
                         .font(.caption)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(SettingsPalette.warn)
                         .padding(.top, 4)
                     }
                 } header: {
@@ -6952,14 +7001,14 @@ struct ClipboardSettings: View {
                     Button("Clear Clipboard History") {
                         clipboardManager.clearHistory()
                     }
-                    .foregroundColor(.red)
+                    .foregroundStyle(SettingsPalette.danger)
                     .disabled(clipboardManager.clipboardHistory.isEmpty)
 
                     Button("Clear Pinned Items") {
                         clipboardManager.pinnedItems.removeAll()
                         clipboardManager.savePinnedItemsToDefaults()
                     }
-                    .foregroundColor(.red)
+                    .foregroundStyle(SettingsPalette.danger)
                     .disabled(clipboardManager.pinnedItems.isEmpty)
                 } header: {
                     Text("Actions")
@@ -7054,10 +7103,10 @@ struct ScreenAssistantSettings: View {
                         Spacer()
                         if geminiApiKey.isEmpty {
                             Text("Not Set")
-                                .foregroundColor(.red)
+                                .foregroundStyle(SettingsPalette.danger)
                         } else {
                             Text("••••••••")
-                                .foregroundColor(.green)
+                                .foregroundStyle(SettingsPalette.ok)
                         }
 
                         Button(showingApiKey ? "Hide" : (geminiApiKey.isEmpty ? "Set" : "Change")) {
@@ -7142,7 +7191,7 @@ struct ScreenAssistantSettings: View {
                     Button("Clear All Files") {
                         screenAssistantManager.clearAllFiles()
                     }
-                    .foregroundColor(.red)
+                    .foregroundStyle(SettingsPalette.danger)
                     .disabled(screenAssistantManager.attachedFiles.isEmpty)
                 } header: {
                     Text("Actions")
@@ -7288,7 +7337,7 @@ struct ColorPickerSettings: View {
                     Button("Clear Color History") {
                         colorPickerManager.clearHistory()
                     }
-                    .foregroundColor(.red)
+                    .foregroundStyle(SettingsPalette.danger)
                     .disabled(colorPickerManager.colorHistory.isEmpty)
 
                     Button("Start Color Picking") {
@@ -7657,7 +7706,7 @@ struct NotesSettingsView: View {
                         if let error = appleNotesSync.lastError {
                             Text(error)
                                 .font(.caption)
-                                .foregroundStyle(.red)
+                                .foregroundStyle(SettingsPalette.danger)
                         }
                     }
                 } header: {
@@ -8091,5 +8140,114 @@ private extension QuickShareProvider {
 
     var symbolFallbackName: String {
         id == "System Share Menu" ? "square.and.arrow.up.on.square" : "square.and.arrow.up"
+    }
+}
+
+// MARK: - Page header and app controls
+
+/// Every page's header: icon, title, one sentence, status, and the main switch
+/// for features that have one.
+private struct SettingsTabHeader: View {
+    let tab: SettingsTab
+
+    var body: some View {
+        if let key = tab.masterKey {
+            SettingsTabSwitchHeader(tab: tab, key: key)
+        } else {
+            SettingsPageHeader(symbol: tab.systemImage, tint: tab.tint, title: tab.title, detail: tab.summary,
+                               statusView: AnyView(SettingsTabStatus(tab: tab)))
+        }
+    }
+}
+
+private struct SettingsTabSwitchHeader: View {
+    let tab: SettingsTab
+    @Default private var isOn: Bool
+
+    init(tab: SettingsTab, key: Defaults.Key<Bool>) {
+        self.tab = tab
+        _isOn = Default(key)
+    }
+
+    var body: some View {
+        SettingsPageHeader(symbol: tab.systemImage, tint: tab.tint, title: tab.title, detail: tab.summary,
+                           statusView: AnyView(SettingsTabStatus(tab: tab)), isOn: $isOn)
+            .settingsHighlight(id: searchID)
+    }
+
+    /// The search tags of the main switches ("orbit-Use Orbit").
+    private var searchID: String {
+        switch tab {
+        case .orbit: return "orbit-Use Orbit"
+        case .agents: return "agents-AI Agents"
+        default: return tab.highlightID(for: tab.title)
+        }
+    }
+}
+
+/// The status line under a page's title, for pages that have one.
+private struct SettingsTabStatus: View {
+    let tab: SettingsTab
+    @ObservedObject private var orbit = Orbit.shared
+    @ObservedObject private var agentHub = AgentHub.shared
+    @ObservedObject private var whatsApp = WhatsAppManager.shared
+    @Default(.enableOrbit) private var orbitOn
+    @Default(.enableAgentsFeature) private var agentsOn
+    @Default(.enableWhatsAppFeature) private var whatsAppOn
+
+    var body: some View {
+        switch tab {
+        case .orbit where orbitOn:
+            if orbit.isRunning {
+                SettingsStatus(text: "Running · \(orbit.state.projects.count) projects, \(orbit.state.people.count) people, \(orbit.state.events.count) events", kind: .ok)
+            } else {
+                SettingsStatus(text: "Paused: turn on a part below", kind: .warn)
+            }
+        case .agents where agentsOn:
+            if agentHub.isBridgeRunning {
+                SettingsStatus(text: "Listening for agents on this Mac only", kind: .ok)
+            } else if let error = agentHub.bridgeError {
+                SettingsStatus(text: error, kind: .error)
+            } else {
+                SettingsStatus(text: "Starting…")
+            }
+        case .whatsapp where whatsAppOn:
+            switch whatsApp.state {
+            case .connected: SettingsStatus(text: "Connected", kind: .ok)
+            case .reconnecting: SettingsStatus(text: "Reconnecting…", kind: .warn)
+            case .waitingForLink: SettingsStatus(text: "Not linked yet: scan the QR code below", kind: .warn)
+            case .failed(let message): SettingsStatus(text: message, kind: .error)
+            case .starting, .installing: SettingsStatus(text: "Starting…")
+            case .notInstalled: SettingsStatus(text: "Not set up yet", kind: .warn)
+            case .disabled: EmptyView()
+            }
+        default:
+            EmptyView()
+        }
+    }
+}
+
+/// Restart and Quit, at the bottom of the sidebar on every page.
+private struct SettingsAppControls: View {
+    var body: some View {
+        HStack(spacing: 8) {
+            Button {
+                AppRelauncher.restart()
+            } label: {
+                Label("Restart", systemImage: "arrow.clockwise")
+                    .frame(maxWidth: .infinity)
+            }
+            .help("Quit NotchFlow and open it again")
+            Button {
+                NSApp.terminate(nil)
+            } label: {
+                Label("Quit", systemImage: "power")
+                    .frame(maxWidth: .infinity)
+            }
+            .help("Quit NotchFlow")
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.regular)
+        .labelStyle(.titleAndIcon)
     }
 }

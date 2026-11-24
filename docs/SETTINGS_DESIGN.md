@@ -6,23 +6,22 @@ in `DynamicIsland/components/Settings/SettingsKit.swift`; use them instead of dr
 
 ## A page, top to bottom
 
-1. **Header** (first `Section`, no title): `SettingsPageHeader` with the page's icon, its group's
-   colour, the title, **one plain sentence** about the feature, an optional status line, and, on a
-   feature's page, its **main on/off switch** (`isOn:`).
+1. **Header**: drawn for every page by `SettingsForm` (`SettingsTabHeader` in `SettingsView.swift`):
+   the page's icon in its group's colour, the title, **one plain sentence** (`SettingsTab.summary`),
+   a status line (`SettingsTabStatus`), and, on a feature's page, its **main on/off switch**
+   (`SettingsTab.masterKey`). Pages **don't draw their own header**; set those three things instead.
 2. **Off state**: when the main switch is off, show one short line ("Off: … does nothing at all")
    and hide every other section.
 3. **Sections** in this order: the parts of the feature, how it behaves, connections (accounts,
    API keys, folders), then **Data** (reset, forget, delete) last.
 
 ```swift
+// In SettingsView.swift: summary, masterKey (and a status case if it has one).
+// The page itself starts with its sections:
 Form {
-    Section {
-        SettingsPageHeader(symbol: "circle.circle", tint: SettingsPalette.work, title: "Orbit",
-                           detail: "Projects, people and loose ends that keep track of themselves.",
-                           status: SettingsStatus(text: "Running", kind: .ok), isOn: $enableOrbit)
-            .settingsHighlight(id: "orbit-Use Orbit")
-    }
-    if enabled {
+    if !enabled {
+        Section { Text("Off: Orbit does nothing at all.").font(.callout).foregroundStyle(.secondary) }
+    } else {
         Section {
             SettingsToggle(key: .orbitLoops, title: "Loops", detail: "What's still open, in one list.")
         } header: { Text("Parts") }
@@ -78,7 +77,10 @@ Form {
   `SettingsTab.group` and `availableTabs` in `SettingsView.swift` (see `docs/SETTINGS.md`).
 - A page that needs the user (disconnected, failed, an error) shows an **orange dot**:
   add a case to `needsAttention(_:)` in `SettingsView.swift`.
-- **Restart** and **Quit** are in the window's toolbar on every page; pages don't add their own.
+- **Restart** and **Quit** sit at the bottom of the sidebar (`SettingsAppControls`), the same on every
+  page; pages don't add their own.
+- Every page has one background and one accent: `SettingsView` sets `.tint` and hides scroll
+  backgrounds. Pages don't set their own `.tint`, background or brand colours.
 
 ## Search
 
@@ -87,7 +89,7 @@ Every switch and choice a user might look for has a `settingsHighlight` tag and 
 
 ## Before you finish
 
-- [ ] Header with one sentence (and the main switch on a feature page)
+- [ ] `summary` (and `masterKey` for a feature) set for the page; no page-drawn header
 - [ ] Everything hidden while the feature is off
 - [ ] Kit rows, one-line details, sentence-case headers
 - [ ] One main button per section at most; destructive buttons ask first

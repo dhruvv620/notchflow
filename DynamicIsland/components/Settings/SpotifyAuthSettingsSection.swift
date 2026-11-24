@@ -53,7 +53,7 @@ struct SpotifyAuthSettingsSection: View {
 
             HStack(spacing: 10) {
                 Circle()
-                    .fill(spotifyAuthManager.isAuthenticated ? Color.green : (hasCookie ? Color.orange : Color.secondary))
+                    .fill(spotifyAuthManager.isAuthenticated ? SettingsPalette.ok : (hasCookie ? SettingsPalette.warn : Color.secondary))
                     .frame(width: 8, height: 8)
 
                 Text(spotifyAuthManager.sessionStatusText)
@@ -63,7 +63,7 @@ struct SpotifyAuthSettingsSection: View {
             if let authErrorMessage = spotifyAuthManager.authErrorMessage, !authErrorMessage.isEmpty {
                 Text(authErrorMessage)
                     .font(.caption)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(SettingsPalette.danger)
             }
 
             HStack {

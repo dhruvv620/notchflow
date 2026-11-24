@@ -700,6 +700,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // NotchFlow has no regular windows, so macOS may treat it as idle and
+        // quit it on its own (around sleep, or under memory pressure). It runs
+        // the notch all the time: opt out of both kinds of automatic quitting.
+        ProcessInfo.processInfo.disableAutomaticTermination("NotchFlow runs the notch")
+        ProcessInfo.processInfo.disableSuddenTermination()
         guard establishSingleNotchFlowInstance() else { return }
         // Opened from the disk image or a download: offer to move into Applications first.
         if AppLocationMover.moveIfNeeded() { return }

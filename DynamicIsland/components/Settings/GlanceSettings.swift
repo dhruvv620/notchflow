@@ -42,7 +42,7 @@ struct GlanceSettings: View {
                         if glance.isRecordingKey {
                             Text("Press a key: Left Shift, fn, Right ⌘… or a shortcut. Esc cancels.")
                                 .font(.caption)
-                                .foregroundStyle(.orange)
+                                .foregroundStyle(SettingsPalette.warn)
                             Button("Cancel") { glance.cancelRecordingKey() }
                         } else {
                             Picker("", selection: $trigger) {
@@ -328,7 +328,7 @@ struct GlanceSettings: View {
                 TextField("Address", text: Binding(get: { panel.address }, set: { value in glance.updatePanel(panel.id) { $0.address = value } }),
                           prompt: Text("mail.google.com"))
                 if !panel.address.isEmpty, GlancePolicy.webURL(panel.address) == nil {
-                    Text("That doesn't look like a web address.").font(.caption).foregroundStyle(.orange)
+                    Text("That doesn't look like a web address.").font(.caption).foregroundStyle(SettingsPalette.warn)
                 }
                 Picker("Reload every", selection: Binding(get: { panel.refreshMinutes },
                                                           set: { value in glance.updatePanel(panel.id) { $0.refreshMinutes = value } })) {

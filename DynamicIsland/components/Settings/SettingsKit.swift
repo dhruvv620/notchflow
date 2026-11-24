@@ -61,6 +61,8 @@ struct SettingsPageHeader: View {
     let title: String
     let detail: String
     var status: SettingsStatus? = nil
+    /// A status line that updates itself (used by the shared page header).
+    var statusView: AnyView? = nil
     /// The feature's main switch; nil on pages without one.
     var isOn: Binding<Bool>? = nil
 
@@ -80,6 +82,7 @@ struct SettingsPageHeader: View {
                 Text(detail).font(.callout).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 if let status { status.padding(.top, 2) }
+                if let statusView { statusView.padding(.top, 2) }
             }
             Spacer(minLength: 8)
             if let isOn {

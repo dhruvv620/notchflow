@@ -137,7 +137,7 @@ struct ProductivitySettings: View {
                         Text("Reads new iMessages and texts you send (from the Messages app or your iPhone) with the message you answered, so a plan you said yes to (\u{201C}coffee Friday 5 pm?\u{201D} \u{2192} \u{201C}okay bhai\u{201D}) is kept as \u{201C}Coffee with Rahul \u{00B7} Fri 5:00 PM\u{201D}. Needs Full Disk Access; only messages from now on, read on this Mac.")
                             .font(.caption).foregroundStyle(.secondary)
                         if let status = keeper.messagesHistoryStatus {
-                            Text(status).font(.caption).foregroundStyle(.orange)
+                            Text(status).font(.caption).foregroundStyle(SettingsPalette.warn)
                         }
                     }
                 }
@@ -149,9 +149,9 @@ struct ProductivitySettings: View {
                             .font(.caption).foregroundStyle(.secondary)
                         if useAI && !AIClient.isReady() {
                             Text("Set up an AI provider in Settings \u{203A} Smart Tools first.")
-                                .font(.caption).foregroundStyle(.orange)
+                                .font(.caption).foregroundStyle(SettingsPalette.warn)
                         } else if useAI, let status = keeper.aiStatus {
-                            Text(status).font(.caption).foregroundStyle(.orange)
+                            Text(status).font(.caption).foregroundStyle(SettingsPalette.warn)
                         }
                     }
                 }

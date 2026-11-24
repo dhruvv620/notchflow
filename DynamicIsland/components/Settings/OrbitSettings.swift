@@ -27,13 +27,6 @@ struct OrbitSettings: View {
 
     var body: some View {
         Form {
-            Section {
-                SettingsPageHeader(symbol: "circle.circle", tint: SettingsPalette.work, title: "Orbit",
-                                   detail: "Projects, people and loose ends that keep track of themselves. Everything stays on this Mac.",
-                                   status: headerStatus, isOn: $enableOrbit)
-                    .settingsHighlight(id: "orbit-Use Orbit")
-            }
-
             if !enableOrbit {
                 Section {
                     Text("Off: Orbit does nothing at all. No listeners, no timers, nothing in memory.")
@@ -52,13 +45,6 @@ struct OrbitSettings: View {
         } message: {
             Text("Its projects, people and timeline are deleted. Notes already in your vault stay.")
         }
-    }
-
-    private var headerStatus: SettingsStatus? {
-        guard enableOrbit else { return nil }
-        guard orbit.isRunning else { return SettingsStatus(text: "Paused: turn on a part below", kind: .warn) }
-        let state = orbit.state
-        return SettingsStatus(text: "Running · \(state.projects.count) projects, \(state.people.count) people, \(state.events.count) events", kind: .ok)
     }
 
     // MARK: Sections

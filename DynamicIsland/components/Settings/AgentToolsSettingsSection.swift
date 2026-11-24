@@ -35,7 +35,7 @@ struct AgentToolsSettingsSection: View {
                     .disabled(tools.isChecking)
             }
             if let error = tools.lastError {
-                Text(error).font(.caption).foregroundStyle(.orange)
+                Text(error).font(.caption).foregroundStyle(SettingsPalette.warn)
             }
         } header: {
             Text("Command-line tools")
