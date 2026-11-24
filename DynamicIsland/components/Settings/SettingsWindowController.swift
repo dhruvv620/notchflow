@@ -32,7 +32,9 @@ class SettingsWindowController: NSWindowController {
     private init() {
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 860, height: 680),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
+            // No full-size content: pages and the sidebar start below the title bar,
+            // so nothing slides under it.
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
         )
@@ -57,7 +59,8 @@ class SettingsWindowController: NSWindowController {
         
         window.title = "NotchFlow Settings"
         window.titlebarAppearsTransparent = false
-        window.titleVisibility = .visible
+        // Each page shows its own title in its header.
+        window.titleVisibility = .hidden
         window.toolbarStyle = .unified
         window.isMovableByWindowBackground = true
         window.minSize = NSSize(width: 760, height: 560)

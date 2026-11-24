@@ -330,17 +330,20 @@ private struct SettingsForm<Content: View>: View {
     @EnvironmentObject private var highlightCoordinator: SettingsHighlightCoordinator
 
     var body: some View {
-        VStack(spacing: 0) {
-            // The same header on every page (docs/SETTINGS_DESIGN.md).
-            SettingsTabHeader(tab: tab)
-                .padding(.horizontal, 24)
-                .padding(.top, 16)
-                .padding(.bottom, 2)
-            pageContent
-                // The form shows the page's background, so header and rows sit on one colour.
-                .scrollContentBackground(.hidden)
-        }
-        .background(Color(nsColor: .windowBackgroundColor))
+        pageContent
+            // The form shows the page's background, so header and rows sit on one colour.
+            .scrollContentBackground(.hidden)
+            // The same header on every page (docs/SETTINGS_DESIGN.md), placed by the
+            // system below the toolbar; the page scrolls under it.
+            .safeAreaInset(edge: .top, spacing: 0) {
+                SettingsTabHeader(tab: tab)
+                    .padding(.horizontal, 24)
+                    .padding(.top, 12)
+                    .padding(.bottom, 6)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color(nsColor: .windowBackgroundColor))
+            }
+            .background(Color(nsColor: .windowBackgroundColor))
     }
 
     private var pageContent: some View {
