@@ -224,6 +224,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .screenAssistant: return .enableScreenAssistant
         case .downloads: return .enableDownloadListener
         case .shortcuts: return .enableShortcuts
+        case .communications: return .communicationsEnabled
         default: return nil
         }
     }
@@ -748,10 +749,9 @@ struct SettingsView: View {
 
     private var settingsSearchIndex: [SettingsSearchEntry] {
         [
-            SettingsSearchEntry(tab: .communications, title: "Enable Communications", keywords: ["notifications", "messages", "imessage", "whatsapp", "instagram", "accessibility", "permission"], highlightID: SettingsTab.communications.highlightID(for: "Enable Communications")),
+            SettingsSearchEntry(tab: .communications, title: "Use Notifications & Calls", keywords: ["notifications", "messages", "imessage", "whatsapp", "instagram", "accessibility", "permission"], highlightID: SettingsTab.communications.highlightID(for: "Use Notifications & Calls")),
             SettingsSearchEntry(tab: .communications, title: "Notification apps", keywords: ["reply", "inbox", "message", "notification", "preview", "focus"], highlightID: SettingsTab.communications.highlightID(for: "Notification apps")),
             SettingsSearchEntry(tab: .communications, title: "Call Island", keywords: ["call", "facetime", "phone", "teams", "zoom", "answer", "decline", "mute"], highlightID: SettingsTab.communications.highlightID(for: "Call Island")),
-            SettingsSearchEntry(tab: .tabsAndFeatures, title: "Tabs & Features", keywords: ["tabs", "features", "notch", "applications", "options"], highlightID: SettingsTab.tabsAndFeatures.highlightID(for: "Tabs & Features")),
             SettingsSearchEntry(tab: .tabsAndFeatures, title: "Tab visibility and order", keywords: ["reorder", "drag", "drop", "hide", "show", "music", "timers", "todos", "calendar"], highlightID: SettingsTab.tabsAndFeatures.highlightID(for: "Tab visibility and order")),
             SettingsSearchEntry(tab: .tabsAndFeatures, title: "Notch feature controls", keywords: ["enable", "disable", "clipboard", "stats", "notes", "terminal"], highlightID: SettingsTab.tabsAndFeatures.highlightID(for: "Notch feature controls")),
             // General
@@ -1752,40 +1752,35 @@ struct Downloads: View {
         SettingsTab.downloads.highlightID(for: title)
     }
 
+    @Default(.enableDownloadListener) private var downloadsOn
+
     var body: some View {
         SwiftUI.Form {
-            Section {
-                Defaults.Toggle(key: .enableDownloadListener) {
-                    Text("Enable download detection")
+            if !downloadsOn {
+                Section {
+                    Text("Off: the Downloads folder isn't watched.")
+                        .font(.callout).foregroundStyle(.secondary)
                 }
-                .settingsHighlight(id: highlightID("Enable download detection"))
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Download indicator style")
-                        .font(.system(size: 13, weight: .semibold))
-
-                    HStack(spacing: 16) {
-                        DownloadStyleButton(
-                            style: .progress,
-                            isSelected: selectedDownloadIndicatorStyle == .progress,
-                            disabled: !Defaults[.enableDownloadListener]
-                        ) {
-                            selectedDownloadIndicatorStyle = .progress
+            } else {
+                Section {
+                    LabeledContent {
+                        HStack(spacing: 12) {
+                            DownloadStyleButton(style: .progress, isSelected: selectedDownloadIndicatorStyle == .progress, disabled: false) {
+                                selectedDownloadIndicatorStyle = .progress
+                            }
+                            DownloadStyleButton(style: .circle, isSelected: selectedDownloadIndicatorStyle == .circle, disabled: false) {
+                                selectedDownloadIndicatorStyle = .circle
+                            }
                         }
-
-                        DownloadStyleButton(
-                            style: .circle,
-                            isSelected: selectedDownloadIndicatorStyle == .circle,
-                            disabled: !Defaults[.enableDownloadListener]
-                        ) {
-                            selectedDownloadIndicatorStyle = .circle
-                        }
+                    } label: {
+                        SettingsRowLabel(title: "Looks like", detail: "Under the closed notch while a file downloads.")
                     }
+                    .settingsHighlight(id: highlightID("Download indicator style"))
+                } header: {
+                    Text("Downloads")
+                } footer: {
+                    Text("Works with downloads from Chrome, Edge, Brave and other Chromium browsers.")
                 }
-                .settingsHighlight(id: highlightID("Download indicator style"))
-            } header: {
-                Text("Download Detection")
-            } footer: {
-                Text("Monitor your Downloads folder for Chromium-style downloads (.crdownload files) and show a live activity in the Dynamic Island while downloads are in progress.")
             }
         }
         .navigationTitle("Download Alerts")
@@ -5566,175 +5561,47 @@ struct Shortcuts: View {
 
     var body: some View {
         Form {
-            Section {
-                Defaults.Toggle(key: .enableShortcuts) {
-                    Text("Enable global keyboard shortcuts")
-                }
-                .settingsHighlight(id: highlightID("Enable global keyboard shortcuts"))
-            } header: {
-                Text("General")
-            } footer: {
-                Text("When disabled, all keyboard shortcuts will be inactive. You can still use the UI controls.")
-                    .multilineTextAlignment(.trailing)
-                    .foregroundStyle(.secondary)
-                    .font(.caption)
-            }
-
-            if enableShortcuts {
+            if !enableShortcuts {
                 Section {
-                    KeyboardShortcuts.Recorder("Toggle Sneak Peek:", name: .toggleSneakPeek)
-                        .disabled(!enableShortcuts)
-                } header: {
-                    Text("Media")
-                } footer: {
-                    Text("Sneak Peek shows the media title and artist under the notch for a few seconds.")
-                        .multilineTextAlignment(.trailing)
-                        .foregroundStyle(.secondary)
-                        .font(.caption)
-                }
-
-                Section {
-                    KeyboardShortcuts.Recorder("Toggle Notch Open:", name: .toggleNotchOpen)
-                        .disabled(!enableShortcuts)
-                } header: {
-                    Text("Navigation")
-                } footer: {
-                    Text("Toggle the Dynamic Island open or closed from anywhere.")
-                        .multilineTextAlignment(.trailing)
-                        .foregroundStyle(.secondary)
-                        .font(.caption)
-                }
-
-                Section {
-                    HStack {
-                        VStack(alignment: .leading) {
-                            KeyboardShortcuts.Recorder("Start Demo Timer:", name: .startDemoTimer)
-                                .disabled(!enableShortcuts || !enableTimerFeature)
-                            if !enableTimerFeature {
-                                Text("Timer feature is disabled")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                    .padding(.top, 2)
-                            }
-                        }
-                        Spacer()
-                    }
-                } header: {
-                    Text("Timer")
-                } footer: {
-                    Text("Starts a 5-minute demo timer to test the timer live activity feature. Only works when timer feature is enabled.")
-                        .multilineTextAlignment(.trailing)
-                        .foregroundStyle(.secondary)
-                        .font(.caption)
-                }
-
-                Section {
-                    HStack {
-                        VStack(alignment: .leading) {
-                            KeyboardShortcuts.Recorder("Clipboard History:", name: .clipboardHistoryPanel)
-                                .disabled(!enableShortcuts || !enableClipboardManager)
-                            if !enableClipboardManager {
-                                Text("Clipboard feature is disabled")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                    .padding(.top, 2)
-                            }
-                        }
-                        Spacer()
-                    }
-                } header: {
-                    Text("Clipboard")
-                } footer: {
-                    Text("Opens the clipboard history panel. Default is Cmd+Shift+V (similar to Windows+V on PC). Only works when clipboard feature is enabled.")
-                        .multilineTextAlignment(.trailing)
-                        .foregroundStyle(.secondary)
-                        .font(.caption)
-                }
-
-                Section {
-                    HStack {
-                        VStack(alignment: .leading) {
-                            KeyboardShortcuts.Recorder("Screen Assistant:", name: .screenAssistantPanel)
-                                .disabled(!enableShortcuts || !Defaults[.enableScreenAssistant])
-                            if !Defaults[.enableScreenAssistant] {
-                                Text("Screen Assistant feature is disabled")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                    .padding(.top, 2)
-                            }
-                        }
-                        Spacer()
-                    }
-                } header: {
-                    Text("AI Assistant")
-                } footer: {
-                    Text("Opens the AI assistant panel for file analysis and conversation. Default is Cmd+Shift+A. Only works when screen assistant feature is enabled.")
-                        .multilineTextAlignment(.trailing)
-                        .foregroundStyle(.secondary)
-                        .font(.caption)
-                }
-
-                Section {
-                    HStack {
-                        VStack(alignment: .leading) {
-                            KeyboardShortcuts.Recorder("Toggle Terminal Tab:", name: .toggleTerminalTab)
-                                .disabled(!enableShortcuts || !Defaults[.enableTerminalFeature])
-                            if !Defaults[.enableTerminalFeature] {
-                                Text("Terminal feature is disabled")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                    .padding(.top, 2)
-                            }
-                        }
-                        Spacer()
-                    }
-                } header: {
-                    Text("Terminal")
-                } footer: {
-                    Text("Opens the terminal tab in the notch. Default is Ctrl+`. Only works when terminal feature is enabled.")
-                        .multilineTextAlignment(.trailing)
-                        .foregroundStyle(.secondary)
-                        .font(.caption)
-                }
-
-                Section {
-                    HStack {
-                        VStack(alignment: .leading) {
-                            KeyboardShortcuts.Recorder("Color Picker Panel:", name: .colorPickerPanel)
-                                .disabled(!enableShortcuts || !enableColorPickerFeature)
-                            if !enableColorPickerFeature {
-                                Text("Color Picker feature is disabled")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                    .padding(.top, 2)
-                            }
-                        }
-                        Spacer()
-                    }
-                } header: {
-                    Text("Color Picker")
-                } footer: {
-                    Text("Opens the color picker panel for screen color capture. Default is Cmd+Shift+P. Only works when color picker feature is enabled.")
-                        .multilineTextAlignment(.trailing)
-                        .foregroundStyle(.secondary)
-                        .font(.caption)
+                    Text("Off: no keyboard shortcuts. Buttons in the notch still work.")
+                        .font(.callout).foregroundStyle(.secondary)
                 }
             } else {
                 Section {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Keyboard shortcuts are disabled")
-                            .font(.headline)
-                            .foregroundStyle(.secondary)
+                    shortcutRow("Open or close the notch", detail: "From anywhere.", name: .toggleNotchOpen)
+                    shortcutRow("Sneak peek", detail: "Shows the song under the notch for a few seconds.", name: .toggleSneakPeek)
+                } header: {
+                    Text("Notch")
+                }
 
-                        Text("Enable global keyboard shortcuts above to customize your shortcuts.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(.vertical, 8)
+                Section {
+                    shortcutRow("Terminal", detail: "Ctrl+` unless you change it.", name: .toggleTerminalTab,
+                                featureOn: Defaults[.enableTerminalFeature])
+                    shortcutRow("Clipboard history", detail: "⌘⇧V unless you change it.", name: .clipboardHistoryPanel,
+                                featureOn: enableClipboardManager)
+                    shortcutRow("Screen Assistant", detail: "⌘⇧A unless you change it.", name: .screenAssistantPanel,
+                                featureOn: Defaults[.enableScreenAssistant])
+                    shortcutRow("Color Picker", detail: "⌘⇧P unless you change it.", name: .colorPickerPanel,
+                                featureOn: enableColorPickerFeature)
+                    shortcutRow("Try a 5-minute timer", name: .startDemoTimer, featureOn: enableTimerFeature)
+                } header: {
+                    Text("Tools")
+                } footer: {
+                    Text("A tool's shortcut works while that tool is on.")
                 }
             }
         }
         .navigationTitle("Shortcuts")
+    }
+
+    @ViewBuilder
+    private func shortcutRow(_ title: String, detail: String? = nil, name: KeyboardShortcuts.Name, featureOn: Bool = true) -> some View {
+        LabeledContent {
+            KeyboardShortcuts.Recorder(for: name)
+                .disabled(!featureOn)
+        } label: {
+            SettingsRowLabel(title: title, detail: featureOn ? detail : "Turn on \(title) first.")
+        }
     }
 }
 
@@ -7539,6 +7406,7 @@ private struct SettingsTabSwitchHeader: View {
         case .screenAssistant: return "screenAssistant-Use Screen Assistant"
         case .downloads: return "downloads-Use Download Alerts"
         case .shortcuts: return "shortcuts-Use Shortcuts"
+        case .communications: return "communications-Use Notifications & Calls"
         default: return tab.highlightID(for: tab.title)
         }
     }

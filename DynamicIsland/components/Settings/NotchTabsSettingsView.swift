@@ -7,14 +7,7 @@ import SwiftUI
 struct NotchTabsSettingsView: View {
     let openSettings: (String) -> Void
     @ObservedObject private var preferences = NotchTabPreferences.shared
-    @EnvironmentObject private var highlightCoordinator: SettingsHighlightCoordinator
     @Default(.enableMinimalisticUI) private var minimalistic
-    @State private var segment = Segment.tabs
-
-    private enum Segment: String, CaseIterable, Identifiable {
-        case tabs = "Tabs", features = "Features"
-        var id: String { rawValue }
-    }
     private var descriptors: [TabModel] {
         let all = preferences.orderedBuiltins.map { TabModel(label: $0.title, icon: $0.symbol, view: $0.view) }
         let ids = NotchTabOrderPolicy.normalizedOrder(Defaults[.notchTabOrder], known: all.map(\.id))
@@ -23,73 +16,52 @@ struct NotchTabsSettingsView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Picker("Tabs and features", selection: $segment) {
-                ForEach(Segment.allCases) { Text($0.rawValue).tag($0) }
-            }.pickerStyle(.segmented)
-                .settingsHighlight(id: "tabsAndFeatures-Tabs & Features")
-                .padding(.horizontal, 20)
-                .padding(.top, 20)
+        Form {
             if minimalistic {
-                HStack {
-                    Text("Tab choices apply to Standard layout. Minimalistic layout keeps its single Music view.")
-                        .font(.caption).foregroundStyle(.secondary)
-                    Spacer()
-                    Button("Use Standard layout") { minimalistic = false }
-                }.padding(.horizontal, 20)
+                Section {
+                    HStack {
+                        SettingsStatus(text: "Minimal mode shows only Music. These tabs are for the standard layout.", kind: .warn)
+                        Spacer()
+                        Button("Use Standard Layout") { minimalistic = false }
+                    }
+                }
             }
-            switch segment {
-            case .tabs:
-                tabEditor
-            case .features:
-                ScrollView { featureControls.padding(.horizontal, 20).padding(.bottom, 20) }
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .onReceive(highlightCoordinator.$activeHighlightID) { id in
-            if id == "tabsAndFeatures-Notch feature controls" { segment = .features }
-            if id == "tabsAndFeatures-Tab visibility and order" { segment = .tabs }
-        }
-    }
-
-    private var tabEditor: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Drag a row to reorder the icons, swipes and page indicators.")
-                .font(.caption).foregroundStyle(.secondary).padding(.horizontal, 20)
-            List {
+            Section {
                 ForEach(descriptors) { tab in tabRow(tab) }
                     .onMove { offsets, destination in
                         preferences.moveRows(from: offsets, to: destination, displayedIDs: descriptors.map(\.id))
                     }
+                HStack {
+                    Spacer()
+                    Button("Reset Order") { preferences.reset() }
+                }
+            } header: {
+                Text("Tabs, in order")
+            } footer: {
+                Text("Drag or use the arrows to reorder. Hiding a tab only removes its icon; the feature keeps running.")
             }
-            .listStyle(.inset)
-            .scrollContentBackground(.hidden)
-            HStack {
-                Text("Hiding a tab keeps its position and leaves its feature running. Music is the fallback when all tabs are hidden.")
-                    .font(.caption).foregroundStyle(.secondary)
-                Spacer()
-                Button("Reset tab layout") { preferences.reset() }
-            }.padding(.horizontal, 20).padding(.bottom, 20)
+            .settingsHighlight(id: "tabsAndFeatures-Tab visibility and order")
+
+            featureControls
         }
-        .settingsHighlight(id: "tabsAndFeatures-Tab visibility and order")
     }
 
     private func tabRow(_ tab: TabModel) -> some View {
         let available = TabSelectionView.candidateTabs.contains { $0.id == tab.id }
-        return HStack(spacing: 12) {
-            Image(systemName: "line.3.horizontal").foregroundStyle(.secondary)
-                .help("Drag to reorder")
+        let ids = descriptors.map(\.id)
+        let index = ids.firstIndex(of: tab.id) ?? 0
+        return HStack(spacing: 10) {
             Image(systemName: tab.icon).frame(width: 20).foregroundStyle(available ? Color.accentColor : Color.secondary)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(tab.label).font(.system(size: 13, weight: .medium))
-                if !available { Text("Feature is off — enable it in Features").font(.caption).foregroundStyle(.secondary) }
-            }
+            SettingsRowLabel(title: tab.label, detail: available ? nil : "Its feature is off. Turn it on below.")
             Spacer()
+            Button { moveUp(tab.id) } label: { Image(systemName: "chevron.up") }
+                .buttonStyle(.borderless).disabled(index == 0).help("Move up")
+            Button { moveDown(tab.id) } label: { Image(systemName: "chevron.down") }
+                .buttonStyle(.borderless).disabled(index + 1 >= ids.count).help("Move down")
             Toggle("Show \(tab.label)", isOn: Binding(get: { preferences.isShown(tab.id) }, set: { preferences.setShown($0, id: tab.id) }))
-                .labelsHidden().toggleStyle(.switch).controlSize(.small)
-                .help(available ? "Show or hide this tab" : "Show this tab when its feature is enabled")
+                .labelsHidden()
+                .help(available ? "Show or hide this tab" : "Shows once its feature is on")
         }
-        .padding(.horizontal, 12).padding(.vertical, 11)
         .contentShape(Rectangle())
         .accessibilityLabel("\(tab.label), \(preferences.isShown(tab.id) ? "shown" : "hidden")")
         .accessibilityAction(named: Text("Move up")) { moveUp(tab.id) }
@@ -107,70 +79,67 @@ struct NotchTabsSettingsView: View {
         preferences.move(id, over: ids[index + 1], knownIDs: ids)
     }
 
-    private var featureControls: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            GroupBox("Notch tabs") {
-                VStack(spacing: 10) {
-                    featureRow("Music", symbol: "music.note", destination: "media") {
-                        Text("The default hover view").font(.caption).foregroundStyle(.secondary)
-                    }
-                    Group {
-                    featureToggle("Shelf", symbol: "tray.fill", key: .dynamicShelf, destination: "shelf")
-                    featureToggle("Timers", symbol: "timer", key: .enableTimerFeature, destination: "timer")
-                    if Defaults[.enableTimerFeature] && Defaults[.timerDisplayMode] != .tab {
-                        HStack {
-                            Text("Timers currently opens outside the tab bar.").font(.caption).foregroundStyle(.secondary)
-                            Spacer()
-                            Button("Use Timers tab") { Defaults[.timerDisplayMode] = .tab }
-                        }
-                    }
-                    featureToggle("Calendar", symbol: "calendar", key: .showCalendar, destination: "calendar")
-                    }
-                    Group {
-                    featureToggle("Notifications & Calls", symbol: "bell.badge", key: .communicationsEnabled, destination: "communications")
-                    featureToggle("WhatsApp", symbol: "message.fill", key: .enableWhatsAppFeature, destination: "whatsapp")
-                    featureToggle("AI Agents", symbol: "sparkles", key: .enableAgentsFeature, destination: "agents")
-                    }
-                    featureToggle("Todos", symbol: "checklist", key: .enableRemindersFeature, destination: "calendar")
-                    featureToggle("Clipboard", symbol: "doc.on.clipboard", key: .enableClipboardManager, destination: "clipboard")
-                    featureToggle("Cuely", symbol: "text.quote", key: .enableCuelyFeature, destination: nil)
-                    featureToggle("Notes", symbol: "note.text", key: .enableNotes, destination: "notes")
-                    featureToggle("Stats", symbol: "chart.xyaxis.line", key: .enableStatsFeature, destination: "stats")
-                    featureToggle("AI Usage", symbol: "chart.bar.doc.horizontal", key: .enableLLMUsageFeature, destination: "stats")
-                    featureToggle("Terminal", symbol: "apple.terminal", key: .enableTerminalFeature, destination: "terminal")
-                }.padding(6)
+    @ViewBuilder private var featureControls: some View {
+        Section {
+            featureRow("Music", symbol: "music.note", destination: "media") {
+                Text("Always on").font(.caption).foregroundStyle(.secondary)
             }
-            GroupBox("In the closed notch") {
-                VStack(spacing: 10) {
-                    featureToggle("Upcoming reminders", symbol: "calendar.badge.clock", key: .enableReminderLiveActivity, destination: "calendar")
-                    featureToggle("Meeting countdown", symbol: "video.fill", key: .enableMeetingCountdown, destination: "calendar")
-                    featureToggle("Download alerts", symbol: "arrow.down.circle", key: .enableDownloadListener, destination: "downloads")
-                    featureToggle("Copy-to-action", symbol: "doc.on.clipboard.fill", key: .enableCopyActions, destination: "smartTools")
-                    featureToggle("Distraction meter", symbol: "eye.trianglebadge.exclamationmark", key: .enableFocusGuard, destination: "smartTools")
-                    featureToggle("Build watcher", symbol: "hammer", key: .enableBuildWatcher, destination: "smartTools")
-                    featureToggle("System HUDs", symbol: "speaker.wave.2", key: .enableSystemHUD, destination: "hudAndOSD")
-                }.padding(6)
+            featureToggle("Shelf", symbol: "tray.fill", key: .dynamicShelf, destination: "shelf")
+            featureToggle("Timers", symbol: "timer", key: .enableTimerFeature, destination: "timer")
+            if Defaults[.enableTimerFeature] && Defaults[.timerDisplayMode] != .tab {
+                HStack {
+                    SettingsStatus(text: "Timers open outside the tab bar now.")
+                    Spacer()
+                    Button("Use a Timers Tab") { Defaults[.timerDisplayMode] = .tab }
+                }
+                .padding(.leading, 30)
             }
-            GroupBox("Tools") {
-                VStack(spacing: 10) {
-                    featureToggle("Color picker", symbol: "eyedropper", key: .enableColorPickerFeature, destination: "colorPicker")
-                    featureToggle("Smart replies", symbol: "sparkles", key: .enableSmartReplies, destination: "smartTools")
-                }.padding(6)
-            }
-            Text("Each switch here is the same setting as on that feature's own page. Turning Clipboard off stops collecting new copies; hiding a tab (in Tabs) only removes its icon.")
-                .font(.caption).foregroundStyle(.secondary)
+            featureToggle("Calendar", symbol: "calendar", key: .showCalendar, destination: "calendar")
+            featureToggle("Todos", symbol: "checklist", key: .enableRemindersFeature, destination: "calendar")
+            featureToggle("Notifications & Calls", symbol: "bell.badge", key: .communicationsEnabled, destination: "communications")
+            featureToggle("WhatsApp", symbol: "message.fill", key: .enableWhatsAppFeature, destination: "whatsapp")
+            featureToggle("AI Agents", symbol: "sparkles", key: .enableAgentsFeature, destination: "agents")
+            featureToggle("Clipboard", symbol: "doc.on.clipboard", key: .enableClipboardManager, destination: "clipboard")
+            featureToggle("Cuely", symbol: "text.quote", key: .enableCuelyFeature, destination: nil)
+            featureToggle("Notes", symbol: "note.text", key: .enableNotes, destination: "notes")
+            featureToggle("Stats", symbol: "chart.xyaxis.line", key: .enableStatsFeature, destination: "stats")
+            featureToggle("AI usage", symbol: "chart.bar.doc.horizontal", key: .enableLLMUsageFeature, destination: "stats")
+            featureToggle("Terminal", symbol: "apple.terminal", key: .enableTerminalFeature, destination: "terminal")
+        } header: {
+            Text("Features with a tab")
+        } footer: {
+            Text("The same switches as on each feature's own page. The slider button opens that page.")
         }
         .settingsHighlight(id: "tabsAndFeatures-Notch feature controls")
+
+        Section {
+            featureToggle("Upcoming reminders", symbol: "calendar.badge.clock", key: .enableReminderLiveActivity, destination: "calendar")
+            featureToggle("Meeting countdown", symbol: "video.fill", key: .enableMeetingCountdown, destination: "calendar")
+            featureToggle("Download alerts", symbol: "arrow.down.circle", key: .enableDownloadListener, destination: "downloads")
+            featureToggle("Copy-to-action", symbol: "doc.on.clipboard.fill", key: .enableCopyActions, destination: "smartTools")
+            featureToggle("Distraction meter", symbol: "eye.trianglebadge.exclamationmark", key: .enableFocusGuard, destination: "smartTools")
+            featureToggle("Build watcher", symbol: "hammer", key: .enableBuildWatcher, destination: "smartTools")
+            featureToggle("Volume and brightness", symbol: "speaker.wave.2", key: .enableSystemHUD, destination: "hudAndOSD")
+        } header: {
+            Text("In the closed notch")
+        }
+
+        Section {
+            featureToggle("Color Picker", symbol: "eyedropper", key: .enableColorPickerFeature, destination: "colorPicker")
+            featureToggle("Smart replies", symbol: "sparkles", key: .enableSmartReplies, destination: "smartTools")
+        } header: {
+            Text("Tools")
+        }
     }
 
     private func featureToggle(_ title: String, symbol: String, key: Defaults.Key<Bool>, destination: String?) -> some View {
         featureRow(title, symbol: symbol, destination: destination) {
-            Defaults.Toggle(key: key) { Text(title) }.labelsHidden().toggleStyle(.switch).controlSize(.small)
+            Defaults.Toggle(key: key) { Text(title) }.labelsHidden()
         }
     }
     private func featureRow<Control: View>(_ title: String, symbol: String, destination: String?, @ViewBuilder control: () -> Control) -> some View {
         HStack(spacing: 10) {
-            Label(title, systemImage: symbol).font(.system(size: 13)).frame(maxWidth: .infinity, alignment: .leading)
+            Label(title, systemImage: symbol).frame(maxWidth: .infinity, alignment: .leading)
             control()
             if let destination {
                 Button { openSettings(destination) } label: { Image(systemName: "slider.horizontal.3") }

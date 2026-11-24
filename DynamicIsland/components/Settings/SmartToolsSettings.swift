@@ -48,32 +48,22 @@ struct SmartToolsSettings: View {
 
     private var focusSection: some View {
         Section {
-            Defaults.Toggle(key: .enableFocusGuard) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Distraction meter")
-                    Text("During a Pomodoro focus block, the notch glows amber and counts the minutes you spend on these sites and apps.")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-            }
-            .settingsHighlight(id: highlightID("Distraction meter"))
+            SettingsToggle(key: .enableFocusGuard, title: "Distraction meter",
+                           detail: "During a Pomodoro, the notch glows amber and counts minutes on these sites and apps.",
+                           highlightID: highlightID("Distraction meter"))
             if enableFocusGuard {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Sites").font(.caption.weight(.semibold))
-                    TextField("youtube.com, x.com", text: $focusGuardSites, axis: .vertical)
-                        .lineLimit(2...4)
-                    Text("Read from the front tab of Safari, Chrome, Arc, Brave or Edge. macOS asks once to let NotchFlow control each browser.")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Apps (bundle identifiers)").font(.caption.weight(.semibold))
-                    TextField("com.hnc.Discord", text: $focusGuardApps)
+                Group {
+                    TextField("Sites", text: $focusGuardSites, prompt: Text("youtube.com, x.com"), axis: .vertical)
+                        .lineLimit(1...4)
+                    TextField("Apps", text: $focusGuardApps, prompt: Text("com.hnc.Discord"))
                     HStack {
-                        Button("Add the app in front") { addFrontApp() }
-                            .help("Switch to the app within three seconds of clicking.")
-                        Button("Reset sites") { focusGuardSites = FocusGuardPolicy.defaultSites.joined(separator: ", ") }
+                        SettingsRowLabel(title: "Add an app", detail: "Click, then switch to the app within three seconds.")
+                        Spacer()
+                        Button("Reset Sites") { focusGuardSites = FocusGuardPolicy.defaultSites.joined(separator: ", ") }
+                        Button("Add the App in Front") { addFrontApp() }
                     }
-                    .controlSize(.small)
                 }
+                .padding(.leading, 16)
             }
         } header: {
             Text("Focus")
@@ -94,14 +84,9 @@ struct SmartToolsSettings: View {
 
     private var copySection: some View {
         Section {
-            Defaults.Toggle(key: .enableCopyActions) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Copy-to-action")
-                    Text("Copy a tracking number, date, address, flight, e-mail, phone number or sum: the closed notch previews it, and a temporary Copied tab (the one the notch opens on) has Track, Add to Calendar, Directions or the answer. The tab goes away after 30 seconds or once used. Text marked secret by password managers is skipped.")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-            }
-            .settingsHighlight(id: highlightID("Copy-to-action"))
+            SettingsToggle(key: .enableCopyActions, title: "Copy-to-action",
+                           detail: "Copy a date, address, flight or tracking number and the notch offers what to do with it.",
+                           highlightID: highlightID("Copy-to-action"))
         } header: {
             Text("Clipboard")
         }
@@ -130,13 +115,15 @@ struct SmartToolsSettings: View {
                         refreshKeys()
                         aiStatus = savedKeys.contains(aiProvider) ? "Key saved." : nil
                     }
+                    .settingsPrimaryButton()
                     .disabled(aiKey.trimmingCharacters(in: .whitespaces).isEmpty)
                     if savedKeys.contains(aiProvider) {
-                        Button("Remove", role: .destructive) {
+                        Button("Remove") {
                             AIClient.setKey("", for: aiProvider)
                             refreshKeys()
                             aiStatus = nil
                         }
+                        .settingsDestructiveButton()
                     }
                 }
             }
@@ -146,20 +133,25 @@ struct SmartToolsSettings: View {
             TextField("Model", text: $aiModel, prompt: Text(aiProvider.defaultModel.isEmpty ? "model name" : aiProvider.defaultModel))
                 .onChange(of: aiModel) { _, value in AIClient.setModel(value, for: aiProvider) }
             HStack {
-                Button(testingAI ? "Testing…" : "Test") { testAI() }
-                    .disabled(!AIClient.isReady(aiProvider) || testingAI)
-                if let page = aiProvider.keyPage, let url = URL(string: page) {
-                    Button("Get a key") { NSWorkspace.shared.open(url) }
+                if let aiStatus {
+                    SettingsStatus(text: aiStatus, kind: aiStatus.hasPrefix("Works") || aiStatus == "Key saved." ? .ok : .warn)
+                        .lineLimit(3)
+                } else {
+                    SettingsStatus(text: AIClient.isReady(aiProvider) ? "Ready" : "Not set up yet",
+                                   kind: AIClient.isReady(aiProvider) ? .ok : .warn)
                 }
+                Spacer()
                 if aiBaseURL != aiProvider.defaultBaseURL || aiModel != aiProvider.defaultModel, aiProvider != .custom {
-                    Button("Reset address and model") {
+                    Button("Use Defaults") {
                         aiBaseURL = aiProvider.defaultBaseURL
                         aiModel = aiProvider.defaultModel
                     }
                 }
-                if let aiStatus {
-                    Text(aiStatus).font(.caption).foregroundStyle(.secondary).lineLimit(3)
+                if let page = aiProvider.keyPage, let url = URL(string: page) {
+                    Button("Get a Key") { NSWorkspace.shared.open(url) }
                 }
+                Button(testingAI ? "Testing…" : "Test") { testAI() }
+                    .disabled(!AIClient.isReady(aiProvider) || testingAI)
             }
         } header: {
             Text("AI provider")
@@ -169,7 +161,7 @@ struct SmartToolsSettings: View {
     }
 
     private var providerFooter: String {
-        var parts = ["Smart replies and the promise keeper's \u{201C}Understand any language\u{201D} use this. Keys stay in your Keychain, one per provider, so you can switch back and forth."]
+        var parts = ["Used by smart replies and promises in any language. Keys stay in your Keychain."]
         switch aiProvider {
         case .minimax: parts.append("MiniMax in mainland China: https://api.minimaxi.com/v1.")
         case .ollama, .lmStudio: parts.append("Runs on this Mac: nothing leaves it. Start \(aiProvider == .ollama ? "Ollama" : "LM Studio's server") and use a model you've downloaded.")
@@ -212,14 +204,9 @@ struct SmartToolsSettings: View {
 
     private var smartReplySection: some View {
         Section {
-            Defaults.Toggle(key: .enableSmartReplies) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Smart replies")
-                    Text("A sparkles button above WhatsApp and notification replies asks your AI provider for three short replies, in the same language and style as the message (Hinglish stays Hinglish). Only the message you are replying to (and, in WhatsApp, the last few lines) is sent, and only when you tap it.")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-            }
-            .settingsHighlight(id: highlightID("Smart replies"))
+            SettingsToggle(key: .enableSmartReplies, title: "Smart replies",
+                           detail: "Three short replies in the message's own language. Only sent when you tap the sparkles.",
+                           highlightID: highlightID("Smart replies"))
         } header: {
             Text("Replies")
         }
@@ -229,14 +216,12 @@ struct SmartToolsSettings: View {
 
     private var pinsSection: some View {
         Section {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("People pins")
-                Text("Up to five WhatsApp chats as faces in the Shelf corner. Drop a file on a face to send it. Pin a chat with a right-click in the notch's WhatsApp tab.")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
-            .settingsHighlight(id: highlightID("People pins"))
+            SettingsRowLabel(title: "People pins",
+                             detail: "Up to five WhatsApp chats as faces in the Shelf. Drop a file on one to send it.")
+                .settingsHighlight(id: highlightID("People pins"))
             if peoplePins.isEmpty {
-                Text("No one pinned yet.").foregroundStyle(.secondary)
+                Text("No one pinned yet. Right-click a chat in the notch's WhatsApp tab.")
+                    .font(.callout).foregroundStyle(.secondary)
             } else {
                 ForEach(peoplePins, id: \.self) { chatID in
                     HStack {
@@ -244,7 +229,6 @@ struct SmartToolsSettings: View {
                         Text(whatsApp.chat(id: chatID)?.displayName ?? WhatsAppJID.displayNumber(chatID))
                         Spacer()
                         Button("Unpin") { PeoplePins.toggle(chatID) }
-                            .controlSize(.small)
                     }
                 }
             }
@@ -257,14 +241,9 @@ struct SmartToolsSettings: View {
 
     private var buildSection: some View {
         Section {
-            Defaults.Toggle(key: .enableBuildWatcher) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Build watcher")
-                    Text("A spinner in the notch while a GitHub Actions run or a terminal command runs, then green or red when it finishes. Click it to open the run.")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-            }
-            .settingsHighlight(id: highlightID("Build watcher"))
+            SettingsToggle(key: .enableBuildWatcher, title: "Build watcher",
+                           detail: "A spinner while GitHub Actions or a terminal command runs, then green or red.",
+                           highlightID: highlightID("Build watcher"))
             if enableBuildWatcher {
                 HStack {
                     SecureField(hasGitHubToken ? "Token saved in Keychain" : "GitHub token", text: $githubToken)
@@ -274,25 +253,32 @@ struct SmartToolsSettings: View {
                         hasGitHubToken = SecretStore.has(.githubToken)
                         buildWatcher.refreshNow()
                     }
+                    .settingsPrimaryButton()
                     .disabled(githubToken.trimmingCharacters(in: .whitespaces).isEmpty)
                     if hasGitHubToken {
-                        Button("Remove", role: .destructive) {
+                        Button("Remove") {
                             SecretStore.write("", for: .githubToken)
                             hasGitHubToken = false
                             buildWatcher.refreshNow()
                         }
+                        .settingsDestructiveButton()
                     }
                 }
                 HStack(spacing: 4) {
-                    Text("A fine-grained token with Actions: Read on the repositories below.")
+                    Text("A fine-grained token with Actions: Read.")
                         .font(.caption).foregroundStyle(.secondary)
                     Link("Create one", destination: URL(string: "https://github.com/settings/personal-access-tokens/new")!)
                         .font(.caption)
                 }
-                TextField("Repositories (owner/name, comma separated)", text: $repositories)
+                TextField("Repositories", text: $repositories, prompt: Text("owner/name, owner/other"))
                     .onSubmit { buildWatcher.refreshNow() }
                 HStack {
-                    Button(testingGitHub ? "Checking…" : "Check connection") {
+                    if let status = githubStatus ?? buildWatcher.lastError {
+                        SettingsStatus(text: status, kind: status.lowercased().contains("connected") || status.lowercased().hasPrefix("works") ? .ok : .warn)
+                            .lineLimit(2)
+                    }
+                    Spacer()
+                    Button(testingGitHub ? "Checking…" : "Check Connection") {
                         testingGitHub = true
                         Task { @MainActor in
                             githubStatus = await BuildWatchManager.testConnection()
@@ -301,27 +287,18 @@ struct SmartToolsSettings: View {
                         }
                     }
                     .disabled(testingGitHub)
-                    if let status = githubStatus ?? buildWatcher.lastError {
-                        Text(status).font(.caption).foregroundStyle(.secondary).lineLimit(2)
-                    }
                 }
 
-                Defaults.Toggle(key: .buildWatcherTerminalJobs) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Watch terminal commands")
-                        Text("Add this to ~/.zshrc, then run long commands as `nf npm test` or `nf bash Build.command`.")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                }
+                SettingsToggle(key: .buildWatcherTerminalJobs, title: "Watch terminal commands",
+                               detail: "Run long commands as `nf npm test`. Copy the shell function below into ~/.zshrc.")
                 HStack {
                     Text("nf() { … }").font(.system(.caption, design: .monospaced)).foregroundStyle(.secondary)
                     Spacer()
-                    Button(copiedShellFunction ? "Copied" : "Copy shell function") {
+                    Button(copiedShellFunction ? "Copied" : "Copy Shell Function") {
                         NSPasteboard.general.clearContents()
                         NSPasteboard.general.setString(BuildWatchPolicy.shellFunction, forType: .string)
                         copiedShellFunction = true
                     }
-                    .controlSize(.small)
                 }
             }
         } header: {

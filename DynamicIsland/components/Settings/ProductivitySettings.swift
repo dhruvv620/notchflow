@@ -23,6 +23,7 @@ struct ProductivitySettings: View {
     @Default(.enableWorkspaces) private var workspacesEnabled
     @State private var editing: Workspace?
     @State private var confirmClearTime = false
+    @State private var confirmClearPromises = false
 
     // SettingsTab is private to SettingsView.swift; ids follow its "<tab>-<title>" form.
     private func highlightID(_ title: String) -> String { "productivity-\(title)" }
@@ -46,31 +47,29 @@ struct ProductivitySettings: View {
         } message: {
             Text("This deletes every day NotchFlow has tracked. It can't be undone.")
         }
+        .confirmationDialog("Clear every promise?", isPresented: $confirmClearPromises) {
+            Button("Clear Promises", role: .destructive) { keeper.clearAll() }
+        } message: {
+            Text("Open and done promises are deleted. This can't be undone.")
+        }
     }
 
     // MARK: Time tracking
 
     private var timeSection: some View {
         Section {
-            Defaults.Toggle(key: .timeTrackingEnabled) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Track where my time goes")
-                    Text("NotchFlow notes the app in front every few seconds (and the website, for browsers) and adds up your day by category and project. Idle time and a locked screen don't count. Everything stays on this Mac.")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-            }
-            .settingsHighlight(id: highlightID("Track where my time goes"))
+            SettingsToggle(key: .timeTrackingEnabled, title: "Track where my time goes",
+                           detail: "Adds up your day by app, website and project. Idle time doesn't count. Stays on this Mac.",
+                           highlightID: highlightID("Track where my time goes"))
             if trackingEnabled {
-                Defaults.Toggle(key: .timeTrackingSites) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Tell websites apart")
-                        Text("Reads the address of the front browser tab (Safari, Chrome, Arc, Brave, Edge). macOS asks once per browser.")
-                            .font(.caption).foregroundStyle(.secondary)
+                SettingsToggle(key: .timeTrackingSites, title: "Tell websites apart",
+                               detail: "Reads the front browser tab's address. macOS asks once per browser.",
+                               highlightID: highlightID("Tell websites apart"))
+                LabeledContent("Daily work goal") {
+                    Stepper(value: $goalHours, in: 0.5...12, step: 0.5) {
+                        Text("\(goalHours.formatted(.number.precision(.fractionLength(0...1)))) h")
+                            .foregroundStyle(.secondary).monospacedDigit()
                     }
-                }
-                .settingsHighlight(id: highlightID("Tell websites apart"))
-                Stepper(value: $goalHours, in: 0.5...12, step: 0.5) {
-                    Text("Daily work goal: \(goalHours.formatted(.number.precision(.fractionLength(0...1)))) hours")
                 }
                 .settingsHighlight(id: highlightID("Daily work goal"))
                 DisclosureGroup("Counts as work: \(workSummary)") {
@@ -84,20 +83,20 @@ struct ProductivitySettings: View {
                             }))
                     }
                 }
-                Defaults.Toggle(key: .timeTrackingShowRing) { Text("Show the work ring under the closed notch") }
-                    .settingsHighlight(id: highlightID("Show the work ring under the closed notch"))
-                Defaults.Toggle(key: .timeTrackingWeeklyReport) { Text("Weekly report on Friday afternoon") }
-                    .settingsHighlight(id: highlightID("Weekly report on Friday afternoon"))
+                SettingsToggle(key: .timeTrackingShowRing, title: "Show the work ring under the closed notch", detail: "How close you are to today's goal.", highlightID: highlightID("Show the work ring under the closed notch"))
+                SettingsToggle(key: .timeTrackingWeeklyReport, title: "Weekly report on Friday afternoon", detail: "Where your week went, as one notification.", highlightID: highlightID("Weekly report on Friday afternoon"))
                 VStack(alignment: .leading, spacing: 4) {
-                    TextField("Project names", text: $extraProjects, prompt: Text("acme-site, thesis, client-x"))
-                    Text("Projects are found in window titles of editors, terminals and Xcode, and from your AI agent sessions. Add other names here, comma separated, to recognize them anywhere (a Figma file, a Google Doc).")
+                    TextField("More projects", text: $extraProjects, prompt: Text("acme-site, thesis, client-x"))
+                    Text("Projects are found by themselves. Add other names, comma separated, to spot them anywhere.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 .settingsHighlight(id: highlightID("Project names"))
                 HStack {
-                    Button("Export hours (CSV)…") { tracker.exportCSV() }
+                    SettingsRowLabel(title: "Your hours")
                     Spacer()
-                    Button("Erase tracked time…", role: .destructive) { confirmClearTime = true }
+                    Button("Export CSV…") { tracker.exportCSV() }
+                    Button("Erase…") { confirmClearTime = true }
+                        .settingsDestructiveButton()
                 }
             }
         } header: {
@@ -114,48 +113,27 @@ struct ProductivitySettings: View {
 
     private var promiseSection: some View {
         Section {
-            Defaults.Toggle(key: .enablePromiseKeeper) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Keep track of promises")
-                    Text("When you write \u{201C}I'll send it tonight\u{201D} in WhatsApp or in a reply from the notch, NotchFlow adds it to Promises in the Todos tab and reminds you before it's due. A plan you say yes to (\u{201C}lunch tomorrow at 1?\u{201D} \u{2192} \u{201C}pakka\u{201D}) is kept too. English is understood on this Mac; for other languages, see below.")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-            }
-            .settingsHighlight(id: highlightID("Keep track of promises"))
+            SettingsToggle(key: .enablePromiseKeeper, title: "Keep track of promises",
+                           detail: "“I'll send it tonight” becomes a reminder in Todos before it's due.",
+                           highlightID: highlightID("Keep track of promises"))
             if promisesEnabled {
-                Defaults.Toggle(key: .promiseTrackTheirs) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Also track what others promise me")
-                        Text("\u{201C}I'll send the invoice Monday\u{201D} becomes \u{201C}waiting on\u{201D}, with a polite reminder ready if it doesn't come.")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
+                SettingsToggle(key: .promiseTrackTheirs, title: "Also track what others promise me",
+                               detail: "“I'll send the invoice Monday” becomes “waiting on”.",
+                               highlightID: highlightID("Also track what others promise me"))
+                SettingsToggle(key: .promiseReadMessagesHistory, title: "See what I send in Messages",
+                               detail: "Plans you agree to in iMessage are kept too. Needs Full Disk Access.",
+                               highlightID: highlightID("See what I send in Messages"))
+                if let status = keeper.messagesHistoryStatus {
+                    SettingsStatus(text: status, kind: .warn).padding(.leading, 16)
                 }
-                .settingsHighlight(id: highlightID("Also track what others promise me"))
-                Defaults.Toggle(key: .promiseReadMessagesHistory) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("See what I send in Messages")
-                        Text("Reads new iMessages and texts you send (from the Messages app or your iPhone) with the message you answered, so a plan you said yes to (\u{201C}coffee Friday 5 pm?\u{201D} \u{2192} \u{201C}okay bhai\u{201D}) is kept as \u{201C}Coffee with Rahul \u{00B7} Fri 5:00 PM\u{201D}. Needs Full Disk Access; only messages from now on, read on this Mac.")
-                            .font(.caption).foregroundStyle(.secondary)
-                        if let status = keeper.messagesHistoryStatus {
-                            Text(status).font(.caption).foregroundStyle(SettingsPalette.warn)
-                        }
-                    }
+                SettingsToggle(key: .promiseUseAI, title: "Understand any language",
+                               detail: "Hindi, Gujarati, Hinglish and more, using your AI provider. Only likely promises are sent.",
+                               highlightID: highlightID("Understand any language"))
+                if useAI && !AIClient.isReady() {
+                    SettingsStatus(text: "Set up an AI provider in Smart Tools first.", kind: .warn).padding(.leading, 16)
+                } else if useAI, let status = keeper.aiStatus {
+                    SettingsStatus(text: status, kind: .warn).padding(.leading, 16)
                 }
-                .settingsHighlight(id: highlightID("See what I send in Messages"))
-                Defaults.Toggle(key: .promiseUseAI) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Understand any language")
-                        Text("Also finds promises in Hindi, Gujarati, Marathi and mixes like Hinglish (\u{201C}kal shaam tak bhej dunga\u{201D}, \u{201C}hu kale moklish\u{201D}, \u{201C}मी उद्या पाठवतो\u{201D}), using your AI provider from Settings \u{203A} Smart Tools. Only messages with a word that hints at a promise or a time are sent, a few at a time, at most 300 a day; \u{201C}ok\u{201D}, \u{201C}haha\u{201D} and the like never leave this Mac. Ollama or LM Studio keeps everything on this Mac.")
-                            .font(.caption).foregroundStyle(.secondary)
-                        if useAI && !AIClient.isReady() {
-                            Text("Set up an AI provider in Settings \u{203A} Smart Tools first.")
-                                .font(.caption).foregroundStyle(SettingsPalette.warn)
-                        } else if useAI, let status = keeper.aiStatus {
-                            Text(status).font(.caption).foregroundStyle(SettingsPalette.warn)
-                        }
-                    }
-                }
-                .settingsHighlight(id: highlightID("Understand any language"))
                 Picker("Remind me", selection: $nudgeMinutes) {
                     Text("15 minutes before").tag(15)
                     Text("30 minutes before").tag(30)
@@ -165,10 +143,10 @@ struct ProductivitySettings: View {
                 }
                 .settingsHighlight(id: highlightID("Remind me"))
                 HStack {
-                    Text("\(keeper.open.count) open")
-                        .foregroundStyle(.secondary)
+                    SettingsRowLabel(title: "Clear all promises", detail: "\(keeper.open.count) open now.")
                     Spacer()
-                    Button("Clear all promises", role: .destructive) { keeper.clearAll() }
+                    Button("Clear…") { confirmClearPromises = true }
+                        .settingsDestructiveButton()
                         .disabled(keeper.promises.isEmpty)
                 }
             }
@@ -181,29 +159,21 @@ struct ProductivitySettings: View {
 
     private var stashSection: some View {
         Section {
-            Defaults.Toggle(key: .enableWindowStash) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Window stash")
-                    Text("A parking spot in the Flow tab for windows you need later but not now. Stash all others parks every window except the app in front; click one to bring it back exactly where it was.")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
+            SettingsToggle(key: .enableWindowStash, title: "Window stash",
+                           detail: "A parking spot in the Flow tab for windows you need later.",
+                           highlightID: highlightID("Window stash"))
+            SettingsToggle(key: .windowStashByDragging, title: "Drag windows into the notch to stash them",
+                           detail: "Drag a window by its title bar up into the notch.",
+                           highlightID: highlightID("Drag windows into the notch to stash them"))
+            LabeledContent("Stash the front window") {
+                KeyboardShortcuts.Recorder(for: .stashFrontWindow)
             }
-            .settingsHighlight(id: highlightID("Window stash"))
-            Defaults.Toggle(key: .windowStashByDragging) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Drag windows into the notch to stash them")
-                    Text("Drag a window by its title bar up past the top of the screen, into the notch. The notch shows \u{201C}Stash \u{00B7} drop here\u{201D} as you get close and \u{201C}Let go to stash\u{201D} when you're on the spot (the trackpad taps too).")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-            }
-            .settingsHighlight(id: highlightID("Drag windows into the notch to stash them"))
-            KeyboardShortcuts.Recorder("Stash the front window:", name: .stashFrontWindow)
             HStack {
-                Text(previewsAllowed ? "Window previews are on." : "Previews need Screen Recording; until then, app icons stand in.")
-                    .font(.caption).foregroundStyle(.secondary)
+                SettingsStatus(text: previewsAllowed ? "Window previews are on." : "Previews need Screen Recording. App icons stand in until then.",
+                               kind: previewsAllowed ? .ok : .neutral)
                 Spacer()
                 if !previewsAllowed {
-                    Button("Show previews") {
+                    Button("Allow Previews") {
                         _ = CGRequestScreenCaptureAccess()
                         previewsAllowed = CGPreflightScreenCaptureAccess()
                     }
@@ -212,7 +182,7 @@ struct ProductivitySettings: View {
         } header: {
             Text("Window stash")
         } footer: {
-            Text("Needs Accessibility. Stashed windows are minimized; bringing one back from the Dock removes it from the stash.")
+            Text("Needs Accessibility. Stashed windows are minimized.")
         }
     }
 
@@ -220,14 +190,9 @@ struct ProductivitySettings: View {
 
     private var workspaceSection: some View {
         Section {
-            Defaults.Toggle(key: .enableWorkspaces) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Workspaces")
-                    Text("Arrange your windows, then Save current in the Flow tab: one tap later puts every window back where it was and as big as it was, opening the apps (or windows) that are closed. Setups can also turn on Focus, music and a Pomodoro. Done for the day closes the apps again.")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-            }
-            .settingsHighlight(id: highlightID("Workspaces"))
+            SettingsToggle(key: .enableWorkspaces, title: "Workspaces",
+                           detail: "Save your windows and apps, then bring them all back in one tap from the Flow tab.",
+                           highlightID: highlightID("Workspaces"))
             if workspacesEnabled {
                 ForEach(workspaces.workspaces) { workspace in
                     HStack(spacing: 10) {
@@ -242,38 +207,30 @@ struct ProductivitySettings: View {
                         Button("Update") { Task { await workspaces.updateFromCurrent(workspace.id) } }
                             .help("Replace this setup with the apps, window positions and sizes, and browser tabs open now.")
                         Button("Edit") { editing = workspace }
-                        Button(role: .destructive) { workspaces.delete(workspace.id) } label: { Image(systemName: "trash") }
+                        Button { workspaces.delete(workspace.id) } label: { Image(systemName: "trash") }
                             .buttonStyle(.borderless)
+                            .foregroundStyle(SettingsPalette.danger)
+                            .help("Delete this workspace")
                     }
                 }
                 HStack {
-                    Button("New workspace") { editing = Workspace(name: "Work") }
-                    Button("Save what's open now") {
+                    Button("New Workspace") { editing = Workspace(name: "Work") }
+                    Button("Save What's Open Now") {
                         Task { editing = await workspaces.captureCurrentSetup(named: "Setup \(workspaces.workspaces.count + 1)") }
                     }
                     Spacer()
                 }
-                Defaults.Toggle(key: .workspaceSuggestions) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Suggest workspaces")
-                        Text("When you open the same apps together on several days, the Flow tab offers to save them.")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-                .settingsHighlight(id: highlightID("Suggest workspaces"))
-                Defaults.Toggle(key: .workspaceDoneQuitsApps) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Done for the day quits workspace apps")
-                        Text("Only apps a workspace opened today; apps still ask to save your work.")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-                .settingsHighlight(id: highlightID("Done for the day quits workspace apps"))
+                SettingsToggle(key: .workspaceSuggestions, title: "Suggest workspaces",
+                               detail: "When you open the same apps together often, Flow offers to save them.",
+                               highlightID: highlightID("Suggest workspaces"))
+                SettingsToggle(key: .workspaceDoneQuitsApps, title: "Done for the day quits workspace apps",
+                               detail: "Only apps a workspace opened today. They still ask to save.",
+                               highlightID: highlightID("Done for the day quits workspace apps"))
             }
         } header: {
             Text("Workspaces")
         } footer: {
-            Text("Saving and restoring window positions needs Accessibility, and Focus uses the two Shortcuts set up under Settings > Timers > Also silence macOS (Focus).")
+            Text("Putting windows back needs Accessibility. Focus uses the two shortcuts from Timers › Also silence macOS.")
         }
     }
 }

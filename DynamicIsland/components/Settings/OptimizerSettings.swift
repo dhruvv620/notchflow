@@ -24,17 +24,17 @@ struct OptimizerSettings: View {
 
     private let items: [Item] = [
         Item(id: "optimizer-Batch and slow the timers", key: .optimizeBatchTimers, title: "Batch and slow the timers",
-             detail: "Background checks (clipboard, meetings, notifications, time tracking, build jobs) run less often, and macOS may line their wake-ups up. The meeting countdown still ticks every second when a meeting is near."),
+             detail: "Background checks run less often and wake the Mac together."),
         Item(id: "optimizer-React to events instead of polling", key: .optimizeUseEvents, title: "React to events instead of polling",
-             detail: "An open agent conversation updates when its file changes instead of being re-read every second; hover detection rests while the mouse is still; time tracking asks the browser for its address only when the tab changes."),
+             detail: "Things update when they change, instead of being checked every second."),
         Item(id: "optimizer-Pause when nobody's looking", key: .optimizePauseWhenIdle, title: "Pause when nobody's looking",
-             detail: "While the screen is locked, the displays sleep or another user is active, background checks stop completely."),
+             detail: "Background checks stop while the screen is locked or asleep."),
         Item(id: "optimizer-Save battery on battery power", key: .optimizeLowPower, title: "Save battery on battery power",
-             detail: "On battery or in Low Power Mode: lyrics animate at 10 frames a second instead of 30, the live audio visualizer turns off, and background checks run half as often."),
+             detail: "Slower lyrics animation, no live visualizer, fewer checks."),
         Item(id: "optimizer-Calm endless animations", key: .optimizeCalmAnimations, title: "Calm endless animations",
-             detail: "Pulses (an agent waiting, the distraction meter, recording and privacy dots) pulse five times and then stay still; on battery saver or when idle they don't pulse. Loading spinners keep turning."),
+             detail: "Pulsing dots pulse five times, then stay still."),
         Item(id: "optimizer-Keep memory in check", key: .optimizeBoundMemory, title: "Keep memory in check",
-             detail: "Reads the last 1 MB of long agent conversations (instead of 4 MB) and keeps 150 messages, and clears cached web responses when the Mac goes idle."),
+             detail: "Reads less of long agent chats and clears web caches when idle."),
     ]
 
     var body: some View {
@@ -47,33 +47,27 @@ struct OptimizerSettings: View {
                         stat("Timer wake-ups", String(format: "~%.1f / s",
                                                       EnergyPolicy.estimatedWakeUps(switches: energy.switches, conditions: energy.conditions)))
                     }
-                    Text(conditionsText)
-                        .font(.caption).foregroundStyle(.secondary)
+                    SettingsStatus(text: conditionsText, kind: energy.conditions.saving ? .ok : .neutral)
                 }
                 .padding(.vertical, 4)
-                HStack {
-                    Button("Turn all on") { setAll(true) }
-                    Button("Turn all off") { setAll(false) }
-                    Spacer()
-                }
             } header: {
-                Text("NotchFlow right now")
-            } footer: {
-                Text("Each switch takes effect immediately. For a fuller before-and-after comparison, run tools/energy-report.sh in the NotchFlow folder.")
+                Text("Right now")
             }
 
             Section {
                 ForEach(items, id: \.title) { item in
-                    Defaults.Toggle(key: item.key) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(item.title)
-                            Text(item.detail).font(.caption).foregroundStyle(.secondary)
-                        }
-                    }
-                    .settingsHighlight(id: item.id)
+                    SettingsToggle(key: item.key, title: item.title, detail: item.detail, highlightID: item.id)
+                }
+                HStack {
+                    Spacer()
+                    Button("Turn All Off") { setAll(false) }
+                    Button("Turn All On") { setAll(true) }
+                        .settingsPrimaryButton()
                 }
             } header: {
-                Text("Optimizations")
+                Text("Ways to save")
+            } footer: {
+                Text("Each one works at once. For a before-and-after report, run tools/energy-report.sh in the NotchFlow folder.")
             }
         }
         .onReceive(ticker) { _ in sample() }
@@ -91,8 +85,8 @@ struct OptimizerSettings: View {
         let conditions = energy.conditions
         var parts = [conditions.onBattery ? "On battery" : "On power adapter"]
         if conditions.lowPowerMode { parts.append("Low Power Mode on") }
-        if conditions.idle { parts.append("Mac idle (background work paused)") }
-        if energy.switches.lowPowerAdapt && conditions.saving { parts.append("battery saver active") }
+        if conditions.idle { parts.append("Mac idle, background work paused") }
+        if energy.switches.lowPowerAdapt && conditions.saving { parts.append("saving battery") }
         return parts.joined(separator: " · ")
     }
 
