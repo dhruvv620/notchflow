@@ -404,23 +404,26 @@ struct SettingsView: View {
                 .padding(.horizontal, 12)
                 .padding(.top, 12)
 
-                List(selection: sidebarSelection) {
-                    ForEach(groupedFilteredTabs, id: \.group) { section in
-                        Section {
-                            ForEach(section.tabs) { tab in
-                                sidebarRow(for: tab)
-                                    .tag(Optional(tab))
-                            }
-                        } header: {
+                // Plain buttons, not List selection: a click always opens the page.
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 2) {
+                        ForEach(groupedFilteredTabs, id: \.group) { section in
                             if let title = section.group.title {
                                 Text(title)
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.secondary)
+                                    .padding(.horizontal, 10)
+                                    .padding(.top, 12)
+                                    .padding(.bottom, 4)
+                            }
+                            ForEach(section.tabs) { tab in
+                                sidebarButton(for: tab)
                             }
                         }
                     }
+                    .padding(.horizontal, 10)
+                    .padding(.bottom, 10)
                 }
-                .listStyle(.sidebar)
-                .scrollContentBackground(.hidden)
-                .environment(\.defaultMinListRowHeight, 40)
 
                 VStack(spacing: 0) {
                     Divider()
@@ -442,13 +445,6 @@ struct SettingsView: View {
         // One accent and one background for every page.
         .tint(SettingsPalette.accent)
         .frame(minWidth: 760, idealWidth: 860, maxWidth: .infinity, minHeight: 560, idealHeight: 680, maxHeight: .infinity)
-        .onChange(of: searchText) { _, newValue in
-            let matches = tabsMatchingSearch(newValue)
-            guard let firstMatch = matches.first else { return }
-            if !matches.contains(resolvedSelection) {
-                selectedTab = firstMatch
-            }
-        }
     }
 
     private var resolvedSelection: SettingsTab {
@@ -459,13 +455,23 @@ struct SettingsView: View {
         tabsMatchingSearch(searchText)
     }
 
-    private var sidebarSelection: Binding<SettingsTab?> {
-        Binding(
-            get: { resolvedSelection },
-            set: { newValue in
-                if let newValue { selectedTab = newValue }
-            }
-        )
+    private func sidebarButton(for tab: SettingsTab) -> some View {
+        let isSelected = tab == resolvedSelection
+        return Button {
+            selectedTab = tab
+        } label: {
+            sidebarRow(for: tab)
+                .foregroundStyle(isSelected ? Color.white : Color.primary)
+                .padding(.horizontal, 8)
+                .frame(maxWidth: .infinity, minHeight: 36, alignment: .leading)
+                .background(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(isSelected ? SettingsPalette.accent : Color.clear)
+                )
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     @ViewBuilder

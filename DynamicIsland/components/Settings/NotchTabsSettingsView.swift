@@ -3,11 +3,15 @@
 
 import Defaults
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct NotchTabsSettingsView: View {
     let openSettings: (String) -> Void
     @ObservedObject private var preferences = NotchTabPreferences.shared
     @Default(.enableMinimalisticUI) private var minimalistic
+    @Default(.notchTabOrder) private var tabOrder
+    /// The tab being dragged in the list, if any.
+    @State private var draggingID: String?
     private var descriptors: [TabModel] {
         let all = preferences.orderedBuiltins.map { TabModel(label: $0.title, icon: $0.symbol, view: $0.view) }
         let ids = NotchTabOrderPolicy.normalizedOrder(Defaults[.notchTabOrder], known: all.map(\.id))
@@ -27,10 +31,20 @@ struct NotchTabsSettingsView: View {
                 }
             }
             Section {
-                ForEach(descriptors) { tab in tabRow(tab) }
-                    .onMove { offsets, destination in
-                        preferences.moveRows(from: offsets, to: destination, displayedIDs: descriptors.map(\.id))
-                    }
+                ForEach(descriptors) { tab in
+                    tabRow(tab)
+                        .opacity(draggingID == tab.id ? 0.4 : 1)
+                        .onDrag {
+                            draggingID = tab.id
+                            return NSItemProvider(object: tab.id as NSString)
+                        }
+                        .onDrop(of: [UTType.text], delegate: TabRowDropDelegate(
+                            target: tab.id,
+                            dragging: $draggingID,
+                            ids: descriptors.map(\.id),
+                            preferences: preferences
+                        ))
+                }
                 HStack {
                     Spacer()
                     Button("Reset Order") { preferences.reset() }
@@ -38,11 +52,16 @@ struct NotchTabsSettingsView: View {
             } header: {
                 Text("Tabs, in order")
             } footer: {
-                Text("Drag or use the arrows to reorder. Hiding a tab only removes its icon; the feature keeps running.")
+                Text("Drag a row by its handle (or use the arrows) to change the order. Hiding a tab only removes its icon; the feature keeps running.")
             }
             .settingsHighlight(id: "tabsAndFeatures-Tab visibility and order")
 
             featureControls
+        }
+        // A drop anywhere else on the page ends the drag, so no row stays faded.
+        .onDrop(of: [UTType.text], isTargeted: nil) { _ in
+            draggingID = nil
+            return false
         }
     }
 
@@ -51,6 +70,9 @@ struct NotchTabsSettingsView: View {
         let ids = descriptors.map(\.id)
         let index = ids.firstIndex(of: tab.id) ?? 0
         return HStack(spacing: 10) {
+            Image(systemName: "line.3.horizontal")
+                .foregroundStyle(.secondary)
+                .help("Drag to reorder")
             Image(systemName: tab.icon).frame(width: 20).foregroundStyle(available ? Color.accentColor : Color.secondary)
             SettingsRowLabel(title: tab.label, detail: available ? nil : "Its feature is off. Turn it on below.")
             Spacer()
@@ -150,4 +172,30 @@ struct NotchTabsSettingsView: View {
             }
         }
     }
+}
+
+/// Moves the dragged tab into place as it passes over each row.
+private struct TabRowDropDelegate: DropDelegate {
+    let target: String
+    @Binding var dragging: String?
+    let ids: [String]
+    let preferences: NotchTabPreferences
+
+    func dropEntered(info: DropInfo) {
+        guard let source = dragging, source != target else { return }
+        withAnimation(.easeInOut(duration: 0.15)) {
+            preferences.move(source, over: target, knownIDs: ids)
+        }
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        DropProposal(operation: .move)
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        dragging = nil
+        return true
+    }
+
+    func dropExited(info: DropInfo) {}
 }
