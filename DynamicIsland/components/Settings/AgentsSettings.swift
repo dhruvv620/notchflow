@@ -42,6 +42,7 @@ struct AgentsSettings: View {
             }
 
             if enabled {
+                AgentToolsSettingsSection()
                 agentsSection
                 approvalsSection
                 newTaskSection

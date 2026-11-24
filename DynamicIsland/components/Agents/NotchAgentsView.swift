@@ -16,37 +16,16 @@ struct NotchAgentsView: View {
     @Default(.agentPanelSize) private var panelSizeValue
     private var panelSize: AgentPanelSize { AgentPanelSize(rawValue: panelSizeValue) ?? .regular }
 
+    @Default(.agentTabFilter) private var filter
+    private var filterKind: AgentKind? { AgentKind(rawValue: filter) }
+
     var body: some View {
-        Group {
-            if let request = hub.requests.first {
-                VStack(alignment: .leading, spacing: NotchTokens.Spacing.m) {
-                    AgentRequestCard(request: request)
-                    if hub.requests.count > 1 {
-                        Text("\(hub.requests.count - 1) more waiting")
-                            .font(NotchTokens.Typography.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
+        VStack(alignment: .leading, spacing: NotchTokens.Spacing.s) {
+            AgentFilterBar(filter: $filter, composing: $composing)
+            if let kind = filterKind {
+                agentView(kind)
             } else {
-                HStack(alignment: .top, spacing: NotchTokens.Spacing.m) {
-                    AgentSessionList(composing: $composing, panelSizeValue: $panelSizeValue)
-                        .frame(width: panelSize.listWidth)
-                    Rectangle().fill(Color.white.opacity(0.08)).frame(width: 1)
-                    Group {
-                        if composing {
-                            AgentTaskComposer { withAnimation(NotchTokens.Motion.standard) { composing = false } }
-                        } else if let selected = conversations.selected {
-                            AgentChatView(summary: selected, textScale: panelSize.textScale)
-                        } else {
-                            NotchEmptyState(symbol: "sparkles",
-                                            title: hub.sessions.isEmpty && conversations.recent.isEmpty ? "No sessions yet" : "Pick a session",
-                                            detail: AgentSetup.anyAgentConnected
-                                                ? "Pick one on the left to see its conversation and keep it going, or start a New task."
-                                                : "Connect Claude Code or Codex in Settings > AI Agents, then start a New task here.")
-                        }
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                }
+                AgentBoard { session in open(session) }
             }
         }
         .notchTabPadding()
@@ -61,6 +40,62 @@ struct NotchAgentsView: View {
         .onDisappear {
             conversations.stopFollowing()
             vm.setAutoCloseSuppression(false, token: interactionToken)
+        }
+    }
+
+    /// One agent's tab: its approvals first, else its sessions beside the open one.
+    @ViewBuilder private func agentView(_ kind: AgentKind) -> some View {
+        if let request = hub.requests.first(where: { $0.agent == kind }) {
+            VStack(alignment: .leading, spacing: NotchTokens.Spacing.m) {
+                AgentRequestCard(request: request)
+                let more = hub.requests.filter { $0.agent == kind }.count - 1
+                if more > 0 {
+                    Text("\(more) more waiting").font(NotchTokens.Typography.caption).foregroundStyle(.secondary)
+                }
+            }
+        } else {
+            HStack(alignment: .top, spacing: NotchTokens.Spacing.m) {
+                AgentSessionList(composing: $composing, panelSizeValue: $panelSizeValue, kind: kind)
+                    .frame(width: panelSize.listWidth)
+                Rectangle().fill(Color.white.opacity(0.08)).frame(width: 1)
+                Group {
+                    if composing {
+                        AgentTaskComposer { withAnimation(NotchTokens.Motion.standard) { composing = false } }
+                    } else if let selected = conversations.selected, kind.readsTranscripts,
+                              selected.agent == (kind == .codex ? .codex : .claude) {
+                        AgentChatView(summary: selected, textScale: panelSize.textScale)
+                    } else if !kind.readsTranscripts {
+                        // Gemini CLI and Cursor: their sessions as cards; the chat lives in their window.
+                        let live = hub.sessions.filter { $0.agent == kind }
+                        if live.isEmpty {
+                            NotchEmptyState(symbol: kind.symbol, title: "No \(kind.displayName) sessions",
+                                            detail: "Start one with its icon above. Its approvals and status show here; the conversation stays in its window.")
+                        } else {
+                            ScrollView(.vertical, showsIndicators: false) {
+                                LazyVGrid(columns: [GridItem(.adaptive(minimum: 220), spacing: 8)], spacing: 8) {
+                                    ForEach(live) { session in AgentWorkCard(session: session) { open(session) } }
+                                }
+                            }
+                        }
+                    } else {
+                        NotchEmptyState(symbol: kind.symbol,
+                                        title: hub.sessions.contains { $0.agent == kind } ? "Pick a session" : "No \(kind.displayName) sessions yet",
+                                        detail: "Pick one on the left to see its conversation and keep it going, or start a New task.")
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            }
+        }
+    }
+
+    /// Opens a session: its conversation for Claude Code and Codex, else its window.
+    private func open(_ session: AgentSession) {
+        if session.agent.readsTranscripts {
+            filter = session.agent.rawValue
+            composing = false
+            conversations.select(sessionID: session.id)
+        } else {
+            hub.openWindow(bundleID: session.appBundleID)
         }
     }
 
@@ -285,22 +320,38 @@ private struct AgentButton: View {
 private struct AgentSessionList: View {
     @Binding var composing: Bool
     @Binding var panelSizeValue: Int
+    /// Only this agent's sessions (nil: all).
+    var kind: AgentKind? = nil
     private var panelSize: AgentPanelSize { AgentPanelSize(rawValue: panelSizeValue) ?? .regular }
     @ObservedObject private var hub = AgentHub.shared
     @ObservedObject private var conversations = AgentConversations.shared
 
+    private var liveSessions: [AgentSession] {
+        guard let kind else { return hub.sessions }
+        return hub.sessions.filter { $0.agent == kind }
+    }
+
     private var recentOnly: [AgentSessionSummary] {
         let live = Set(hub.sessions.map(\.id))
-        return conversations.recent.filter { !live.contains($0.id) }
+        return conversations.recent.filter { summary in
+            guard !live.contains(summary.id) else { return false }
+            switch kind {
+            case nil: return true
+            case .claudeCode?: return summary.agent == .claude
+            case .codex?: return summary.agent == .codex
+            default: return false
+            }
+        }
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: NotchTokens.Spacing.s) {
             HStack(spacing: NotchTokens.Spacing.s) {
-                Text("AI Agents").font(NotchTokens.Typography.title)
+                Text(kind?.displayName ?? "AI Agents").font(NotchTokens.Typography.title).lineLimit(1)
                 Spacer(minLength: 0)
                 sizeMenu
                 NotchPillButton(title: "New", symbol: "plus", prominent: !composing) {
+                    if let launch = kind?.launchAgent { Defaults[.agentLaunchAgent] = launch.rawValue }
                     withAnimation(NotchTokens.Motion.standard) { composing.toggle() }
                 }
             }
@@ -310,9 +361,9 @@ private struct AgentSessionList: View {
                         AgentListRow(symbol: "sparkle", title: "Starting…", subtitle: "New session", tint: .white,
                                      busy: true, selected: false) {}
                     }
-                    if !hub.sessions.isEmpty {
+                    if !liveSessions.isEmpty {
                         NotchSectionHeader(title: "Live")
-                        ForEach(hub.sessions) { session in
+                        ForEach(liveSessions) { session in
                             AgentListRow(symbol: session.agent.symbol, title: session.project, subtitle: liveSubtitle(session),
                                          tint: tint(session.state), busy: session.isWorking || conversations.isRunning(session.id),
                                          selected: conversations.selected?.id == session.id) {
@@ -337,8 +388,10 @@ private struct AgentSessionList: View {
                             }
                         }
                     }
-                    if hub.sessions.isEmpty && recentOnly.isEmpty && !conversations.startingNewSession {
-                        Text("Claude Code and Codex sessions from the last two weeks appear here.")
+                    if liveSessions.isEmpty && recentOnly.isEmpty && !conversations.startingNewSession {
+                        Text(kind == nil || kind?.readsTranscripts == true
+                             ? "Sessions from the last two weeks appear here."
+                             : "Running sessions appear here.")
                             .font(NotchTokens.Typography.caption)
                             .foregroundStyle(.secondary)
                             .padding(.top, NotchTokens.Spacing.s)
@@ -657,20 +710,39 @@ struct AgentLiveActivity: View {
                     .lineLimit(1)
             }
         } else if let working = hub.workingSessions.first {
+            let all = hub.workingSessions
             ClosedNotchWings(isHovering: isHovering) {
-                ProgressView().controlSize(.mini).tint(.white).frame(width: 12, height: 12)
-                Text(working.project)
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.85))
-                    .lineLimit(1)
+                if all.count > 1 {
+                    // One dot per running agent, in its colour.
+                    HStack(spacing: 3) {
+                        ForEach(all.prefix(6)) { session in
+                            Circle().fill(session.agent.tint).frame(width: 7, height: 7)
+                                .opacity(pulse ? 1 : 0.55)
+                        }
+                    }
+                    .onAppear { withAnimation(EnergyState.repeating(.easeInOut(duration: 1.2))) { pulse = true } }
+                } else {
+                    ProgressView().controlSize(.mini).tint(working.agent.tint).frame(width: 12, height: 12)
+                    Text(working.project)
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.85))
+                        .lineLimit(1)
+                }
             } trailing: {
-                if case .working(let activity) = working.state {
-                    Text(hub.workingSessions.count > 1 ? "\(hub.workingSessions.count) agents" : activity)
+                if all.count > 1 {
+                    Text("\(all.count) working")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.7))
+                        .lineLimit(1)
+                } else if case .working(let activity) = working.state {
+                    Text(activity)
                         .font(.system(size: 10, weight: .medium))
                         .foregroundStyle(.white.opacity(0.65))
                         .lineLimit(1)
                 }
             }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(all.count > 1 ? "\(all.count) agents working" : "\(working.agent.displayName) working in \(working.project)")
         }
     }
 
@@ -801,5 +873,352 @@ private struct AgentTaskComposer: View {
             directory = url.path
             hub.rememberProject(url.path)
         }
+    }
+}
+
+// MARK: - Agents as a team
+
+extension AgentKind {
+    /// The agent's colour, the same everywhere (tabs, cards, closed-notch dots).
+    var tint: Color {
+        switch self {
+        case .claudeCode: return Color(red: 0.88, green: 0.54, blue: 0.37)
+        case .codex: return Color(red: 0.25, green: 0.75, blue: 0.61)
+        case .gemini: return Color(red: 0.44, green: 0.61, blue: 1.0)
+        case .cursor: return Color(red: 0.71, green: 0.55, blue: 1.0)
+        case .script: return Color(white: 0.75)
+        }
+    }
+
+    var monogram: String {
+        switch self {
+        case .claudeCode: return "C"
+        case .codex: return "X"
+        case .gemini: return "G"
+        case .cursor: return "U"
+        case .script: return "S"
+        }
+    }
+
+    var shortName: String {
+        switch self {
+        case .claudeCode: return "Claude"
+        case .gemini: return "Gemini"
+        default: return displayName
+        }
+    }
+
+    /// Claude Code and Codex keep session files NotchFlow can read and continue.
+    var readsTranscripts: Bool { self == .claudeCode || self == .codex }
+
+    var launchAgent: AgentHookPolicy.LaunchAgent? {
+        switch self {
+        case .claudeCode: return .claude
+        case .codex: return .codex
+        case .gemini: return .gemini
+        case .cursor: return .cursor
+        case .script: return nil
+        }
+    }
+
+    static let teamOrder: [AgentKind] = [.claudeCode, .codex, .gemini, .cursor]
+}
+
+private func agentColor(hex: String) -> Color {
+    var value: UInt64 = 0
+    Scanner(string: hex.trimmingCharacters(in: CharacterSet(charactersIn: "#"))).scanHexInt64(&value)
+    return Color(red: Double((value >> 16) & 0xFF) / 255, green: Double((value >> 8) & 0xFF) / 255, blue: Double(value & 0xFF) / 255)
+}
+
+/// All · Claude · Codex · Gemini · Cursor, then the Start icons.
+private struct AgentFilterBar: View {
+    @Binding var filter: String
+    @Binding var composing: Bool
+    @ObservedObject private var hub = AgentHub.shared
+    @ObservedObject private var tools = AgentTools.shared
+    @ObservedObject private var jobs = OrbitJobs.shared
+    @Default(.agentToolsShown) private var shownIDs
+
+    var body: some View {
+        HStack(spacing: 6) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 5) {
+                    tab(title: "All", kind: nil, count: hub.sessions.count + reviewCount,
+                        needsYou: !hub.requests.isEmpty || !hub.waitingInWindowSessions.isEmpty)
+                    ForEach(AgentKind.teamOrder, id: \.self) { kind in
+                        tab(title: kind.shortName, kind: kind, count: hub.sessions.filter { $0.agent == kind }.count,
+                            needsYou: hub.requests.contains { $0.agent == kind } || hub.sessions.contains { $0.agent == kind && $0.isWaiting })
+                    }
+                }
+            }
+            Spacer(minLength: 4)
+            HStack(spacing: 4) {
+                ForEach(tools.shown) { tool in AgentStartButton(tool: tool) }
+                Button {
+                    SettingsWindowController.shared.showWindow()
+                } label: {
+                    Image(systemName: "plus").font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary)
+                        .frame(width: 24, height: 24)
+                        .background(RoundedRectangle(cornerRadius: 7, style: .continuous)
+                            .strokeBorder(Color.white.opacity(0.2), style: StrokeStyle(lineWidth: 1, dash: [3, 2])))
+                }
+                .buttonStyle(.plain)
+                .help("Add or choose tools in Settings › AI Agents")
+            }
+        }
+        .onAppear { tools.checkIfNeeded() }
+    }
+
+    private var reviewCount: Int { jobs.isActive ? jobs.reviewCount : 0 }
+
+    private func tab(title: String, kind: AgentKind?, count: Int, needsYou: Bool) -> some View {
+        let selected = (kind?.rawValue ?? "") == filter
+        return Button {
+            withAnimation(NotchTokens.Motion.standard) {
+                filter = kind?.rawValue ?? ""
+                composing = false
+            }
+        } label: {
+            HStack(spacing: 5) {
+                if let kind { Circle().fill(kind.tint).frame(width: 7, height: 7) }
+                Text(title).font(.system(size: 11, weight: selected ? .semibold : .regular)).lineLimit(1)
+                if count > 0 {
+                    Text("\(count)").font(.system(size: 9, weight: .semibold).monospacedDigit()).foregroundStyle(.secondary)
+                }
+                if needsYou { Circle().fill(Color.orange).frame(width: 5, height: 5) }
+            }
+            .padding(.horizontal, 9)
+            .padding(.vertical, 4)
+            .background(Capsule().fill(selected ? (kind?.tint ?? .white).opacity(0.2) : Color.white.opacity(0.05)))
+            .overlay(Capsule().strokeBorder(selected ? (kind?.tint ?? .white).opacity(0.45) : .clear, lineWidth: 0.5))
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+/// One tool's Start icon: pick a folder and it starts there, in the notch's
+/// Terminal tab (hold ⌥ for your terminal app).
+private struct AgentStartButton: View {
+    let tool: AgentTool
+    @ObservedObject private var tools = AgentTools.shared
+
+    private var notInstalled: Bool { tools.hasChecked && !tools.installed.contains(tool.id) }
+    private var optionDown: Bool { NSEvent.modifierFlags.contains(.option) }
+
+    var body: some View {
+        Menu {
+            if notInstalled {
+                Text("\(tool.name) wasn't found on this Mac")
+                if !tool.install.isEmpty {
+                    Button("Install \(tool.name)…") { tools.install(tool) }
+                }
+                Button("Check Again") { Task { await tools.check() } }
+                Divider()
+            }
+            Section("Start \(tool.name) in") {
+                ForEach(tools.folders(for: tool), id: \.self) { folder in
+                    Button((folder as NSString).lastPathComponent) {
+                        tools.launch(tool, in: folder, external: optionDown)
+                    }
+                }
+                Button("Choose Folder…") { tools.chooseFolderAndLaunch(tool, external: optionDown) }
+            }
+            Divider()
+            Text("Hold ⌥ to open it in your terminal app")
+        } label: {
+            Text(tool.monogram)
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(agentColor(hex: tool.color).opacity(notInstalled ? 0.45 : 1))
+                .frame(width: 24, height: 24)
+                .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(Color.white.opacity(0.07)))
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help(notInstalled ? "\(tool.name) isn't installed" : "Start \(tool.name) in a project")
+    }
+}
+
+/// "All": what needs you on the left, every agent at work on the right.
+private struct AgentBoard: View {
+    let onOpen: (AgentSession) -> Void
+    @ObservedObject private var hub = AgentHub.shared
+    @ObservedObject private var jobs = OrbitJobs.shared
+
+    private var reviews: [OrbitJob] { jobs.isActive ? jobs.jobs.filter { $0.state == .review } : [] }
+    private var members: [AgentSession] {
+        hub.sessions.sorted { a, b in
+            (rank(a), b.updatedAt) < (rank(b), a.updatedAt)
+        }
+    }
+    private func rank(_ session: AgentSession) -> Int { session.isWaiting ? 0 : session.isWorking ? 1 : 2 }
+
+    var body: some View {
+        if hub.requests.isEmpty && hub.waitingInWindowSessions.isEmpty && reviews.isEmpty && members.isEmpty {
+            NotchEmptyState(symbol: "person.3", title: "No agents at work",
+                            detail: "Start one with an icon above: pick a project and it opens right here in the Terminal tab. Running agents, their approvals and finished work show up on this board.")
+        } else {
+            HStack(alignment: .top, spacing: 10) {
+                needsYou.frame(width: 290)
+                ScrollView(.vertical, showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        NotchSectionHeader(title: "Working now")
+                        if members.isEmpty {
+                            Text("No sessions running.").font(NotchTokens.Typography.caption).foregroundStyle(.secondary)
+                        }
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 210), spacing: 8)], alignment: .leading, spacing: 8) {
+                            ForEach(members) { session in AgentWorkCard(session: session) { onOpen(session) } }
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity)
+            }
+        }
+    }
+
+    private var needsYou: some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 6) {
+                NotchSectionHeader(title: "Needs you")
+                if hub.requests.isEmpty && hub.waitingInWindowSessions.isEmpty {
+                    Text("Nothing is waiting on you.").font(NotchTokens.Typography.caption).foregroundStyle(.secondary)
+                }
+                ForEach(hub.requests) { request in
+                    AgentRequestCard(request: request)
+                        .padding(8)
+                        .background(RoundedRectangle(cornerRadius: NotchTokens.Radius.card, style: .continuous)
+                            .fill(request.agent.tint.opacity(0.1)))
+                }
+                ForEach(hub.waitingInWindowSessions) { session in
+                    Button { hub.openWindow(bundleID: session.appBundleID) } label: {
+                        HStack(spacing: 6) {
+                            Circle().fill(session.agent.tint).frame(width: 7, height: 7)
+                            Text("\(session.agent.shortName) · \(session.project)").font(NotchTokens.Typography.bodyEmphasis).lineLimit(1)
+                            Spacer(minLength: 4)
+                            Text("Asking in its window").font(NotchTokens.Typography.caption).foregroundStyle(.orange)
+                        }
+                        .padding(8)
+                        .background(RoundedRectangle(cornerRadius: NotchTokens.Radius.card, style: .continuous).fill(Color.orange.opacity(0.1)))
+                    }
+                    .buttonStyle(.plain)
+                }
+                if !reviews.isEmpty {
+                    NotchSectionHeader(title: "Ready for review").padding(.top, 4)
+                    ForEach(reviews) { job in AgentReviewRow(job: job) }
+                }
+            }
+        }
+    }
+}
+
+/// A finished background hand-off, from the board.
+private struct AgentReviewRow: View {
+    let job: OrbitJob
+    @ObservedObject private var jobs = OrbitJobs.shared
+
+    var body: some View {
+        let agent = AgentHookPolicy.LaunchAgent(rawValue: job.agent)
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 6) {
+                Circle().fill(tint).frame(width: 7, height: 7)
+                Text("\(agent?.title ?? job.agent) · \(job.title)").font(NotchTokens.Typography.bodyEmphasis).lineLimit(1)
+            }
+            Text(job.changes.summary).font(NotchTokens.Typography.caption).foregroundStyle(.green)
+            HStack(spacing: 6) {
+                NotchPillButton(title: "See changes", symbol: "doc.text.magnifyingglass") { jobs.seeChanges(job) }
+                if job.branch != nil && !job.changes.isEmpty {
+                    NotchPillButton(title: "Commit", symbol: "checkmark.circle", prominent: true) {
+                        Task { await jobs.apply(job, commit: true) }
+                    }
+                }
+                Spacer(minLength: 0)
+                Button {
+                    DynamicIslandViewCoordinator.shared.currentView = .orbit
+                    Orbit.shared.requestedTabMode = "team"
+                } label: {
+                    Image(systemName: "ellipsis").font(.system(size: 11)).frame(width: 20, height: 20)
+                }
+                .buttonStyle(.plain)
+                .help("More in Orbit › Team (apply, keep going, throw away)")
+            }
+        }
+        .padding(8)
+        .background(RoundedRectangle(cornerRadius: NotchTokens.Radius.card, style: .continuous).fill(Color.green.opacity(0.08)))
+    }
+
+    private var tint: Color {
+        switch job.agent {
+        case "codex": return AgentKind.codex.tint
+        default: return AgentKind.claudeCode.tint
+        }
+    }
+}
+
+/// One agent at work: who, where, what it's doing now, for how long.
+private struct AgentWorkCard: View {
+    let session: AgentSession
+    let onOpen: () -> Void
+    @ObservedObject private var hub = AgentHub.shared
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 7) {
+                Text(session.agent.monogram)
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(session.agent.tint)
+                    .frame(width: 22, height: 22)
+                    .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(session.agent.tint.opacity(0.18)))
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(session.agent.displayName).font(NotchTokens.Typography.bodyEmphasis).lineLimit(1)
+                    Text("\(session.project) · \(place)").font(NotchTokens.Typography.caption).foregroundStyle(.secondary).lineLimit(1)
+                }
+                Spacer(minLength: 4)
+                Text(OrbitTeamPolicy.status(working: session.isWorking, waiting: session.isWaiting,
+                                            since: session.turnStartedAt ?? session.updatedAt, now: Date()))
+                    .font(NotchTokens.Typography.caption)
+                    .foregroundStyle(statusTint)
+                    .lineLimit(1)
+            }
+            if let prompt = session.lastPrompt, !prompt.isEmpty {
+                Text(prompt).font(NotchTokens.Typography.body).lineLimit(2)
+            }
+            Text(activity).font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary).lineLimit(1)
+            HStack(spacing: 6) {
+                NotchPillButton(title: session.agent.readsTranscripts ? "Open" : "Show window", symbol: "arrow.up.right") { onOpen() }
+                if !session.isWorking && !session.isWaiting {
+                    NotchPillButton(title: "Dismiss", symbol: "xmark") { hub.dismiss(session) }
+                }
+            }
+        }
+        .padding(9)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: NotchTokens.Radius.card, style: .continuous).fill(Color.white.opacity(0.06)))
+        .overlay(RoundedRectangle(cornerRadius: NotchTokens.Radius.card, style: .continuous)
+            .strokeBorder(session.isWaiting ? Color.orange.opacity(0.5) : Color.clear, lineWidth: 1))
+    }
+
+    private var statusTint: Color {
+        session.isWaiting ? .orange : session.isWorking ? .green : .secondary
+    }
+
+    private var activity: String {
+        switch session.state {
+        case .ready: return "Ready"
+        case .working(let activity): return activity
+        case .waiting(let reason): return "Needs you · \(reason)"
+        case .done(let summary): return "Done · \(summary)"
+        }
+    }
+
+    /// Where it runs: a background copy, the notch's terminal, or an app.
+    private var place: String {
+        if session.cwd.hasPrefix(OrbitJobs.worktrees.path) { return "background copy" }
+        guard let bundle = session.appBundleID else { return "terminal" }
+        if bundle == Bundle.main.bundleIdentifier { return "NotchFlow" }
+        if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundle) {
+            return FileManager.default.displayName(atPath: url.path).replacingOccurrences(of: ".app", with: "")
+        }
+        return "terminal"
     }
 }

@@ -415,11 +415,12 @@ class TerminalManager: ObservableObject {
         select(session.id)
     }
 
-    /// A new terminal tab that starts in `directory`.
-    func newSession(in directory: String) {
+    /// A new terminal tab that starts in `directory` (and types `startupInput`
+    /// instead, when given: say, starting an AI tool there).
+    func newSession(in directory: String, startupInput: String? = nil) {
         let session = Session()
         session.title = (directory as NSString).lastPathComponent
-        session.startupInput = "cd \(TerminalCommandPolicy.shellQuoted(directory)) && clear\n"
+        session.startupInput = startupInput ?? "cd \(TerminalCommandPolicy.shellQuoted(directory)) && clear\n"
         sessions.append(session)
         select(session.id)
     }

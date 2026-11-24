@@ -265,6 +265,12 @@ printf '\nChecking agent conversations (Claude Code and Codex session files, res
     "$SOURCE_DIR/tests/AgentTranscriptRegression.swift" -o "$BUILD_ROOT/AgentTranscriptRegression"
 "$BUILD_ROOT/AgentTranscriptRegression"
 
+printf '\nChecking agent tools (catalog, finding them, start lines)...\n'
+/usr/bin/xcrun swiftc -swift-version 5 -parse-as-library \
+    "$SOURCE_DIR/DynamicIsland/helpers/AgentToolsPolicy.swift" \
+    "$SOURCE_DIR/tests/AgentToolsRegression.swift" -o "$BUILD_ROOT/AgentToolsRegression"
+"$BUILD_ROOT/AgentToolsRegression"
+
 printf '\nChecking smart tools (distraction meter, copy-to-action, replies, build watcher)...\n'
 /usr/bin/xcrun swiftc -swift-version 5 -parse-as-library \
     "$SOURCE_DIR/DynamicIsland/helpers/SmartToolsPolicy.swift" \

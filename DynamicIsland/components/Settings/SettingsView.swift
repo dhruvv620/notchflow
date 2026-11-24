@@ -942,6 +942,7 @@ struct SettingsView: View {
 
             // Terminal
             SettingsSearchEntry(tab: .terminal, title: "Enable terminal", keywords: ["terminal", "guake", "shell"], highlightID: SettingsTab.terminal.highlightID(for: "Enable terminal")),
+            SettingsSearchEntry(tab: .agents, title: "Command-line tools", keywords: ["cli", "claude", "codex", "gemini", "cursor", "opencode", "aider", "copilot", "ollama", "install", "start", "launcher", "terminal"], highlightID: SettingsTab.agents.highlightID(for: "Command-line tools")),
             SettingsSearchEntry(tab: .agents, title: "Tab size", keywords: ["agents", "size", "large", "bigger", "text"], highlightID: SettingsTab.agents.highlightID(for: "Tab size")),
             SettingsSearchEntry(tab: .agents, title: "AI Agents", keywords: ["agents","ai","claude","approve","permission"], highlightID: SettingsTab.agents.highlightID(for: "AI Agents")),
             SettingsSearchEntry(tab: .agents, title: "Connect an agent", keywords: ["claude code","codex","cursor","gemini","hooks","connect","approve"], highlightID: SettingsTab.agents.highlightID(for: "Connect an agent")),
