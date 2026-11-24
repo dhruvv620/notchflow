@@ -22,6 +22,7 @@ struct OrbitSettings: View {
     @Default(.orbitDailyBrief) private var briefOn
     @Default(.orbitBriefHour) private var briefHour
     @Default(.orbitScenes) private var scenesOn
+    @Default(.orbitTeam) private var teamOn
     @ObservedObject private var workspaces = WorkspaceManager.shared
 
     var body: some View {
@@ -49,6 +50,16 @@ struct OrbitSettings: View {
                             Text("Your AI agents as a board: who's working, who's waiting on you. Right-click a loop to hand it to an agent in that project's folder.")
                                 .font(.caption).foregroundStyle(.secondary)
                         }
+                    }
+                    if teamOn {
+                        Defaults.Toggle(key: .orbitBackgroundHandoffs) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Hand-offs work in the background")
+                                Text("Claude Code and Codex work out of sight in their own copy of the project (a git worktree on a new branch), so your files aren't touched. When done, review the changes and apply, commit or throw them away. File edits there don't ask; commands still ask in the notch.")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                        .padding(.leading, 16)
                     }
                     Defaults.Toggle(key: .orbitTrackProjects) {
                         VStack(alignment: .leading, spacing: 2) {

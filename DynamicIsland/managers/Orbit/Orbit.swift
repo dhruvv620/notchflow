@@ -110,6 +110,7 @@ final class Orbit: ObservableObject {
         wireSignals()
         OrbitLinear.shared.setActive(true)
         OrbitBriefing.shared.setActive(Defaults[.orbitDailyBrief])
+        OrbitJobs.shared.setActive(Defaults[.orbitTeam])
         if Defaults[.orbitWriteVault] { scheduleVaultWrite(all: true) } else { vaultTask?.cancel(); vaultTask = nil; vaultStatus = nil }
     }
 
@@ -118,6 +119,7 @@ final class Orbit: ObservableObject {
         signals.removeAll()
         OrbitLinear.shared.setActive(false)
         OrbitBriefing.shared.setActive(false)
+        OrbitJobs.shared.setActive(false)
         flushFocus()
         let snapshot = state
         saveTask?.cancel(); saveTask = nil
@@ -187,6 +189,8 @@ final class Orbit: ObservableObject {
             let wasWorking = agentStates[session.id] ?? false
             agentStates[session.id] = session.isWorking
             guard wasWorking, !session.isWorking else { continue }
+            // Background hand-offs report through OrbitJobs, not here.
+            if session.cwd.hasPrefix(OrbitJobs.worktrees.path) { continue }
             let project = projectID(forFolder: session.cwd, fallbackName: session.project)
             let prompt = session.lastPrompt.map { ": \($0)" } ?? ""
             let outcome = session.isWaiting ? "needs you" : "finished"
@@ -302,6 +306,10 @@ final class Orbit: ObservableObject {
     func loops(now: Date = Date()) -> [OrbitLoop] {
         guard isRunning, showsLoops else { return [] }
         var all: [OrbitLoop] = []
+        for job in OrbitJobs.shared.jobs where job.state == .review {
+            all.append(OrbitLoop(id: "review:\(job.id.uuidString)", kind: .review, title: "Review: \(job.title)",
+                                 detail: job.changes.summary, date: job.finished ?? job.started, project: job.project, url: job.url))
+        }
         for session in AgentHub.shared.sessions where session.isWaiting {
             var detail = session.project
             if let prompt = session.lastPrompt { detail += " · " + OrbitPolicy.clip(prompt, to: 80) }
@@ -351,6 +359,8 @@ final class Orbit: ObservableObject {
             DynamicIslandViewCoordinator.shared.currentView = .reminders
         case .build, .linear:
             if let link = loop.url, let url = URL(string: link) { NSWorkspace.shared.open(url) }
+        case .review:
+            requestedTabMode = "team"
         }
     }
 
@@ -399,9 +409,23 @@ final class Orbit: ObservableObject {
     /// with the loop as its task, and the loop is marked handed off.
     func handOff(_ loop: OrbitLoop, to agent: AgentHookPolicy.LaunchAgent, folder: String) {
         guard isRunning, showsTeam else { return }
-        let prompt = OrbitTeamPolicy.handoffPrompt(title: loop.title, detail: loop.detail, url: loop.url)
-        AgentHub.shared.startTask(agent: agent, prompt: prompt, directory: folder)
         let project = loop.project ?? projectID(forFolder: folder)
+        // The context pack: what the agent would otherwise have to ask you.
+        let description = loop.issueID.flatMap { id in OrbitLinear.shared.issues.first { $0.id == id }?.description }
+        let failedBuild = BuildWatchManager.shared.runs.first { run in
+            run.state == .failure && (loop.kind == .build ? "build:\(run.id)" == loop.id
+                                      : project != nil && projectID(mentionedIn: run.title + " " + run.detail) == project)
+        }
+        let prompt = OrbitTeamPolicy.handoffPrompt(
+            title: loop.title, detail: loop.detail, url: loop.url, description: description,
+            buildFailure: failedBuild.map { "\($0.title) (\($0.detail))" + ($0.url.map { " \($0.absoluteString)" } ?? "") },
+            history: project.map { OrbitTeamPolicy.history(for: $0, in: state) } ?? [])
+        // Claude Code and Codex work out of sight in their own copy of the
+        // project; the others open in a terminal.
+        let background = Defaults[.orbitBackgroundHandoffs] && OrbitJobs.shared.start(
+            agent: agent, title: loop.title, prompt: prompt, folder: folder, project: project,
+            loopID: loop.id, issueID: loop.issueID, url: loop.url)
+        if !background { AgentHub.shared.startTask(agent: agent, prompt: prompt, directory: folder) }
         add(OrbitEvent(date: Date(), kind: .agent, text: "Handed to \(agent.title): \(loop.title)", project: project, url: loop.url))
         if loop.kind != .linear && loop.kind != .promise && loop.kind != .theirPromise {
             state.dismissedLoops[loop.id] = Date()
@@ -410,6 +434,26 @@ final class Orbit: ObservableObject {
             Task { await OrbitLinear.shared.move(issueID: issue, toType: "started") }
         }
     }
+
+    /// A background job came back.
+    func jobFinished(_ job: OrbitJob, agentName: String) {
+        guard isRunning else { return }
+        let outcome = job.state == .review ? "finished (\(job.changes.summary))" : "stopped: \(job.error ?? "error")"
+        add(OrbitEvent(date: Date(), kind: .agent, text: "\(agentName) \(outcome): \(job.title)", project: job.project, url: job.url))
+        if job.state == .review, let issue = job.issueID, Defaults[.orbitLinearAgentComments] {
+            let text = "\(agentName) finished this from NotchFlow Orbit (\(job.changes.summary)).\n\n\(job.summary)"
+            Task { await OrbitLinear.shared.comment(issueID: issue, text: text) }
+        }
+    }
+
+    /// You decided what to do with a job's changes.
+    func jobClosed(_ job: OrbitJob, outcome: String) {
+        guard isRunning else { return }
+        add(OrbitEvent(date: Date(), kind: .agent, text: "\(outcome): \(job.title)", project: job.project, url: job.url))
+    }
+
+    /// Set to show a view in the Orbit tab (a review loop opens Team).
+    @Published var requestedTabMode: String?
 
     // MARK: Scenes
 

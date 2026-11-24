@@ -609,10 +609,16 @@ struct AgentLiveActivity: View {
                     .foregroundStyle(.white.opacity(0.85))
                     .lineLimit(1)
             } trailing: {
-                Text(hub.requests.count > 1 ? "\(hub.requests.count) waiting" : label(for: request))
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(Color.orange)
-                    .lineLimit(1)
+                if isHovering, hub.requests.count == 1, case .permission(_, _, let risk, _) = request.kind, risk != .danger {
+                    // Answer without opening the notch. Dangerous ones always open it.
+                    ClosedApprovalButton(title: "Allow", tint: .green) { hub.resolve(request, with: .allow) }
+                    ClosedApprovalButton(title: "Deny", tint: .red) { hub.resolve(request, with: .deny("Declined in NotchFlow")) }
+                } else {
+                    Text(hub.requests.count > 1 ? "\(hub.requests.count) waiting" : label(for: request))
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(Color.orange)
+                        .lineLimit(1)
+                }
             }
             .onAppear { withAnimation(EnergyState.repeating(.easeInOut(duration: 0.9))) { pulse = true } }
             .accessibilityElement(children: .ignore)
@@ -679,6 +685,27 @@ struct AgentLiveActivity: View {
     private func doneLabel(_ session: AgentSession) -> String {
         if case .done(let summary) = session.state, session.agent == .script, !summary.isEmpty { return summary }
         return "Done"
+    }
+}
+
+/// A small Allow / Deny button in the closed notch.
+private struct ClosedApprovalButton: View {
+    let title: String
+    let tint: Color
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(tint)
+                .padding(.horizontal, 7)
+                .padding(.vertical, 3)
+                .background(Capsule().fill(tint.opacity(0.18)))
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .help(title)
     }
 }
 

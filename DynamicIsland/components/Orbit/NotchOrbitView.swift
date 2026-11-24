@@ -35,6 +35,10 @@ struct NotchOrbitView: View {
     @State private var draft = ""
     @State private var interactionToken = UUID()
     @FocusState private var noteFocused: Bool
+    @FocusState private var followUpFocused: Bool
+    @ObservedObject private var jobsModel = OrbitJobs.shared
+    @State private var followUps: [UUID: String] = [:]
+    @State private var expandedJob: UUID?
 
     private var projects: [OrbitProject] { OrbitPolicy.activeProjects(orbit.state, now: Date()) }
     private var people: [OrbitPerson] {
@@ -83,8 +87,15 @@ struct NotchOrbitView: View {
         .onChange(of: showTeam) { _, _ in fixMode() }
         .onChange(of: showScenes) { _, _ in fixMode() }
         .onChange(of: briefOn) { _, _ in fixMode() }
-        .onChange(of: noteFocused) { _, focused in
-            vm.setAutoCloseSuppression(focused, token: interactionToken)
+        .onChange(of: noteFocused) { _, _ in
+            vm.setAutoCloseSuppression(noteFocused || followUpFocused, token: interactionToken)
+        }
+        .onChange(of: followUpFocused) { _, _ in
+            vm.setAutoCloseSuppression(noteFocused || followUpFocused, token: interactionToken)
+        }
+        .onChange(of: orbit.requestedTabMode) { _, requested in
+            if let requested, let target = Mode(rawValue: requested), modes.contains(target) { mode = target }
+            orbit.requestedTabMode = nil
         }
         .onDisappear { vm.setAutoCloseSuppression(false, token: interactionToken) }
     }
@@ -178,6 +189,15 @@ struct NotchOrbitView: View {
                 NotchBadge(text: "Overdue", tint: .red)
             } else {
                 Text(relative(loop.date)).font(NotchTokens.Typography.caption).foregroundStyle(.tertiary)
+            }
+            if showTeam, loop.kind == .build || loop.kind == .linear,
+               let folder = orbit.folder(forProject: loop.project) ?? agents.recentProjects.first {
+                let agent = AgentHookPolicy.LaunchAgent(rawValue: Defaults[.agentLaunchAgent]) ?? .claude
+                NotchIconButton(symbol: "sparkles",
+                                help: "Let \(agent.title) do it in \((folder as NSString).lastPathComponent)", size: 20) {
+                    orbit.handOff(loop, to: agent, folder: folder)
+                    mode = .team
+                }
             }
             if loop.kind == .linear, let issue = loop.issueID {
                 NotchIconButton(symbol: "play", help: "Start (move to In Progress)", size: 20) {
@@ -322,18 +342,142 @@ struct NotchOrbitView: View {
     // MARK: Team
 
     @ViewBuilder private var teamView: some View {
-        let members = agents.sessions.sorted { a, b in
-            (a.isWaiting ? 0 : a.isWorking ? 1 : 2, b.updatedAt) < (b.isWaiting ? 0 : b.isWorking ? 1 : 2, a.updatedAt)
-        }
-        if members.isEmpty {
+        // Background hand-off sessions show as jobs, not twice.
+        let members = agents.sessions
+            .filter { !$0.cwd.hasPrefix(OrbitJobs.worktrees.path) }
+            .sorted { a, b in
+                (a.isWaiting ? 0 : a.isWorking ? 1 : 2, b.updatedAt) < (b.isWaiting ? 0 : b.isWorking ? 1 : 2, a.updatedAt)
+            }
+        let jobs = jobsModel.visibleJobs
+        if members.isEmpty && jobs.isEmpty {
             NotchEmptyState(symbol: "person.3", title: "No agents at work",
-                            detail: "Hand a loop to an agent (right-click it in Loops), run a scene with an agent task, or start one in the AI Agents tab.")
+                            detail: "Right-click anything in Loops and choose Hand Off: the agent works out of sight in its own copy of the project and comes back with changes to review.")
         } else {
             ScrollView(.vertical, showsIndicators: false) {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 190), spacing: 6)], alignment: .leading, spacing: 6) {
-                    ForEach(members) { session in memberCard(session) }
+                VStack(alignment: .leading, spacing: 6) {
+                    if !jobs.isEmpty {
+                        HStack {
+                            Text("Hand-offs").font(NotchTokens.Typography.captionEmphasis).foregroundStyle(.secondary)
+                            Spacer(minLength: 0)
+                            if jobs.contains(where: { !$0.state.isOpen }) {
+                                Button("Clear finished") { jobsModel.clearFinished() }
+                                    .buttonStyle(.plain).font(NotchTokens.Typography.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                        ForEach(jobs) { job in jobCard(job) }
+                    }
+                    if !members.isEmpty {
+                        if !jobs.isEmpty {
+                            Text("Sessions").font(NotchTokens.Typography.captionEmphasis).foregroundStyle(.secondary)
+                        }
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 190), spacing: 6)], alignment: .leading, spacing: 6) {
+                            ForEach(members) { session in memberCard(session) }
+                        }
+                    }
                 }
             }
+        }
+    }
+
+    private func jobCard(_ job: OrbitJob) -> some View {
+        let agentName = AgentHookPolicy.LaunchAgent(rawValue: job.agent)?.title ?? job.agent
+        let tint: Color = {
+            switch job.state {
+            case .running: return .blue
+            case .review: return .green
+            case .failed: return .orange
+            default: return .secondary
+            }
+        }()
+        return VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 6) {
+                if job.state == .running {
+                    ProgressView().controlSize(.mini).frame(width: 12, height: 12)
+                } else {
+                    Image(systemName: job.state == .review ? "checkmark.seal.fill" : job.state == .failed ? "exclamationmark.triangle.fill" : "checkmark")
+                        .font(.system(size: 11)).foregroundStyle(tint)
+                }
+                Text(job.title).font(NotchTokens.Typography.bodyEmphasis).lineLimit(1)
+                Spacer(minLength: 4)
+                Text(jobStatus(job, agentName: agentName)).font(NotchTokens.Typography.caption).foregroundStyle(tint).lineLimit(1)
+            }
+            if job.state == .running {
+                HStack {
+                    Text("\(agentName) is working in its own copy of \(job.project ?? (job.folder as NSString).lastPathComponent). Your files aren't touched.")
+                        .font(NotchTokens.Typography.caption).foregroundStyle(.secondary).lineLimit(2)
+                    Spacer(minLength: 4)
+                    NotchPillButton(title: "Stop", symbol: "stop.fill") { jobsModel.stop(job) }
+                }
+            }
+            if job.state == .review || job.state == .failed {
+                if !job.summary.isEmpty {
+                    Text(job.summary).font(NotchTokens.Typography.caption).foregroundStyle(.secondary)
+                        .lineLimit(expandedJob == job.id ? 12 : 2)
+                        .onTapGesture { expandedJob = expandedJob == job.id ? nil : job.id }
+                }
+                if let error = job.error {
+                    Text(error).font(NotchTokens.Typography.caption).foregroundStyle(.orange).lineLimit(2)
+                }
+                if !job.changes.isEmpty {
+                    VStack(alignment: .leading, spacing: 1) {
+                        ForEach(job.changes.files.prefix(expandedJob == job.id ? 30 : 3), id: \.path) { file in
+                            HStack(spacing: 6) {
+                                Text(file.path).font(.system(size: 10, design: .monospaced)).lineLimit(1).truncationMode(.head)
+                                Spacer(minLength: 4)
+                                Text("+\(file.added)").font(.system(size: 10, design: .monospaced)).foregroundStyle(.green)
+                                Text("−\(file.removed)").font(.system(size: 10, design: .monospaced)).foregroundStyle(.red)
+                            }
+                        }
+                        if job.changes.files.count > 3 && expandedJob != job.id {
+                            Button("\(job.changes.files.count - 3) more files") { expandedJob = job.id }
+                                .buttonStyle(.plain).font(NotchTokens.Typography.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                HStack(spacing: 6) {
+                    if job.state == .review {
+                        NotchPillButton(title: "See changes", symbol: "doc.text.magnifyingglass") { jobsModel.seeChanges(job) }
+                        if job.branch != nil && !job.changes.isEmpty {
+                            NotchPillButton(title: "Apply", symbol: "square.and.arrow.down") { Task { await jobsModel.apply(job, commit: false) } }
+                            NotchPillButton(title: "Commit", symbol: "checkmark.circle", prominent: true) { Task { await jobsModel.apply(job, commit: true) } }
+                        } else {
+                            NotchPillButton(title: "Done", symbol: "checkmark", prominent: true) { Task { await jobsModel.apply(job, commit: false) } }
+                        }
+                    }
+                    Spacer(minLength: 0)
+                    NotchPillButton(title: "Throw away", symbol: "trash") { Task { await jobsModel.discard(job) } }
+                }
+                if job.sessionID != nil {
+                    NotchComposeField(placeholder: "Keep going: tell \(agentName) what else to do",
+                                      text: Binding(get: { followUps[job.id] ?? "" }, set: { followUps[job.id] = $0 }),
+                                      onSend: {
+                                          jobsModel.keepGoing(job, message: followUps[job.id] ?? "")
+                                          followUps[job.id] = nil
+                                      },
+                                      isFocused: $followUpFocused)
+                }
+            }
+        }
+        .padding(8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: NotchTokens.Radius.card, style: .continuous)
+            .fill(Color.white.opacity(job.state.isOpen ? 0.07 : 0.03)))
+        .contextMenu {
+            Button("Show Its Folder") { jobsModel.openWorkFolder(job) }
+            if let link = job.url, let url = URL(string: link) {
+                Button("Open Link") { NSWorkspace.shared.open(url) }
+            }
+        }
+    }
+
+    private func jobStatus(_ job: OrbitJob, agentName: String) -> String {
+        switch job.state {
+        case .running: return OrbitTeamPolicy.status(working: true, waiting: false, since: job.started, now: Date())
+        case .review: return job.changes.summary
+        case .failed: return "Stopped"
+        case .applied: return "Applied"
+        case .committed: return "Committed"
+        case .discarded: return "Thrown away"
         }
     }
 

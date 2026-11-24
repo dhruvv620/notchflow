@@ -339,7 +339,7 @@ final class AgentConversations: ObservableObject {
 }
 
 /// Splits a byte stream into complete lines across reads.
-private final class LineBuffer: @unchecked Sendable {
+final class LineBuffer: @unchecked Sendable {
     private var pending = Data()
     private let lock = NSLock()
 

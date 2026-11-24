@@ -177,5 +177,16 @@ final class OrbitLinear: ObservableObject {
         }
     }
 
+    /// Comments on an issue by its id.
+    func comment(issueID: String, text: String) async {
+        guard isActive else { return }
+        do {
+            let data = try await send(OrbitLoopsPolicy.commentBody(issueID: issueID, text: text))
+            guard OrbitLoopsPolicy.succeeded(data, operation: "commentCreate") else { throw LinearError.badReply }
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
     var teamKeys: Set<String> { Set(issues.map(\.teamKey) + teams.map(\.key)) }
 }

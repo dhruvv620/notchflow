@@ -171,6 +171,13 @@ struct OrbitRegression {
         let prompt = T.handoffPrompt(title: "ENG-12 Fix tabs", detail: "Todo · NotchFlow", url: "https://linear.app/x")
         try require(prompt.hasPrefix("Task: ENG-12 Fix tabs\nContext: Todo · NotchFlow\nLink: https://linear.app/x"), "Prompt: \(prompt)")
         try require(!T.handoffPrompt(title: "A", detail: " ", url: nil).contains("Context"), "No empty context")
+        let packed = T.handoffPrompt(title: "Fix tabs", detail: "", url: nil, description: "Tabs jump on hover.",
+                                     buildFailure: "CI failed: TabTests", history: ["2026-11-18 command: Ran swift (2m)"])
+        try require(packed.contains("Description:\nTabs jump on hover.") && packed.contains("The last build failed: CI failed: TabTests")
+                    && packed.contains("Recently in this project:\n- 2026-11-18 command: Ran swift (2m)") && packed.hasSuffix("in a few lines."),
+                    "Context pack: \(packed)")
+        try require(T.history(for: p, in: small, calendar: calendar).first?.hasPrefix("2026-11-18 agent: Claude finished") == true,
+                    "History: \(T.history(for: p, in: small, calendar: calendar))")
         try require(T.status(working: true, waiting: false, since: now.addingTimeInterval(-720), now: now) == "Working 12m", "Working")
         try require(T.status(working: false, waiting: true, since: nil, now: now) == "Waiting for you", "Waiting")
         try require(T.status(working: false, waiting: false, since: now.addingTimeInterval(-3600), now: now) == "Done 1h 0m ago", "Done")
@@ -243,6 +250,38 @@ struct OrbitRegression {
         try require(P.vault(containing: "/Users/dv/Orbit/Other/x.md", vaults: vaults) == nil, "Outside")
         try require(P.vault(containing: "/Users/dv/NotesOld/x.md", vaults: vaults) == nil, "Prefix is not enough")
         try require(P.obsidianVaults(from: Data("nope".utf8)).isEmpty, "Bad file")
+
+        // Background hand-offs
+        typealias J = OrbitJobsPolicy
+        let jobID = UUID(uuidString: "1A2B3C4D-0000-0000-0000-000000000000")!
+        try require(J.slug("Fix the Settings typo!! (ENG-12)") == "fix-the-settings-typo-eng-12", "Slug: \(J.slug("Fix the Settings typo!! (ENG-12)"))")
+        try require(J.slug("???") == "task", "Empty slug")
+        try require(J.branchName(title: "Fix typo", id: jobID) == "orbit/fix-typo-1a2b3c", "Branch: \(J.branchName(title: "Fix typo", id: jobID))")
+        try require(J.worktreePath(base: "/w", project: "NotchFlow", id: jobID) == "/w/notchflow-1a2b3c4d", "Worktree path")
+        try require(J.workFolder(for: "/r/app/src", repoRoot: "/r", worktree: "/w/x") == "/w/x/app/src", "Subfolder")
+        try require(J.workFolder(for: "/r", repoRoot: "/r", worktree: "/w/x") == "/w/x", "Root")
+        try require(J.command(agent: "claude", prompt: "it's done") == #"claude -p --permission-mode acceptEdits --output-format stream-json --verbose 'it'\''s done'"#,
+                    "Claude command: \(J.command(agent: "claude", prompt: "it's done"))")
+        try require(J.command(agent: "claude", prompt: "more", resume: "s1").contains("-p --resume 's1' --permission-mode"), "Resume")
+        try require(J.command(agent: "codex", prompt: "go") == "codex exec --json --full-auto 'go'", "Codex")
+        try require(J.command(agent: "codex", prompt: "go", resume: "t1") == "codex exec --json --full-auto resume 't1' 'go'", "Codex resume")
+        let stat = J.diffStat(fromNumstat: "12\t3\tSources/App.swift\n-\t-\tlogo.png\n0\t5\told name => new name\n\nbad line")
+        try require(stat.files.count == 3 && stat.added == 12 && stat.removed == 8 && stat.summary == "3 files · +12 −8", "Numstat: \(stat)")
+        try require(OrbitDiffStat().summary == "No changes", "No changes")
+        try require(J.finalAnswer(fromStreamLine: #"{"type":"result","is_error":false,"result":"Fixed the typo."}"#) == "Fixed the typo.", "Claude result")
+        try require(J.finalAnswer(fromStreamLine: #"{"type":"result","is_error":true,"result":"x"}"#) == nil, "Error result")
+        try require(J.finalAnswer(fromStreamLine: #"{"type":"item.completed","item":{"type":"agent_message","text":"Done"}}"#) == "Done", "Codex answer")
+        try require(J.finalAnswer(fromStreamLine: "noise") == nil, "Noise")
+        let jobs = [
+            OrbitJob(agent: "claude", title: "a", prompt: "", folder: "/r", workFolder: "/r", state: .applied, started: now.addingTimeInterval(-200_000), finished: now.addingTimeInterval(-100_000)),
+            OrbitJob(agent: "claude", title: "b", prompt: "", folder: "/r", workFolder: "/r", state: .running, started: now),
+            OrbitJob(agent: "claude", title: "c", prompt: "", folder: "/r", workFolder: "/r", state: .review, started: now.addingTimeInterval(-60)),
+            OrbitJob(agent: "claude", title: "d", prompt: "", folder: "/r", workFolder: "/r", state: .discarded, started: now, finished: now),
+        ]
+        try require(J.visible(jobs, now: now).map(\.title) == ["c", "b", "d"], "Visible jobs: \(J.visible(jobs, now: now).map(\.title))")
+        let jobData = try JSONEncoder().encode(jobs)
+        let jobsBack = try JSONDecoder().decode([OrbitJob].self, from: jobData)
+        try require(jobsBack == jobs, "Jobs round trip")
 
         print("Orbit: all checks passed")
     }

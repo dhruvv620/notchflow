@@ -35,13 +35,29 @@ enum OrbitTeamPolicy {
     // MARK: Hand-off
 
     /// The task an agent gets when a loop is handed to it.
-    static func handoffPrompt(title: String, detail: String, url: String?) -> String {
+    static func handoffPrompt(title: String, detail: String, url: String?,
+                              description: String? = nil, buildFailure: String? = nil, history: [String] = []) -> String {
         var parts = ["Task: \(title)"]
         let trimmed = detail.trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmed.isEmpty { parts.append("Context: \(trimmed)") }
         if let url, !url.isEmpty { parts.append("Link: \(url)") }
+        if let description = description?.trimmingCharacters(in: .whitespacesAndNewlines), !description.isEmpty {
+            let clipped = description.count > 2000 ? String(description.prefix(2000)) + "…" : description
+            parts.append("Description:\n\(clipped)")
+        }
+        if let buildFailure, !buildFailure.isEmpty { parts.append("The last build failed: \(buildFailure)") }
+        if !history.isEmpty {
+            parts.append("Recently in this project:\n" + history.prefix(8).map { "- \($0)" }.joined(separator: "\n"))
+        }
         parts.append("When you're done, sum up what you changed in a few lines.")
         return parts.joined(separator: "\n")
+    }
+
+    /// A project's recent timeline as short lines for an agent.
+    static func history(for project: String, in state: OrbitState, calendar: Calendar = .current) -> [String] {
+        OrbitPolicy.events(for: project, in: state, limit: 8).map {
+            "\(OrbitPolicy.dayKey($0.date, calendar: calendar)) \($0.kind.rawValue): \($0.text)"
+        }
     }
 
     /// "Working 12m", "Waiting 3m", "Done 1h ago".
@@ -124,7 +140,9 @@ enum OrbitTeamPolicy {
         let agents = loops.filter { $0.kind == .agent }.count
         let issues = loops.filter { $0.kind == .linear }.count
         let replies = loops.filter { $0.kind == .message }.count
+        let reviews = loops.filter { $0.kind == .review }.count
         var open: [String] = []
+        if reviews > 0 { open.append("\(reviews) change\(reviews == 1 ? "" : "s") to review") }
         if agents > 0 { open.append("\(agents) agent\(agents == 1 ? "" : "s") waiting") }
         if overdue > 0 { open.append("\(overdue) overdue promise\(overdue == 1 ? "" : "s")") }
         if replies > 0 { open.append("\(replies) repl\(replies == 1 ? "y" : "ies") owed") }

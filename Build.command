@@ -136,6 +136,7 @@ printf '\nChecking Orbit...\n'
     "$SOURCE_DIR/DynamicIsland/helpers/OrbitPolicy.swift" \
     "$SOURCE_DIR/DynamicIsland/helpers/OrbitLoopsPolicy.swift" \
     "$SOURCE_DIR/DynamicIsland/helpers/OrbitTeamPolicy.swift" \
+    "$SOURCE_DIR/DynamicIsland/helpers/OrbitJobsPolicy.swift" \
     "$SOURCE_DIR/tests/OrbitRegression.swift" -o "$BUILD_ROOT/OrbitRegression"
 "$BUILD_ROOT/OrbitRegression"
 
