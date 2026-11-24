@@ -169,3 +169,6 @@ TemporaryAssets/
 # Python checks run by Build.command and CI are part of the repo.
 !tests/*.py
 tests/__pycache__/
+
+# Orbit notes written into the project folder by mistake (an Obsidian vault set to ~/notchflow)
+/Orbit/
