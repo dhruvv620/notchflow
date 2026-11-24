@@ -232,6 +232,13 @@ struct DynamicIslandHeader: View {
                                 }
                         }
                         .buttonStyle(PlainButtonStyle())
+                        .help("Settings (right-click to restart or quit)")
+                        .contextMenu {
+                            Button("Settings…") { SettingsWindowController.shared.showWindow() }
+                            Divider()
+                            Button("Restart NotchFlow") { AppRelauncher.restart() }
+                            Button("Quit NotchFlow") { NSApp.terminate(nil) }
+                        }
                     }
                     
                     // Screen Recording Indicator

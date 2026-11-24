@@ -1324,6 +1324,11 @@ struct GeneralSettings: View {
             gestureControls()
         }
         .toolbar {
+            Button("Restart") {
+                AppRelauncher.restart()
+            }
+            .controlSize(.extraLarge)
+            .help("Quit NotchFlow and open it again")
             Button("Quit app") {
                 NSApp.terminate(self)
             }
