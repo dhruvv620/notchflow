@@ -115,7 +115,13 @@ enum AgentDecision {
 final class AgentHub: ObservableObject {
     static let shared = AgentHub()
 
-    @Published private(set) var sessions: [AgentSession] = []
+    @Published private(set) var sessions: [AgentSession] = [] {
+        didSet { updateStallCheck() }
+    }
+    /// Runs only while an agent is working: catches turns that ended without
+    /// a Stop event (Esc in Claude Code sends none), so nothing spins forever.
+    private var stallCheck: Timer?
+    private var transcriptURLs: [String: URL] = [:]
     @Published private(set) var requests: [AgentRequest] = []
     /// A session that just finished, flashed under the closed notch.
     @Published private(set) var announcement: AgentSession?
@@ -290,7 +296,7 @@ final class AgentHub: ObservableObject {
                 let request = AgentRequest(sessionID: session.id, agent: agent, project: session.project,
                                            appBundleID: session.appBundleID, kind: .question(questions))
                 let decision = await wait(for: request)
-                updateState(of: session.id, to: .working("Continuing"))
+                updateAfterAnswer(of: session.id, to: .working("Continuing"))
                 if case .answers(let answers) = decision {
                     return .json(AgentHookPolicy.questionAnswers(input: event.toolInput, answers: answers))
                 }
@@ -320,16 +326,16 @@ final class AgentHub: ObservableObject {
             hookInputs[request.id] = nil
             switch decision {
             case .allow:
-                updateState(of: session.id, to: .working("Continuing"))
+                updateAfterAnswer(of: session.id, to: .working("Continuing"))
                 return .json(AgentHookPolicy.permissionAllow())
             case .allowAlways:
-                updateState(of: session.id, to: .working("Continuing"))
+                updateAfterAnswer(of: session.id, to: .working("Continuing"))
                 return .json(AgentHookPolicy.permissionAllow(alwaysRules: event.permissionSuggestions))
             case .deny(let message):
-                updateState(of: session.id, to: .working("Changing course"))
+                updateAfterAnswer(of: session.id, to: .working("Changing course"))
                 return .json(AgentHookPolicy.permissionDeny(message: message))
             default:
-                updateState(of: session.id, to: .waiting("Asking in its window: \(title)"))
+                updateAfterAnswer(of: session.id, to: .waiting("Asking in its window: \(title)"))
                 return .empty
             }
         case "Notification":
@@ -414,13 +420,13 @@ final class AgentHub: ObservableObject {
                                        kind: .permission(title: title, detail: detail, risk: risk, canAlwaysAllow: false))
             switch await wait(for: request) {
             case .allow, .allowAlways:
-                updateState(of: session.id, to: .working("Continuing"))
+                updateAfterAnswer(of: session.id, to: .working("Continuing"))
                 return .json(AgentHookPolicy.cursorAnswer(.allow))
             case .deny(let message):
-                updateState(of: session.id, to: .working("Changing course"))
+                updateAfterAnswer(of: session.id, to: .working("Changing course"))
                 return .json(AgentHookPolicy.cursorAnswer(.deny, userMessage: "Declined in NotchFlow", agentMessage: message))
             default:
-                updateState(of: session.id, to: .waiting("Asking in Cursor: \(title)"))
+                updateAfterAnswer(of: session.id, to: .waiting("Asking in Cursor: \(title)"))
                 return .json(AgentHookPolicy.cursorAnswer(.ask))
             }
         case "beforeSubmitPrompt":
@@ -563,10 +569,85 @@ final class AgentHub: ObservableObject {
         }
     }
 
-    private func updateState(of sessionID: String, to state: AgentSession.State) {
-        guard let index = sessions.firstIndex(where: { $0.id == sessionID }) else { return }
+    /// After you answer in the notch. If the session already moved on (it
+    /// stopped, or was answered in its window), a late answer must not set it
+    /// back to working.
+    private func updateAfterAnswer(of sessionID: String, to state: AgentSession.State) {
+        guard let index = sessions.firstIndex(where: { $0.id == sessionID }), sessions[index].isWaiting else { return }
         sessions[index].state = state
         sessions[index].updatedAt = Date()
+    }
+
+    // MARK: Stalled sessions
+
+    private func updateStallCheck() {
+        let anyWorking = sessions.contains(where: \.isWorking)
+        if anyWorking, stallCheck == nil {
+            let timer = Timer(timeInterval: 15, repeats: true) { _ in
+                Task { @MainActor in AgentHub.shared.checkStalled() }
+            }
+            timer.tolerance = 5
+            RunLoop.main.add(timer, forMode: .common)
+            stallCheck = timer
+        } else if !anyWorking, let timer = stallCheck {
+            timer.invalidate()
+            stallCheck = nil
+            transcriptURLs = [:]
+        }
+    }
+
+    private func checkStalled() {
+        let now = Date()
+        let waitingOn = Set(requests.compactMap(\.sessionID))
+        for session in sessions where session.isWorking && !waitingOn.contains(session.id) {
+            let quiet = now.timeIntervalSince(session.updatedAt)
+            guard quiet >= 10 else { continue }
+            if session.agent == .claudeCode, let url = transcriptURL(for: session.id),
+               let tail = Self.readTail(of: url, bytes: 16_384) {
+                let modified = (try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+                switch AgentTranscriptPolicy.claudeTurnEnd(fromTail: tail) {
+                case .interrupted:
+                    setQuietly(session.id, to: .ready)
+                    continue
+                case .answered(let text) where quiet >= 90 && now.timeIntervalSince(modified) >= 90:
+                    setQuietly(session.id, to: .done(text.isEmpty ? "Finished" : String(text.prefix(140))))
+                    continue
+                default:
+                    break
+                }
+            }
+            // Any agent: nothing at all for 20 minutes means it isn't running any more.
+            if quiet >= 20 * 60 { setQuietly(session.id, to: .ready) }
+        }
+    }
+
+    /// Changes the state without the "finished" flash.
+    private func setQuietly(_ sessionID: String, to state: AgentSession.State) {
+        guard let index = sessions.firstIndex(where: { $0.id == sessionID }) else { return }
+        sessions[index].state = state
+    }
+
+    /// ~/.claude/projects/<folder>/<session id>.jsonl, found once per session.
+    private func transcriptURL(for sessionID: String) -> URL? {
+        if let known = transcriptURLs[sessionID] { return known }
+        let root = AgentConversations.claudeRoot
+        let folders = (try? FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil)) ?? []
+        for folder in folders {
+            let candidate = folder.appendingPathComponent("\(sessionID).jsonl")
+            if FileManager.default.fileExists(atPath: candidate.path) {
+                transcriptURLs[sessionID] = candidate
+                return candidate
+            }
+        }
+        return nil
+    }
+
+    private static func readTail(of url: URL, bytes: UInt64) -> Data? {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+        defer { try? handle.close() }
+        let size = (try? handle.seekToEnd()) ?? 0
+        try? handle.seek(toOffset: size > bytes ? size - bytes : 0)
+        return try? handle.readToEnd()
     }
 
     private func announce(_ session: AgentSession) {

@@ -59,6 +59,40 @@ struct AgentTranscriptRegression {
         try require(AgentTranscriptPolicy.failure(fromStreamLine: #"{"type":"result","is_error":false,"result":"ok"}"#) == nil, "Success read as failure")
         try require(AgentTranscriptPolicy.failure(fromStreamLine: #"{"type":"turn.failed","error":{"message":"rate limited"}}"#) == "rate limited", "Codex failure")
 
+        // Turn end from the transcript tail (no Stop hook)
+
+        let interruptedTail = Data(#"""
+
+        partial line without json
+
+        {"type":"assistant","message":{"content":[{"type":"tool_use","name":"Bash","input":{}}]}}
+
+        {"type":"user","message":{"content":[{"type":"text","text":"[Request interrupted by user for tool use]"}]}}
+
+        """#.utf8)
+
+        guard AgentTranscriptPolicy.claudeTurnEnd(fromTail: interruptedTail) == .interrupted else { fatalError("Interrupted") }
+
+        let answeredTail = Data(#"""
+
+        {"type":"user","message":{"content":"fix it"}}
+
+        {"type":"assistant","message":{"content":[{"type":"text","text":"Done.\nAll fixed."}]}}
+
+        {"type":"system","content":"x"}
+
+        """#.utf8)
+
+        guard case .answered(let answer)? = AgentTranscriptPolicy.claudeTurnEnd(fromTail: answeredTail), answer.hasPrefix("Done.") else { fatalError("Answered") }
+
+        let toolTail = Data(#"{"type":"assistant","message":{"content":[{"type":"text","text":"Let me run it"},{"type":"tool_use","name":"Bash","input":{}}]}}"#.utf8)
+
+        guard AgentTranscriptPolicy.claudeTurnEnd(fromTail: toolTail) == nil else { fatalError("Tool pending") }
+
+        let promptTail = Data(#"{"type":"user","message":{"content":"go"}}"#.utf8)
+
+        guard AgentTranscriptPolicy.claudeTurnEnd(fromTail: promptTail) == nil else { fatalError("Prompt pending") }
+
         print("Agent transcript checks passed")
     }
 }

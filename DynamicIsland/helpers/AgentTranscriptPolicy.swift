@@ -117,6 +117,33 @@ enum AgentTranscriptPolicy {
         return items
     }
 
+    /// How a Claude Code turn ended, read from the end of its transcript, for
+    /// when no Stop hook came (Esc interrupts never send one).
+    enum TurnEnd: Equatable {
+        case interrupted
+        /// The last thing written is Claude's answer (text, no tool call pending).
+        case answered(String)
+    }
+
+    static func claudeTurnEnd(fromTail data: Data) -> TurnEnd? {
+        // The tail may start mid-line; lines() skips what doesn't parse.
+        for line in lines(data).reversed() {
+            guard let type = line["type"] as? String, type == "user" || type == "assistant",
+                  line["isSidechain"] as? Bool != true,
+                  let message = line["message"] as? [String: Any] else { continue }
+            let blocks = message["content"] as? [[String: Any]] ?? []
+            let texts = (message["content"] as? String).map { [$0] } ?? blocks.compactMap { $0["text"] as? String }
+            if type == "user" {
+                if texts.contains(where: { $0.contains("[Request interrupted by user") }) { return .interrupted }
+                return nil  // a prompt or tool result: Claude is still on it
+            }
+            if blocks.contains(where: { $0["type"] as? String == "tool_use" }) { return nil }
+            guard let last = texts.last(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) else { continue }
+            return .answered(oneLine(last))
+        }
+        return nil
+    }
+
     /// Session id, folder, title and last activity, from a transcript's lines.
     static func claudeSummary(from data: Data, fileURL: URL, modified: Date) -> AgentSessionSummary? {
         let all = lines(data)
