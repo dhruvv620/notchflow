@@ -7,14 +7,15 @@ Read this before adding, moving or removing a setting. `tests/test_settings_inte
 
 | Group | Pages | What belongs here |
 |---|---|---|
-| (top, no header) | General, Appearance, Tabs & Features, Shortcuts | The notch as a whole: behavior, look, which tabs exist, keys |
-| In the Notch | Music, Live Activities, Notifications & Calls, WhatsApp, AI Agents, Calendar & Todos, Timers, Shelf | One page per thing that shows up in the notch (a tab or a closed-notch activity) |
-| Tools | Smart Tools, Productivity, Notes, Clipboard, Screen Assistant, Color Picker, Terminal, Stats | Features you open and use |
+| General | General, Appearance, Tabs & Features, Shortcuts | The notch as a whole: behavior, look, which tabs exist, keys |
+| In the notch | Music, Notifications & Calls, WhatsApp, Calendar & Todos, Timers, Shelf, Live Activities, Stats | One page per thing that shows up in the notch (a tab or a closed-notch activity) |
+| Work | Orbit, AI Agents, Productivity, Glance, Terminal, Notes, Clipboard, Smart Tools, Screen Assistant, Color Picker | Tools for getting work done |
 | System | Controls, Battery, Devices, Download Alerts, Lock Screen, Optimizer | macOS integrations outside the notch panel |
 | (bottom) | About | Version and updates |
 
 The group of each page is set in `SettingsTab.group`, and the order in `availableTabs`
 (`SettingsView.swift`). **Checked:** every page appears exactly once in the order.
+How pages look (header, rows, colours, buttons, words) is in **`docs/SETTINGS_DESIGN.md`**.
 
 ## One home per setting
 
@@ -35,8 +36,9 @@ The group of each page is set in `SettingsTab.group`, and the order in `availabl
 1. Define the key next to the feature that reads it: `extension Defaults.Keys { static let ... }`.
 2. Read it in the app. **Checked:** a key that nothing outside `components/Settings/` reads fails
    the test, because a switch nothing reads does nothing.
-3. Add the control to the feature's page, inside a `Section` with a short header (Title Case),
-   and a one-line caption (`.font(.caption).foregroundStyle(.secondary)`) if the label isn't obvious.
+3. Add the control to the feature's page with the Settings kit (`SettingsToggle`, `SettingsRowLabel`,
+   `SettingsStatus`…), inside a `Section` with a short sentence-case header, following
+   `docs/SETTINGS_DESIGN.md`.
 4. Tag it with `.settingsHighlight(id: highlightID("Its title"))` and add a `SettingsSearchEntry`
    with the same title. **Checked:** every search entry must point to a tagged control.
 5. Use system colors (`.primary`, `.secondary`, `.accentColor`) in Settings, not `.white`, or

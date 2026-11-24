@@ -28,247 +28,207 @@ struct OrbitSettings: View {
     var body: some View {
         Form {
             Section {
-                Defaults.Toggle(key: .enableOrbit) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Use Orbit")
-                        Text("Projects and people pages that build themselves from your day. Off means Orbit does nothing at all: no listeners, no timers, nothing in memory.")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-                .settingsHighlight(id: "orbit-Use Orbit")
-                if enableOrbit {
-                    Defaults.Toggle(key: .orbitLoops) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Loops")
-                            Text("One inbox of what's still open: agents waiting on you, promises, unanswered messages, failing builds and Linear issues.")
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-                    }
-                    Defaults.Toggle(key: .orbitTeam) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Team")
-                            Text("Your AI agents as a board: who's working, who's waiting on you. Right-click a loop to hand it to an agent in that project's folder.")
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-                    }
-                    if teamOn {
-                        Defaults.Toggle(key: .orbitBackgroundHandoffs) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Hand-offs work in the background")
-                                Text("Claude Code and Codex work out of sight in their own copy of the project (a git worktree on a new branch), so your files aren't touched. When done, review the changes and apply, commit or throw them away. File edits there don't ask; commands still ask in the notch.")
-                                    .font(.caption).foregroundStyle(.secondary)
-                            }
-                        }
-                        .padding(.leading, 16)
-                    }
-                    Defaults.Toggle(key: .orbitTrackProjects) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Projects")
-                            Text("From commands in the Terminal tab, AI agents, builds and focus time.")
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-                    }
-                    Defaults.Toggle(key: .orbitTrackPeople) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("People")
-                            Text("Only people you pin (right-click a message or promise in Loops). Their messages and promises are kept on their page; message text only when it names one of your projects.")
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-                    }
-                    HStack {
-                        Image(systemName: orbit.isRunning ? "circle.fill" : "pause.circle")
-                            .foregroundStyle(orbit.isRunning ? .green : .secondary)
-                            .font(.caption)
-                        Text(statusText).font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-            } header: {
-                Text("Orbit")
-            } footer: {
-                Text("Everything stays on this Mac, in Application Support › NotchFlow › Orbit.")
+                SettingsPageHeader(symbol: "circle.circle", tint: SettingsPalette.work, title: "Orbit",
+                                   detail: "Projects, people and loose ends that keep track of themselves. Everything stays on this Mac.",
+                                   status: headerStatus, isOn: $enableOrbit)
+                    .settingsHighlight(id: "orbit-Use Orbit")
             }
 
-            if enableOrbit {
+            if !enableOrbit {
                 Section {
-                    Defaults.Toggle(key: .orbitWriteVault) {
-                        Text("Write notes to an Obsidian vault")
-                    }
-                    .settingsHighlight(id: "orbit-Obsidian vault")
-                    if writeVault {
-                        HStack {
-                            Text("Vault")
-                            Spacer()
-                            Text(orbit.vaultURL.path.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
-                                .font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
-                            Button("Choose…", action: chooseVault)
-                            if !vaultPath.isEmpty { Button("Default") { vaultPath = "" } }
-                        }
-                        Defaults.Toggle(key: .orbitDailyNotes) {
-                            Text("Daily notes")
-                        }
-                        if orbit.hasObsidian {
-                            if orbit.obsidianKnowsVault {
-                                Label("Obsidian has this vault open", systemImage: "checkmark.circle.fill")
-                                    .font(.caption).foregroundStyle(.green)
-                            } else {
-                                HStack(alignment: .top) {
-                                    Label("Obsidian hasn't opened this folder yet. In Obsidian, choose Open folder as vault and pick the folder above. Links from the notch work after that.",
-                                          systemImage: "exclamationmark.triangle.fill")
-                                        .font(.caption).foregroundStyle(.orange)
-                                    Spacer()
-                                    Button("Show Folder") {
-                                        try? FileManager.default.createDirectory(at: orbit.vaultURL, withIntermediateDirectories: true)
-                                        NSWorkspace.shared.activateFileViewerSelecting([orbit.vaultURL])
-                                    }
-                                }
-                            }
-                        } else {
-                            Label("Obsidian isn't installed. The notes are plain markdown files; get Obsidian at obsidian.md to browse them as linked pages.",
-                                  systemImage: "info.circle")
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-                        HStack {
-                            Button("Write Now") { orbit.writeVaultNow() }.disabled(!orbit.isRunning)
-                            Button("Open in Obsidian") { orbit.openInObsidian(nil) }
-                            Spacer()
-                            if let status = orbit.vaultStatus {
-                                Text(status).font(.caption).foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                } header: {
-                    Text("Obsidian vault")
-                } footer: {
-                    Text("Notes go in the vault's Orbit folder (Projects, People, Daily) with [[links]] between them. Orbit only rewrites the part between its markers; anything you write outside it is kept. A new folder is set up as a vault, so Obsidian can open it.")
+                    Text("Off: Orbit does nothing at all. No listeners, no timers, nothing in memory.")
+                        .font(.callout).foregroundStyle(.secondary)
                 }
-
-                Section {
-                    Defaults.Toggle(key: .orbitDailyBrief) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Morning brief")
-                            Text("Yesterday's work, today's meetings and what's open, as a notification and at the top of the daily note. One timer for that moment; nothing runs in between.")
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-                    }
-                    .settingsHighlight(id: "orbit-Morning brief")
-                    if briefOn {
-                        Picker("At", selection: $briefHour) {
-                            ForEach(5..<13, id: \.self) { hour in
-                                Text(String(format: "%02d:00", hour)).tag(hour)
-                            }
-                        }
-                    }
-                    Defaults.Toggle(key: .orbitFocusPlan) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Best focus hours")
-                            Text("From two weeks of time tracking, Orbit finds the two hours you do your deepest work and lets you block them in one click: notifications are held then, and a scene can start.")
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-                    }
-                    .settingsHighlight(id: "orbit-Best focus hours")
-                    Defaults.Toggle(key: .orbitScatter) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Notice when I'm scattered")
-                            Text("Jumping between 6 or more apps in 10 minutes shows Scattered under the closed notch, with Focus 25 min one click away. At most every 30 minutes; it only listens for app switches.")
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-                    }
-                    Defaults.Toggle(key: .orbitBillWatch) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Bills and renewals")
-                            Text("Messages and emails about a renewal, a trial ending or a bill due show in Loops three days before (with the amount when it's mentioned). Read on this Mac only.")
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-                    }
-                    .settingsHighlight(id: "orbit-Bills and renewals")
-                    Defaults.Toggle(key: .orbitScenes) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Scenes")
-                            Text("One click sets you up: open a workspace, hold notifications, open a terminal in the project, start an agent on a task.")
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-                    }
-                    .settingsHighlight(id: "orbit-Scenes")
-                    if scenesOn && orbit.isRunning {
-                        ForEach(orbit.state.scenes) { scene in
-                            sceneEditor(scene)
-                        }
-                        Button("Add Scene") { orbit.saveScene(OrbitScene(name: "New scene")) }
-                    }
-                } header: {
-                    Text("Today")
-                }
-
-                Section {
-                    Defaults.Toggle(key: .orbitLinear) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Connect Linear")
-                            Text("Your open assigned issues appear in Loops (Start and Done move them in Linear), and anything in Orbit can become a Linear issue. Checks every five minutes while on.")
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-                    }
-                    .settingsHighlight(id: "orbit-Linear")
-                    if linearOn {
-                        HStack {
-                            SecureField(linear.hasKey ? "API key saved (paste a new one to replace it)" : "Personal API key (lin_api_…)", text: $linearKey)
-                            Button("Save") {
-                                linear.saveKey(linearKey)
-                                linearKey = ""
-                            }
-                            .disabled(linearKey.trimmingCharacters(in: .whitespaces).isEmpty)
-                            if linear.hasKey {
-                                Button("Remove") { linear.saveKey("") }
-                            }
-                        }
-                        HStack {
-                            if let name = linear.accountName {
-                                Label("Connected as \(name), \(linear.issues.count) open issues", systemImage: "checkmark.circle.fill")
-                                    .foregroundStyle(.green)
-                            } else if let error = linear.lastError {
-                                Label(error, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
-                            } else {
-                                Text("Make a key in Linear: Settings › Account › Security & access › Personal API keys.")
-                                    .foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            Button("Check Now") { Task { await linear.refresh() } }
-                                .disabled(!linear.isActive || linear.isRefreshing)
-                        }
-                        .font(.caption)
-                        if !linear.teams.isEmpty {
-                            Picker("New issues go to", selection: $linearTeam) {
-                                Text("First team").tag("")
-                                ForEach(linear.teams) { team in
-                                    Text("\(team.name) (\(team.key))").tag(team.id)
-                                }
-                            }
-                        }
-                        Defaults.Toggle(key: .orbitLinearAgentComments) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Comment when an agent finishes an issue")
-                                Text("When an AI agent's task names one of your issues (like ENG-12), Orbit adds a comment to it when the agent is done.")
-                                    .font(.caption).foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                } header: {
-                    Text("Linear")
-                } footer: {
-                    Text("The key is kept in your Keychain. Off means no requests to Linear at all.")
-                }
-
-                Section {
-                    Button("Forget Everything…", role: .destructive) { confirmForget = true }
-                        .disabled(!orbit.isRunning)
-                } header: {
-                    Text("Data")
-                } footer: {
-                    Text("Deletes Orbit's saved projects, people and timeline. Notes already in the vault stay.")
-                }
+            } else {
+                partsSection
+                todaySection
+                vaultSection
+                linearSection
+                dataSection
             }
         }
         .confirmationDialog("Forget everything Orbit kept?", isPresented: $confirmForget) {
             Button("Forget Everything", role: .destructive) { orbit.forgetEverything() }
+        } message: {
+            Text("Its projects, people and timeline are deleted. Notes already in your vault stay.")
+        }
+    }
+
+    private var headerStatus: SettingsStatus? {
+        guard enableOrbit else { return nil }
+        guard orbit.isRunning else { return SettingsStatus(text: "Paused: turn on a part below", kind: .warn) }
+        let state = orbit.state
+        return SettingsStatus(text: "Running · \(state.projects.count) projects, \(state.people.count) people, \(state.events.count) events", kind: .ok)
+    }
+
+    // MARK: Sections
+
+    private var partsSection: some View {
+        Section {
+            SettingsToggle(key: .orbitLoops, title: "Loops",
+                           detail: "What's still open, in one list: agents waiting, promises, replies, failing builds, Linear issues.")
+            SettingsToggle(key: .orbitTeam, title: "Team",
+                           detail: "Your AI agents as a board. Right-click a loop to hand it to an agent.")
+            if teamOn {
+                SettingsToggle(key: .orbitBackgroundHandoffs, title: "Hand-offs work in the background",
+                               detail: "Claude Code and Codex work in their own copy of the project, so your files aren't touched. You review before anything is kept.")
+                    .padding(.leading, 16)
+            }
+            SettingsToggle(key: .orbitTrackProjects, title: "Projects",
+                           detail: "Pages that build themselves from the Terminal tab, AI agents, builds and focus time.")
+            SettingsToggle(key: .orbitTrackPeople, title: "People",
+                           detail: "Only people you pin: right-click a message or promise in Loops.")
+        } header: {
+            Text("Parts")
+        }
+    }
+
+    private var todaySection: some View {
+        Section {
+            SettingsToggle(key: .orbitDailyBrief, title: "Morning brief",
+                           detail: "Yesterday's work, today's meetings and what's open, as one notification.",
+                           highlightID: "orbit-Morning brief")
+            if briefOn {
+                Picker("Brief at", selection: $briefHour) {
+                    ForEach(5..<13, id: \.self) { hour in
+                        Text(String(format: "%02d:00", hour)).tag(hour)
+                    }
+                }
+                .padding(.leading, 16)
+            }
+            SettingsToggle(key: .orbitFocusPlan, title: "Best focus hours",
+                           detail: "Finds the two hours you do your deepest work and blocks them in one click.",
+                           highlightID: "orbit-Best focus hours")
+            SettingsToggle(key: .orbitScatter, title: "Notice when I'm scattered",
+                           detail: "Jumping between 6+ apps in 10 minutes shows Scattered, with Focus 25 min one click away.")
+            SettingsToggle(key: .orbitBillWatch, title: "Bills and renewals",
+                           detail: "Renewals, trials ending and bills due show in Loops three days before.",
+                           highlightID: "orbit-Bills and renewals")
+            SettingsToggle(key: .orbitScenes, title: "Scenes",
+                           detail: "One click sets you up: a workspace, quiet time, a terminal, an agent on a task.",
+                           highlightID: "orbit-Scenes")
+            if scenesOn && orbit.isRunning {
+                ForEach(orbit.state.scenes) { scene in
+                    sceneEditor(scene)
+                }
+                Button("Add Scene") { orbit.saveScene(OrbitScene(name: "New scene")) }
+            }
+        } header: {
+            Text("Today")
+        }
+    }
+
+    private var vaultSection: some View {
+        Section {
+            SettingsToggle(key: .orbitWriteVault, title: "Write notes to an Obsidian vault",
+                           detail: "Projects, People and Daily notes with [[links]]. Your own writing in them is kept.",
+                           highlightID: "orbit-Obsidian vault")
+            if writeVault {
+                LabeledContent {
+                    HStack(spacing: 8) {
+                        Text(orbit.vaultURL.path.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
+                            .foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                        Button("Choose…", action: chooseVault)
+                        if !vaultPath.isEmpty { Button("Default") { vaultPath = "" } }
+                    }
+                } label: {
+                    Text("Folder")
+                }
+                SettingsToggle(key: .orbitDailyNotes, title: "Daily notes")
+                vaultStatusRow
+                HStack {
+                    if let status = orbit.vaultStatus {
+                        Text(status).font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button("Open in Obsidian") { orbit.openInObsidian(nil) }
+                    Button("Write Now") { orbit.writeVaultNow() }
+                        .settingsPrimaryButton()
+                        .disabled(!orbit.isRunning)
+                }
+            }
+        } header: {
+            Text("Obsidian vault")
+        }
+    }
+
+    @ViewBuilder private var vaultStatusRow: some View {
+        if !orbit.hasObsidian {
+            SettingsStatus(text: "Obsidian isn't installed. The notes are plain markdown; get Obsidian at obsidian.md to browse them.")
+        } else if orbit.obsidianKnowsVault {
+            SettingsStatus(text: "Obsidian has this vault open", kind: .ok)
+        } else {
+            HStack(alignment: .top) {
+                SettingsStatus(text: "Obsidian hasn't opened this folder yet: in Obsidian, choose Open folder as vault.", kind: .warn)
+                Spacer()
+                Button("Show Folder") {
+                    try? FileManager.default.createDirectory(at: orbit.vaultURL, withIntermediateDirectories: true)
+                    NSWorkspace.shared.activateFileViewerSelecting([orbit.vaultURL])
+                }
+            }
+        }
+    }
+
+    private var linearSection: some View {
+        Section {
+            SettingsToggle(key: .orbitLinear, title: "Connect Linear",
+                           detail: "Your assigned issues in Loops; Start and Done move them in Linear. Checks every five minutes while on.",
+                           highlightID: "orbit-Linear")
+            if linearOn {
+                HStack {
+                    SecureField(linear.hasKey ? "API key saved (paste a new one to replace it)" : "Personal API key (lin_api_…)", text: $linearKey)
+                    Button("Save") {
+                        linear.saveKey(linearKey)
+                        linearKey = ""
+                    }
+                    .settingsPrimaryButton()
+                    .disabled(linearKey.trimmingCharacters(in: .whitespaces).isEmpty)
+                    if linear.hasKey {
+                        Button("Remove") { linear.saveKey("") }
+                            .settingsDestructiveButton()
+                    }
+                }
+                HStack {
+                    if let name = linear.accountName {
+                        SettingsStatus(text: "Connected as \(name) · \(linear.issues.count) open issues", kind: .ok)
+                    } else if let error = linear.lastError {
+                        SettingsStatus(text: error, kind: .warn)
+                    } else {
+                        SettingsStatus(text: "Make a key in Linear: Settings › Account › Security & access › Personal API keys.")
+                    }
+                    Spacer()
+                    Button("Check Now") { Task { await linear.refresh() } }
+                        .disabled(!linear.isActive || linear.isRefreshing)
+                }
+                if !linear.teams.isEmpty {
+                    Picker("New issues go to", selection: $linearTeam) {
+                        Text("First team").tag("")
+                        ForEach(linear.teams) { team in
+                            Text("\(team.name) (\(team.key))").tag(team.id)
+                        }
+                    }
+                }
+                SettingsToggle(key: .orbitLinearAgentComments, title: "Comment when an agent finishes an issue",
+                               detail: "When an agent's task names an issue (like ENG-12), Orbit comments on it when done.")
+            }
+        } header: {
+            Text("Linear")
+        } footer: {
+            Text("The key is kept in your Keychain. Off means no requests to Linear at all.")
+        }
+    }
+
+    private var dataSection: some View {
+        Section {
+            HStack {
+                SettingsRowLabel(title: "Forget everything", detail: "Deletes Orbit's projects, people and timeline. Vault notes stay.")
+                Spacer()
+                Button("Forget…") { confirmForget = true }
+                    .settingsDestructiveButton()
+                    .disabled(!orbit.isRunning)
+            }
+        } header: {
+            Text("Data")
         }
     }
 
@@ -305,12 +265,6 @@ struct OrbitSettings: View {
         } label: {
             Label(scene.name, systemImage: scene.symbol)
         }
-    }
-
-    private var statusText: String {
-        guard orbit.isRunning else { return "Paused: turn on a part above." }
-        let state = orbit.state
-        return "Running: \(state.projects.count) projects, \(state.people.count) people, \(state.events.count) events."
     }
 
     private func chooseVault() {

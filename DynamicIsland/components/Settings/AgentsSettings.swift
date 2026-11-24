@@ -18,26 +18,28 @@ struct AgentsSettings: View {
     @State private var pendingConnect: AgentSetup.Connector?
     @State private var copiedPath = false
 
+    private var headerStatus: SettingsStatus? {
+        guard enabled else { return nil }
+        if hub.isBridgeRunning { return SettingsStatus(text: "Listening for agents on this Mac only", kind: .ok) }
+        if let error = hub.bridgeError { return SettingsStatus(text: error, kind: .error) }
+        return SettingsStatus(text: "Starting…", kind: .neutral)
+    }
+
     // SettingsTab is private to SettingsView.swift; ids follow its "<tab>-<title>" form.
     private func highlightID(_ title: String) -> String { "agents-\(title)" }
 
     var body: some View {
         Form {
             Section {
-                Defaults.Toggle(key: .enableAgentsFeature) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("AI Agents")
-                        Text("Approve what agents want to do, answer their questions and follow their progress from the notch.")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-                .settingsHighlight(id: highlightID("AI Agents"))
-                if enabled {
-                    HStack(spacing: 6) {
-                        Circle().fill(hub.isBridgeRunning ? Color.green : Color.orange).frame(width: 8, height: 8)
-                        Text(hub.isBridgeRunning ? "Listening for agents on this Mac only" : (hub.bridgeError ?? "Starting…"))
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
+                SettingsPageHeader(symbol: "sparkles", tint: SettingsPalette.work, title: "AI Agents",
+                                   detail: "Start, watch and approve Claude Code, Codex, Gemini and Cursor from the notch.",
+                                   status: headerStatus, isOn: $enabled)
+                    .settingsHighlight(id: highlightID("AI Agents"))
+            }
+            if !enabled {
+                Section {
+                    Text("Off: no agent connection is open and nothing runs.")
+                        .font(.callout).foregroundStyle(.secondary)
                 }
             }
 
@@ -72,18 +74,22 @@ struct AgentsSettings: View {
             ForEach(AgentSetup.connectors) { connector in
                 let isConnected = connected.contains(connector.id)
                 HStack(spacing: 10) {
-                    Image(systemName: connector.agent.symbol).foregroundStyle(.orange).frame(width: 20)
+                    Image(systemName: connector.agent.symbol).foregroundStyle(connector.agent.tint).frame(width: 20)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(connector.agent.displayName)
-                        Text(isConnected ? "Connected · \(connector.summary)" : connector.summary)
-                            .font(.caption).foregroundStyle(.secondary)
+                        if isConnected {
+                            SettingsStatus(text: "Connected · \(connector.summary)", kind: .ok)
+                        } else {
+                            Text(connector.summary).font(.caption).foregroundStyle(.secondary)
+                        }
                     }
                     Spacer()
                     if isConnected {
-                        Button("Disconnect", role: .destructive) { disconnect(connector) }
+                        Button("Disconnect") { disconnect(connector) }
+                            .settingsDestructiveButton()
                     } else {
                         Button("Connect") { pendingConnect = connector }
-                            .buttonStyle(.borderedProminent)
+                            .settingsPrimaryButton()
                     }
                 }
             }

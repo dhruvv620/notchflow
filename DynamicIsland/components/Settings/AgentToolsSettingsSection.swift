@@ -24,6 +24,7 @@ struct AgentToolsSettingsSection: View {
                     newName = ""
                     newCommand = ""
                 }
+                .settingsPrimaryButton()
                 .disabled(newCommand.trimmingCharacters(in: .whitespaces).isEmpty)
             }
             HStack {
@@ -55,9 +56,11 @@ struct AgentToolsSettingsSection: View {
                 .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(color(tool.color)))
             VStack(alignment: .leading, spacing: 1) {
                 Text(tool.name)
-                Text(status(tool, found: found))
-                    .font(.caption)
-                    .foregroundStyle(found ? Color.green : Color.secondary)
+                if tools.hasChecked {
+                    SettingsStatus(text: status(tool, found: found), kind: found ? .ok : .neutral)
+                } else {
+                    Text(tool.command).font(.caption).foregroundStyle(.secondary)
+                }
             }
             Spacer()
             if tools.hasChecked && !found && !tool.install.isEmpty {
@@ -65,9 +68,10 @@ struct AgentToolsSettingsSection: View {
                     .help(tool.install)
             }
             if tool.isCustom {
-                Button(role: .destructive) { tools.removeCustom(tool) } label: { Image(systemName: "trash") }
-                    .buttonStyle(.borderless)
-                    .help("Remove")
+                Button { tools.removeCustom(tool) } label: { Image(systemName: "trash") }
+                    .settingsDestructiveButton()
+                    .help("Remove \(tool.name)")
+                    .accessibilityLabel("Remove \(tool.name)")
             }
             Toggle("Show in notch", isOn: Binding(get: { shownIDs.contains(tool.id) },
                                                  set: { tools.setShown($0, tool) }))

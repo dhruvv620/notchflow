@@ -35,11 +35,22 @@ private enum SettingsTabGroup: String, CaseIterable, Identifiable {
     /// Display title for the section header.  `nil` means no visible header.
     var title: String? {
         switch self {
-        case .core:         return nil
-        case .notch:        return String(localized: "In the Notch")
-        case .tools:        return String(localized: "Tools")
+        case .core:         return String(localized: "General")
+        case .notch:        return String(localized: "In the notch")
+        case .tools:        return String(localized: "Work")
         case .system:       return String(localized: "System")
         case .info:         return nil
+        }
+    }
+
+    /// One colour per group, for its pages' sidebar icons and headers.
+    var tint: Color {
+        switch self {
+        case .core: return SettingsPalette.general
+        case .notch: return SettingsPalette.notch
+        case .tools: return SettingsPalette.work
+        case .system: return SettingsPalette.system
+        case .info: return SettingsPalette.system
         }
     }
 }
@@ -81,10 +92,10 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
     var group: SettingsTabGroup {
         switch self {
         case .general, .appearance, .tabsAndFeatures, .shortcuts:                return .core
-        case .media, .liveActivities, .communications, .whatsapp, .agents,
-             .calendar, .timer, .shelf:                                          return .notch
-        case .smartTools, .productivity, .glance, .orbit, .notes, .clipboard, .screenAssistant,
-             .colorPicker, .terminal, .stats:                                    return .tools
+        case .media, .liveActivities, .communications, .whatsapp,
+             .calendar, .timer, .shelf, .stats:                                  return .notch
+        case .orbit, .agents, .productivity, .glance, .terminal, .notes, .clipboard,
+             .smartTools, .screenAssistant, .colorPicker:                        return .tools
         case .hudAndOSD, .battery, .devices, .downloads, .lockScreen, .optimizer:           return .system
         case .about:                                                            return .info
         }
@@ -158,39 +169,8 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         }
     }
 
-    var tint: Color {
-        switch self {
-        case .general: return .blue
-        case .tabsAndFeatures: return .indigo
-        case .communications: return .green
-        case .liveActivities: return .pink
-        case .appearance: return .purple
-        case .lockScreen: return .orange
-        case .media: return .green
-        case .devices: return Color(red: 0.1, green: 0.11, blue: 0.12)
-        case .timer: return .red
-        case .calendar: return .cyan
-        case .hudAndOSD: return .indigo
-        case .battery: return Color(red: 0.202, green: 0.783, blue: 0.348, opacity: 1.000)
-        case .stats: return .teal
-        case .clipboard: return .mint
-        case .screenAssistant: return .pink
-        case .colorPicker: return .accentColor
-        case .downloads: return .gray
-        case .shelf: return .brown
-        case .shortcuts: return .orange
-        case .notes: return Color(red: 0.979, green: 0.716, blue: 0.153, opacity: 1.000)
-        case .smartTools: return .orange
-        case .productivity: return .indigo
-        case .optimizer: return .green
-        case .glance: return .cyan
-        case .orbit: return .indigo
-        case .terminal: return Color(red: 0.2, green: 0.8, blue: 0.4)
-        case .whatsapp: return .whatsAppGreen
-        case .agents: return .orange
-        case .about: return .secondary
-        }
-    }
+    /// Pages take their group's colour (docs/SETTINGS_DESIGN.md).
+    var tint: Color { group.tint }
 
     func highlightID(for title: String) -> String {
         "\(rawValue)-\(title)"
@@ -326,6 +306,9 @@ struct SettingsView: View {
     @State private var searchText: String = ""
     @StateObject private var highlightCoordinator = SettingsHighlightCoordinator()
     @Default(.enableMinimalisticUI) var enableMinimalisticUI
+    // For the sidebar's "needs you" dots.
+    @ObservedObject private var whatsApp = WhatsAppManager.shared
+    @ObservedObject private var agentHub = AgentHub.shared
 
     let updaterController: SPUStandardUpdaterController?
 
@@ -377,9 +360,18 @@ struct SettingsView: View {
         .navigationSplitViewStyle(.balanced)
         .toolbar(removing: .sidebarToggle)
         .toolbar { toolbarSpacingShim }
+        .toolbar {
+            // On every page (docs/SETTINGS_DESIGN.md).
+            ToolbarItemGroup(placement: .primaryAction) {
+                Button("Restart") { AppRelauncher.restart() }
+                    .help("Quit NotchFlow and open it again")
+                Button("Quit") { NSApp.terminate(nil) }
+                    .help("Quit NotchFlow")
+            }
+        }
         .environmentObject(highlightCoordinator)
         .formStyle(.grouped)
-        .frame(width: 700)
+        .frame(width: 760)
         .onChange(of: searchText) { _, newValue in
             let matches = tabsMatchingSearch(newValue)
             guard let firstMatch = matches.first else { return }
@@ -450,29 +442,34 @@ struct SettingsView: View {
 
     @ViewBuilder
     private func sidebarIcon(for tab: SettingsTab) -> some View {
-        RoundedRectangle(cornerRadius: 8, style: .continuous)
-            .fill(
-                LinearGradient(
-                    colors: [
-                        tab.tint.opacity(1),
-                        tab.tint.opacity(0.7)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
-            .frame(width: 26, height: 26)
-            .overlay {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .strokeBorder(Color.white.opacity(0.2), lineWidth: 0.7)
-                    .blendMode(.plusLighter)
-            }
-            .shadow(color: tab.tint.opacity(0.35), radius: 2, x: 0, y: 1)
+        RoundedRectangle(cornerRadius: 7, style: .continuous)
+            .fill(tab.tint.gradient)
+            .frame(width: 24, height: 24)
             .overlay {
                 Image(systemName: tab.systemImage)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(Color.white)
             }
+            .accessibilityHidden(true)
+    }
+
+    /// Pages that need you get an orange dot in the sidebar.
+    private func needsAttention(_ tab: SettingsTab) -> Bool {
+        switch tab {
+        case .whatsapp:
+            guard Defaults[.enableWhatsAppFeature] else { return false }
+            switch whatsApp.state {
+            case .failed, .waitingForLink: return true
+            default: return false
+            }
+        case .agents:
+            return Defaults[.enableAgentsFeature] && agentHub.bridgeError != nil
+        case .orbit:
+            return Defaults[.enableOrbit] && (OrbitLinear.shared.lastError != nil
+                || (Orbit.shared.vaultStatus?.hasPrefix("Couldn't") ?? false))
+        default:
+            return false
+        }
     }
 
     @ViewBuilder
@@ -480,6 +477,11 @@ struct SettingsView: View {
         HStack(spacing: 10) {
             sidebarIcon(for: tab)
             Text(LocalizedStringKey(tab.title))
+            if needsAttention(tab) {
+                Spacer(minLength: 4)
+                Circle().fill(SettingsPalette.warn).frame(width: 7, height: 7)
+                    .accessibilityLabel("Needs attention")
+            }
             if tab == .downloads {
                 Spacer()
                 Text("BETA")
@@ -499,31 +501,31 @@ struct SettingsView: View {
     private var availableTabs: [SettingsTab] {
         // Ordered to match the sidebar groups (see SettingsTabGroup).
         let ordered: [SettingsTab] = [
-            // Core
+            // General
             .general,
             .appearance,
             .tabsAndFeatures,
             .shortcuts,
-            // In the Notch
+            // In the notch
             .media,
-            .liveActivities,
             .communications,
             .whatsapp,
-            .agents,
             .calendar,
             .timer,
             .shelf,
-            // Tools
-            .smartTools,
+            .liveActivities,
+            .stats,
+            // Work
+            .orbit,
+            .agents,
             .productivity,
             .glance,
-            .orbit,
+            .terminal,
             .notes,
             .clipboard,
+            .smartTools,
             .screenAssistant,
             .colorPicker,
-            .terminal,
-            .stats,
             // System
             .hudAndOSD,
             .battery,
@@ -1193,6 +1195,10 @@ struct GeneralSettings: View {
     var body: some View {
         Form {
             Section {
+                SettingsPageHeader(symbol: "gearshape.fill", tint: SettingsPalette.general, title: "General",
+                                   detail: "How NotchFlow starts, opens and behaves.")
+            }
+            Section {
                 Defaults.Toggle(key: .enableMinimalisticUI) {
                     Text("Enable Minimalistic UI")
                 }
@@ -1260,7 +1266,7 @@ struct GeneralSettings: View {
                 }
                 .settingsHighlight(id: highlightID("Hide Dynamic Island during screenshots & recordings"))
             } header: {
-                Text("Menu Bar & Displays")
+                Text("Menu bar and displays")
             }
 
             Section {
@@ -1321,23 +1327,12 @@ struct GeneralSettings: View {
                     }
                 }
             } header: {
-                Text("Closed Notch Height")
+                Text("Closed notch height")
             }
 
             NotchBehaviour()
 
             gestureControls()
-        }
-        .toolbar {
-            Button("Restart") {
-                AppRelauncher.restart()
-            }
-            .controlSize(.extraLarge)
-            .help("Quit NotchFlow and open it again")
-            Button("Quit app") {
-                NSApp.terminate(self)
-            }
-            .controlSize(.extraLarge)
         }
         .navigationTitle("General")
         .onChange(of: openNotchOnHover) {
@@ -1413,66 +1408,61 @@ struct GeneralSettings: View {
     }
 
     @ViewBuilder
+    @ViewBuilder
     func NotchBehaviour() -> some View {
         Section {
-            Defaults.Toggle(key: .extendHoverArea) {
-                Text("Extend hover area")
-            }
-            .settingsHighlight(id: highlightID("Extend hover area"))
-            Defaults.Toggle(key: .enableHaptics) {
-                Text("Enable haptics")
-            }
-            .settingsHighlight(id: highlightID("Enable haptics"))
-            Defaults.Toggle(key: .openNotchOnHover) {
-                Text("Open notch on hover")
-            }
-            .settingsHighlight(id: highlightID("Open notch on hover"))
-            Defaults.Toggle(key: .enableNotchPeek) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Peek before opening")
-                    Text("Hovering shows a one-line preview (timer, music, next meeting, unread messages). Click to open, or keep hovering when Open notch on hover is on.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .settingsHighlight(id: highlightID("Peek before opening"))
             NotchOpensOnSettings()
                 .settingsHighlight(id: highlightID("Opens on"))
+        } header: {
+            Text("When the notch opens")
+        }
+
+        Section {
+            SettingsToggle(key: .openNotchOnHover, title: "Open on hover", highlightID: highlightID("Open notch on hover"))
             if openNotchOnHover {
-                Slider(value: $minimumHoverDuration, in: 0...1, step: 0.1) {
-                    HStack {
-                        Text("Minimum hover duration")
-                        Spacer()
+                LabeledContent {
+                    HStack(spacing: 8) {
+                        Slider(value: $minimumHoverDuration, in: 0...1, step: 0.1)
+                            .frame(width: 160)
+                            .labelsHidden()
                         Text("\(minimumHoverDuration, specifier: "%.1f")s")
+                            .monospacedDigit()
                             .foregroundStyle(.secondary)
+                            .frame(width: 34, alignment: .trailing)
                     }
+                } label: {
+                    Text("Hover delay")
                 }
                 .onChange(of: minimumHoverDuration) {
                     NotificationCenter.default.post(name: Notification.Name.notchHeightChanged, object: nil)
                 }
             }
-            Picker("External display style", selection: $externalDisplayStyle) {
+            SettingsToggle(key: .enableNotchPeek, title: "Peek before opening",
+                           detail: "A one-line preview while you hover: timer, music, next meeting, unread messages.",
+                           highlightID: highlightID("Peek before opening"))
+            SettingsToggle(key: .extendHoverArea, title: "Bigger hover area", highlightID: highlightID("Extend hover area"))
+            SettingsToggle(key: .enableHaptics, title: "Haptic feedback", highlightID: highlightID("Enable haptics"))
+        } header: {
+            Text("Opening")
+        }
+
+        Section {
+            Picker(selection: $externalDisplayStyle) {
                 ForEach(ExternalDisplayStyle.allCases) { style in
-                    Text(style.localizedName)
-                        .tag(style)
+                    Text(style.localizedName).tag(style)
                 }
+            } label: {
+                SettingsRowLabel(title: "Style on displays without a notch", detail: externalDisplayStyle.description)
             }
             .onChange(of: externalDisplayStyle) {
                 NotificationCenter.default.post(name: Notification.Name.notchHeightChanged, object: nil)
             }
             .settingsHighlight(id: highlightID("External display style"))
-            Text(externalDisplayStyle.description)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Defaults.Toggle(key: .hideNonNotchUntilHover) {
-                Text("Hide until hovered on non-notch displays")
-            }
-            .settingsHighlight(id: highlightID("Hide until hovered"))
-            Text("When enabled, the notch slides up and hides on external (non-notch) displays until you hover over it.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            SettingsToggle(key: .hideNonNotchUntilHover, title: "Hide until hovered",
+                           detail: "On displays without a notch, it slides away until you hover over it.",
+                           highlightID: highlightID("Hide until hovered"))
         } header: {
-            Text("Opening the Notch")
+            Text("Other displays")
         }
     }
 }
