@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
+### Changed
+
+### Fixed
+
+## [1.2.7] - 2026-11-24
+
+### Added
 - **Orbit: your best focus hours**: from two weeks of time tracking, Orbit's Today view shows the two hours you do your deepest work (coding, writing, design, learning), like "10:00–12:00: about 1h 40m of deep work there on a typical day", and one click blocks them for today. When the block starts, notifications are held until it ends and a scene you pick can start; the morning brief mentions them too.
 - **Orbit: Scattered**: jumping between 6 or more apps in 10 minutes shows "Scattered · 7 apps" under the closed notch; opening it offers Focus 25 min in one click. At most every 30 minutes, and it only listens for app switches while on.
 - **Orbit: Shut down for the day**: one button in Today picks tomorrow's top 3 from your open loops (shown in the next morning's brief), saves your open windows as a workspace, backs up unsaved code in your projects to a `wip/notchflow-<date>` branch (pushed to GitHub when there's a remote; your files and current branch stay exactly as they are), holds notifications until your brief's hour, and runs Done for the day. Each step can be unticked.
