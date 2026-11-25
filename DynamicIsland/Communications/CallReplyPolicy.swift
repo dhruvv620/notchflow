@@ -24,7 +24,7 @@ enum CallReplyPolicy {
         return (trimmed.hasPrefix("+") ? "+" : "") + digits
     }
 
-    /// Initials for an avatar: "Selene Park" -> "SP", "+1 555" -> "#".
+    /// Initials for an avatar: "Maya Park" -> "MP", "+1 555" -> "#".
     static func initials(for name: String) -> String {
         let words = name.split(whereSeparator: { $0 == " " || $0 == "-" })
             .filter { $0.first?.isLetter == true }

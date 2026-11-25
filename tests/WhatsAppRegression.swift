@@ -49,16 +49,16 @@ struct WhatsAppRegression {
 
         // REST payloads
         let chats = try JSONDecoder().decode(GOWAResponse<GOWAChatList>.self, from: Data(#"""
-        {"code":"SUCCESS","results":{"data":[{"jid":"628123@s.whatsapp.net","name":"Selene","last_message_time":"2024-01-15T10:30:00Z","archived":false}]}}
+        {"code":"SUCCESS","results":{"data":[{"jid":"628123@s.whatsapp.net","name":"Maya","last_message_time":"2024-01-15T10:30:00Z","archived":false}]}}
         """#.utf8))
-        try require(chats.results?.data?.first?.name == "Selene", "Chat list not decoded")
+        try require(chats.results?.data?.first?.name == "Maya", "Chat list not decoded")
         let messages = try JSONDecoder().decode(GOWAResponse<GOWAMessageList>.self, from: Data(#"""
-        {"code":"SUCCESS","results":{"data":[{"id":"ABC","chat_jid":"628123@s.whatsapp.net","sender_jid":"628123@s.whatsapp.net","sender_display_name":"Selene","content":"","timestamp":"2024-01-15T10:30:00Z","is_from_me":false,"media_type":"image","filename":null}]}}
+        {"code":"SUCCESS","results":{"data":[{"id":"ABC","chat_jid":"628123@s.whatsapp.net","sender_jid":"628123@s.whatsapp.net","sender_display_name":"Maya","content":"","timestamp":"2024-01-15T10:30:00Z","is_from_me":false,"media_type":"image","filename":null}]}}
         """#.utf8))
         guard let stored = messages.results?.data?.first?.toMessage(fallbackChatJID: "x") else {
             throw NSError(domain: "WhatsAppRegression", code: 1, userInfo: [NSLocalizedDescriptionKey: "Message list not decoded"])
         }
-        try require(stored.chatJID == "628123@s.whatsapp.net" && stored.senderName == "Selene", "Message fields misread")
+        try require(stored.chatJID == "628123@s.whatsapp.net" && stored.senderName == "Maya", "Message fields misread")
         try require(stored.previewText == WhatsAppMessage.label(forMediaType: "image", filename: nil), "Photo without caption has no label")
 
         // GOWA omits `results` when a list is empty

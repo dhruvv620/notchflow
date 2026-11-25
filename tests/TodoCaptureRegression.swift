@@ -17,7 +17,7 @@ struct TodoCaptureRegression {
         try require(TodoCapturePolicy.title(fromURL: URL(string: "https://www.example.com/article/1")!) == "Read example.com/article/1", "Link title wrong")
         try require(TodoCapturePolicy.title(fromURL: URL(fileURLWithPath: "/tmp/Invoice March.pdf")) == "Open Invoice March", "File title wrong")
         try require(TodoCapturePolicy.title(fromURL: URL(string: "mailto:sam@example.com?subject=Hi")!) == "Email sam@example.com", "Email title wrong")
-        try require(TodoCapturePolicy.followUpTitle(sender: "Selene", body: "Are you coming?\nSeat saved") == "Reply to Selene: Are you coming?", "Follow-up title wrong")
+        try require(TodoCapturePolicy.followUpTitle(sender: "Maya", body: "Are you coming?\nSeat saved") == "Reply to Maya: Are you coming?", "Follow-up title wrong")
         try require(TodoCapturePolicy.followUpTitle(sender: "", body: "") == "Follow up", "Empty follow-up wrong")
 
         var calendar = Calendar(identifier: .gregorian)

@@ -83,7 +83,7 @@ struct NotificationCardRegression {
                     "A WhatsApp call in progress was read as a notification")
         try require(!NotificationCardPolicy.isCallCard(app: .faceTime, texts: ["Rahul", "Missed FaceTime Video"], buttonLabels: ["Call Back", "Message"]),
                     "A missed call was dropped")
-        try require(!NotificationCardPolicy.isCallCard(app: .messages, texts: ["Rahul", "kal 3pm pe milte hain"], buttonLabels: ["Reply", "Close"]),
+        try require(!NotificationCardPolicy.isCallCard(app: .messages, texts: ["Rahul", "kal 4pm pe milte hain"], buttonLabels: ["Reply", "Close"]),
                     "A message was treated as a call")
         try require(NotificationCardPolicy.button("Reply…", matches: .reply) && !NotificationCardPolicy.button("Reply from Alex", matches: .reply), "Reply matching was too broad")
         let first = NotificationCardPolicy.stableID(app: .messages, nativeIdentity: "1", sender: "Alex", body: "Hello")

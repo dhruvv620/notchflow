@@ -358,8 +358,8 @@ extension PromisePolicy {
 
     /// Whether a reply says yes to a plan: a short yes ("ok", "okay bhai",
     /// "pakka", "haan chalo", "sounds good", "👍"), a yes that goes on to
-    /// repeat the plan ("Done bhai, kal 5 baje coffee ke liye ready",
-    /// "Perfect, kal 3pm pe milte hain"), or "kal 3pm pe milte hain". Anything
+    /// repeat the plan ("Done yaar, kal 6 baje coffee ke liye ready",
+    /// "Perfect, kal 4pm pe milte hain"), or "kal 4pm pe milte hain". Anything
     /// with a no, a maybe or a question ("ok but not Friday", "okay I'll check") isn't.
     static func isAgreement(_ text: String) -> Bool {
         if isShortYes(text) { return true }
@@ -411,7 +411,7 @@ extension PromisePolicy {
             word.contains(" ") ? lower.contains(word) : words.contains(word)
         }
         guard isProposal else { return nil }
-        // The time the reply says is the one agreed ("Perfect, kal 3pm pe milte hain").
+        // The time the reply says is the one agreed ("Perfect, kal 4pm pe milte hain").
         // A reply with only a time ("haan, par 6 baje") keeps the invitation's day.
         let dayWords = ["tomorrow", "today", "tonight", "in 2 days", "next week", "weekend"] + weekdays
         let replyEnglish = englishTimes(reply)

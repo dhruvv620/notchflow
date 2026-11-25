@@ -94,21 +94,21 @@ struct PromiseRegression {
                     "News taken as a plan")
         try require(P.agreedPlan(invitation: "coffee Friday 5pm?", reply: "can't, sorry", person: "Sam", now: now, calendar: calendar) == nil,
                     "A no taken as a yes")
-        // The conversation from the screenshot (Wednesday 14:00; "kal" is Thursday the 19th).
-        try require(P.isAgreement("Done bhai, kal 5 baje coffee ke liye ready.") && P.isAgreement("Perfect, kal 3pm pe milte hain")
-                    && P.isAgreement("kal 3pm pe milte hain"), "Long Hinglish yes not understood")
+        // A Hinglish conversation (Wednesday 14:00; "kal" is Thursday the 19th).
+        try require(P.isAgreement("Done yaar, kal 6 baje coffee ke liye ready.") && P.isAgreement("Perfect, kal 4pm pe milte hain")
+                    && P.isAgreement("kal 4pm pe milte hain"), "Long Hinglish yes not understood")
         for notYes in ["Kal nahi yaar, busy hu", "kal kab milte hai?", "ok I'll let you know", "Sorry bhai, next time",
                        "haan but 6 baje", "dekhta hu kal"] {
             try require(!P.isAgreement(notYes), "Taken as a yes: \(notYes)")
         }
-        let five = P.agreedPlan(invitation: "Bhai kal 5 baje coffe ke liye milte hai", reply: "Done bhai, kal 5 baje coffee ke liye ready.",
+        let five = P.agreedPlan(invitation: "Yaar kal 6 baje coffe ke liye milte hai", reply: "Done yaar, kal 6 baje coffee ke liye ready.",
                                 person: "Rahul", now: now, calendar: calendar)
-        try require(five?.title == "Coffee with Rahul" && five?.due == at(19, 17, 0), "5 baje plan: \(show(five))")
-        let three = P.agreedPlan(invitation: "Kal 3pm  baje coffee ke liye milte hai", reply: "Perfect, kal 3pm pe milte hain",
+        try require(five?.title == "Coffee with Rahul" && five?.due == at(19, 18, 0), "6 baje plan: \(show(five))")
+        let three = P.agreedPlan(invitation: "Kal 4pm  baje coffee ke liye milte hai", reply: "Perfect, kal 4pm pe milte hain",
                                  person: "Rahul", now: now, calendar: calendar)
-        try require(three?.title == "Coffee with Rahul" && three?.due == at(19, 15, 0), "3pm plan: \(show(three))")
+        try require(three?.title == "Coffee with Rahul" && three?.due == at(19, 16, 0), "4pm plan: \(show(three))")
         // The reply's time wins when it differs.
-        let moved = P.agreedPlan(invitation: "Bhai kal 5 baje coffee?", reply: "haan, par 6 baje", person: "Rahul", now: now, calendar: calendar)
+        let moved = P.agreedPlan(invitation: "Yaar kal 4 baje coffee?", reply: "haan, par 6 baje", person: "Rahul", now: now, calendar: calendar)
         try require(moved?.due == at(19, 18, 0), "Reply's time: \(show(moved))")
         let later = P.agreedPlan(invitation: "coffee tomorrow 5pm?", reply: "ok see you later", person: "Rahul", now: now, calendar: calendar)
         try require(later?.due == at(19, 17, 0), "\"see you later\" moved the plan: \(show(later))")

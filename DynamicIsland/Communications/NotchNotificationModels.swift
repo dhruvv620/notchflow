@@ -196,7 +196,7 @@ enum NotchNotificationPolicy {
 
     /// The phone number of a WhatsApp chat from a notification's thread
     /// ("919876543210@s.whatsapp.net", "+91 98765 43210"); nil for groups and
-    /// for private ids ("49752934731960@lid"), which look like numbers but aren't.
+    /// for private ids ("12345678901234@lid"), which look like numbers but aren't.
     static func whatsAppPhone(fromThread thread: String?) -> String? {
         guard let thread = thread?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(), !thread.isEmpty else { return nil }
         if let at = thread.firstIndex(of: "@") {

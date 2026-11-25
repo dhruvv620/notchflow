@@ -244,11 +244,11 @@ struct OrbitRegression {
         try require(OrbitState.empty.version == 2, "New state is current")
 
         // Obsidian vaults
-        let vaults = P.obsidianVaults(from: Data(#"{"vaults":{"a1":{"path":"/Users/dv/Notes","ts":1,"open":true},"b2":{"path":"/Users/dv/Orbit/Obsidian/"}}}"#.utf8))
-        try require(vaults.sorted() == ["/Users/dv/Notes", "/Users/dv/Orbit/Obsidian"], "Vaults: \(vaults)")
-        try require(P.vault(containing: "/Users/dv/Orbit/Obsidian/Orbit/People/Ron.md", vaults: vaults) == "/Users/dv/Orbit/Obsidian", "Inside")
-        try require(P.vault(containing: "/Users/dv/Orbit/Other/x.md", vaults: vaults) == nil, "Outside")
-        try require(P.vault(containing: "/Users/dv/NotesOld/x.md", vaults: vaults) == nil, "Prefix is not enough")
+        let vaults = P.obsidianVaults(from: Data(#"{"vaults":{"a1":{"path":"/Users/me/Notes","ts":1,"open":true},"b2":{"path":"/Users/me/Orbit/Obsidian/"}}}"#.utf8))
+        try require(vaults.sorted() == ["/Users/me/Notes", "/Users/me/Orbit/Obsidian"], "Vaults: \(vaults)")
+        try require(P.vault(containing: "/Users/me/Orbit/Obsidian/Orbit/People/Alex.md", vaults: vaults) == "/Users/me/Orbit/Obsidian", "Inside")
+        try require(P.vault(containing: "/Users/me/Orbit/Other/x.md", vaults: vaults) == nil, "Outside")
+        try require(P.vault(containing: "/Users/me/NotesOld/x.md", vaults: vaults) == nil, "Prefix is not enough")
         try require(P.obsidianVaults(from: Data("nope".utf8)).isEmpty, "Bad file")
 
         // Background hand-offs

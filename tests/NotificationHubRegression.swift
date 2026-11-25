@@ -19,13 +19,13 @@ struct NotificationHubRegression {
         let plist: [String: Any] = [
             "app": "com.apple.MobileSMS",
             "date": 790_000_000.0,
-            "req": ["titl": "Selene", "subt": "", "body": "Are you coming?", "thre": "iMessage;-;+15551234567"],
+            "req": ["titl": "Maya", "subt": "", "body": "Are you coming?", "thre": "iMessage;-;+15551234567"],
         ]
         let data = try PropertyListSerialization.data(fromPropertyList: plist, format: .binary, options: 0)
         guard let record = NotificationCenterRecord.parse(recordID: 42, appIdentifier: nil, data: data, fallbackDate: nil) else {
             throw NSError(domain: "NotificationHubRegression", code: 1, userInfo: [NSLocalizedDescriptionKey: "Record not parsed"])
         }
-        try require(record.bundleIdentifier == "com.apple.MobileSMS" && record.title == "Selene" && record.body == "Are you coming?", "Record fields misread")
+        try require(record.bundleIdentifier == "com.apple.MobileSMS" && record.title == "Maya" && record.body == "Are you coming?", "Record fields misread")
         try require(record.date == Date(timeIntervalSinceReferenceDate: 790_000_000), "Record date misread")
         let converted = record.notification(appName: "Messages")
         try require(converted.reply == .messages(chatID: "iMessage;-;+15551234567"), "Messages reply route not found")
@@ -64,12 +64,12 @@ struct NotificationHubRegression {
         try require(groups.last?.items.map(\.id) == ["c", "a"], "Items inside a group not newest-first")
 
         // A banner and its Notification Center record are one notification.
-        let stored = item("nc-1", app: "com.apple.MobileSMS", name: "Messages", title: "Selene", body: "Are you coming? I saved you a seat", at: 100)
-        let banner = item("banner-x", app: "com.apple.MobileSMS", name: "Messages", title: "Selene", body: "Are you coming?", at: 103, source: .banner)
+        let stored = item("nc-1", app: "com.apple.MobileSMS", name: "Messages", title: "Maya", body: "Are you coming? I saved you a seat", at: 100)
+        let banner = item("banner-x", app: "com.apple.MobileSMS", name: "Messages", title: "Maya", body: "Are you coming?", at: 103, source: .banner)
         try require(NotchNotificationPolicy.isSameNotification(banner, as: stored), "Banner not matched to its stored notification")
-        let late = item("banner-y", app: "com.apple.MobileSMS", name: "Messages", title: "Selene", body: "Are you coming?", at: 400, source: .banner)
+        let late = item("banner-y", app: "com.apple.MobileSMS", name: "Messages", title: "Maya", body: "Are you coming?", at: 400, source: .banner)
         try require(!NotchNotificationPolicy.isSameNotification(late, as: stored), "Banners minutes apart merged")
-        let other = item("banner-z", app: "com.apple.MobileSMS", name: "Messages", title: "Khushii", body: "Are you coming?", at: 101, source: .banner)
+        let other = item("banner-z", app: "com.apple.MobileSMS", name: "Messages", title: "Leo", body: "Are you coming?", at: 101, source: .banner)
         try require(!NotchNotificationPolicy.isSameNotification(other, as: stored), "Different senders merged")
         // The WhatsApp app on this Mac and the linked account: the same message once, other messages always.
         let gateway = NotchNotification(id: "wa-1", source: .whatsapp, bundleIdentifier: "net.whatsapp.WhatsApp", appName: "WhatsApp",
@@ -94,7 +94,7 @@ struct NotificationHubRegression {
         try require(N.whatsAppPhone(fromThread: "919876543210@s.whatsapp.net") == "919876543210", "JID thread")
         try require(N.whatsAppPhone(fromThread: "919876543210:12@s.whatsapp.net") == "919876543210", "Device JID thread")
         try require(N.whatsAppPhone(fromThread: "+91 98765 43210") == "919876543210", "Number thread")
-        try require(N.whatsAppPhone(fromThread: "49752934731960@lid") == nil, "A private WhatsApp id was taken for a phone number")
+        try require(N.whatsAppPhone(fromThread: "12345678901234@lid") == nil, "A private WhatsApp id was taken for a phone number")
         try require(N.whatsAppPhone(fromThread: "120363025246125244@g.us") == nil && N.whatsAppPhone(fromThread: "chat-42") == nil
                     && N.whatsAppPhone(fromThread: nil) == nil, "Group or unknown thread gave a number")
         try require(N.whatsAppSendURL(phone: "919876543210", text: "ok bhai, 5 baje")?.absoluteString
@@ -139,7 +139,7 @@ struct NotificationHubRegression {
                     && !NotchNotificationPolicy.isRepeat(yesterday, of: againToday), "A new message taken for a repeat")
 
         // An old notification hovered in the open Notification Center panel, an hour later.
-        let browsed = item("banner-w", app: "com.apple.MobileSMS", name: "Messages", title: "Selene", body: "Are you coming?", at: 3_700, source: .banner)
+        let browsed = item("banner-w", app: "com.apple.MobileSMS", name: "Messages", title: "Maya", body: "Are you coming?", at: 3_700, source: .banner)
         try require(NotchNotificationPolicy.isSameNotification(browsed, as: stored, window: .infinity), "Panel card not matched to its notification")
         try require(!NotchNotificationPolicy.isSameNotification(other, as: stored, window: .infinity), "Panel card matched another sender")
 
