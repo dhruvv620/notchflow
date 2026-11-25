@@ -100,6 +100,95 @@ final class NativeCallBridge: @unchecked Sendable {
         }
     }
 
+    /// Ends a call through the app's menu bar ("End Call", "Hang Up", "Leave
+    /// Meeting"), for calls whose window buttons can't be read.
+    func endViaMenu(_ app: CommunicationApp) async -> Bool {
+        guard AXIsProcessTrusted() else { return false }
+        let pids = await MainActor.run { Self.pids(for: app) }
+        return await withCheckedContinuation { continuation in
+            queue.async {
+                for pid in pids {
+                    let root = AXUIElementCreateApplication(pid)
+                    AXUIElementSetMessagingTimeout(root, 0.2)
+                    if let item = Self.menuItems(root).first(where: { CallAudioPolicy.isEndMenuTitle($0.title) && $0.enabled }),
+                       AXUIElementPerformAction(item.element, kAXPressAction as CFString) == .success {
+                        continuation.resume(returning: true); return
+                    }
+                }
+                continuation.resume(returning: false)
+            }
+        }
+    }
+
+    /// The call window's title (usually who you're talking to), if readable.
+    func callWindowTitle(_ app: CommunicationApp) async -> String? {
+        guard AXIsProcessTrusted() else { return nil }
+        let pids = await MainActor.run { Self.pids(for: app) }
+        return await withCheckedContinuation { continuation in
+            queue.async {
+                let ignored = Set([app.title.lowercased(), "facetime", "whatsapp", "zoom", "zoom workplace", "microsoft teams",
+                                   "teams", "zoom meeting", "meeting", ""])
+                for pid in pids {
+                    let root = AXUIElementCreateApplication(pid)
+                    AXUIElementSetMessagingTimeout(root, 0.1)
+                    for window in CommunicationsAX.elements(root, kAXWindowsAttribute).prefix(4) {
+                        let title = (CommunicationsAX.string(window, kAXTitleAttribute) ?? "")
+                            .trimmingCharacters(in: .whitespacesAndNewlines)
+                        if !ignored.contains(title.lowercased()), title.count <= 60 {
+                            continuation.resume(returning: title); return
+                        }
+                    }
+                }
+                continuation.resume(returning: nil)
+            }
+        }
+    }
+
+    /// What NotchFlow can see of the call apps, for a bug report: button and
+    /// menu labels only, never message text or window contents.
+    func diagnosticReport(audio: [CallAudioPolicy.Process]) async -> String {
+        var lines = ["NotchFlow call report", "Accessibility: \(AXIsProcessTrusted() ? "allowed" : "not allowed")", ""]
+        lines.append("Apps using the microphone:")
+        if audio.isEmpty { lines.append("  none") }
+        for process in audio {
+            let app = CallAudioPolicy.app(for: process)?.title ?? "not a call app"
+            lines.append("  \(process.name.isEmpty ? "?" : process.name) [\(process.bundleID)] input:\(process.input) output:\(process.output) -> \(app)")
+        }
+        guard AXIsProcessTrusted() else { return lines.joined(separator: "\n") }
+        let targets: [(CommunicationApp, [pid_t])] = await MainActor.run {
+            [CommunicationApp.faceTime, .whatsapp, .zoom, .teams].map { ($0, Self.pids(for: $0)) }
+        }
+        let body: [String] = await withCheckedContinuation { continuation in
+            queue.async {
+                var out: [String] = []
+                for (app, pids) in targets where !pids.isEmpty {
+                    out.append("")
+                    out.append("\(app.title):")
+                    for pid in pids {
+                        let root = AXUIElementCreateApplication(pid)
+                        AXUIElementSetMessagingTimeout(root, 0.1)
+                        let windows = CommunicationsAX.elements(root, kAXWindowsAttribute)
+                        out.append("  windows: \(windows.count)")
+                        for (index, window) in windows.prefix(4).enumerated() {
+                            let nodes = CommunicationsAX.snapshot(window, maxDepth: 9, maxNodes: 220, budget: 0.4)
+                            let buttons = nodes.filter { Self.isControl($0) }.map { node in
+                                "\(node.labels.isEmpty ? "(no label)" : node.labels.joined(separator: " / "))\(node.isEnabled ? "" : " [off]")"
+                            }
+                            out.append("  window \(index + 1) buttons: \(buttons.prefix(40).joined(separator: " | "))")
+                        }
+                        let menu = Self.menuItems(root).map(\.title).filter { title in
+                            let text = title.lowercased()
+                            return ["end", "hang", "leave", "mute", "microphone", "camera", "video", "call"].contains { text.contains($0) }
+                        }
+                        out.append("  call menu items: \(menu.isEmpty ? "none" : menu.joined(separator: " | "))")
+                    }
+                }
+                continuation.resume(returning: out)
+            }
+        }
+        return (lines + body).joined(separator: "\n")
+    }
+
     func stop() async {
         await withCheckedContinuation { continuation in
             queue.async { self.records.removeAll(); self.firstSeen.removeAll(); continuation.resume() }
@@ -169,6 +258,38 @@ final class NativeCallBridge: @unchecked Sendable {
             let left = Self.priority($0.phase), right = Self.priority($1.phase)
             return left == right ? $0.observedAt < $1.observedAt : left < right
         }
+    }
+
+    @MainActor private static func pids(for app: CommunicationApp) -> [pid_t] {
+        NSWorkspace.shared.runningApplications.filter { running in
+            guard let bundle = running.bundleIdentifier else { return false }
+            return app.bundleIdentifiers.contains(bundle)
+                || ((app == .faceTime || app == .phone) && bundle.lowercased().hasPrefix("com.apple.facetime"))
+        }.map(\.processIdentifier)
+    }
+
+    private struct MenuItem { let element: AXUIElement; let title: String; let enabled: Bool }
+
+    /// Every item of an app's menu bar menus (one level of submenus).
+    private static func menuItems(_ root: AXUIElement) -> [MenuItem] {
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(root, kAXMenuBarAttribute as CFString, &value) == .success,
+              let value, CFGetTypeID(value) == AXUIElementGetTypeID() else { return [] }
+        let bar = value as! AXUIElement
+        var items: [MenuItem] = []
+        func collect(_ menu: AXUIElement, depth: Int) {
+            for item in CommunicationsAX.elements(menu, kAXChildrenAttribute).prefix(60) {
+                let title = CommunicationsAX.string(item, kAXTitleAttribute) ?? ""
+                if !title.isEmpty { items.append(MenuItem(element: item, title: title, enabled: CommunicationsAX.enabled(item))) }
+                if depth < 1 {
+                    for submenu in CommunicationsAX.elements(item, kAXChildrenAttribute).prefix(1) { collect(submenu, depth: depth + 1) }
+                }
+            }
+        }
+        for barItem in CommunicationsAX.elements(bar, kAXChildrenAttribute).dropFirst().prefix(12) {
+            for menu in CommunicationsAX.elements(barItem, kAXChildrenAttribute).prefix(1) { collect(menu, depth: 0) }
+        }
+        return items
     }
 
     private static func source(for bundle: String) -> CommunicationApp? {

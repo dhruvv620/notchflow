@@ -41,6 +41,11 @@ final class CommunicationsManager: ObservableObject {
     private var callLastSeen: [String: Date] = [:]
     private var endingCalls: [String: Date] = [:]
     private var answeringCalls: [String: Date] = [:]
+    /// Calls found from microphone use: their mute is the Mac's microphone.
+    private var systemMuteCallIDs = Set<String>()
+    private var audioCallTitles: [CommunicationApp: String] = [:]
+    /// What the last scan found, for Settings.
+    @Published private(set) var detectionSummary = "No call right now"
 
     var priorityCall: CommunicationCall? { CommunicationsPolicy.priorityCall(calls) }
     var enabled: Bool { Defaults[.communicationsEnabled] }
@@ -127,20 +132,28 @@ final class CommunicationsManager: ObservableObject {
 
     func refresh() async {
         refreshAccess()
-        guard enabled, accessGranted, !isRefreshing, !LockScreenManager.shared.isLocked else { return }
+        guard enabled, !isRefreshing, !LockScreenManager.shared.isLocked else { return }
         let version = generation
         isRefreshing = true
         defer { isRefreshing = false }
         let notificationApps = Set(Defaults[.communicationNotificationApps].compactMap(CommunicationApp.init(rawValue:)))
         let callApps = Set(Defaults[.communicationCallApps].compactMap(CommunicationApp.init(rawValue:)))
+        // Calls are also found from microphone use, which needs no permission,
+        // so a call shows even when its window's buttons can't be read.
+        let audioApps = CallAudioPolicy.callApps(from: CallAudioMonitor.processes(), allowed: callApps,
+                                                 ownBundleID: Bundle.main.bundleIdentifier ?? "")
+        guard accessGranted else {
+            guard version == generation else { return }
+            await mergeCalls(observed: [], audioApps: audioApps, callApps: callApps)
+            return
+        }
         async let observedNotifications = notificationBridge.scan(allowedApps: notificationApps)
         async let observedCalls = callBridge.scan(allowedApps: callApps)
         let (notificationScan, observed) = await (observedNotifications, observedCalls)
         refreshAccess()
-        guard enabled, accessGranted, version == generation, !Task.isCancelled else { return }
+        guard enabled, version == generation, !Task.isCancelled else { return }
         notificationDiagnostics = notificationScan.diagnostics
         let capturedMessages = notificationScan.notifications
-        let now = Date()
         hiddenNotificationIDs.formIntersection(Set(capturedMessages.map(\.id)))
         let messages = capturedMessages.filter { !hiddenNotificationIDs.contains($0.id) }
         // Older notifications seen while browsing the Notification Center panel aren't new.
@@ -161,6 +174,42 @@ final class CommunicationsManager: ObservableObject {
                 self?.latestNotification = nil
             }
         }
+        await mergeCalls(observed: observed, audioApps: audioApps, callApps: callApps)
+    }
+
+    /// Combines calls read from their windows with calls found from microphone
+    /// use, keeps a call through a brief gap, and frees the microphone after.
+    private func mergeCalls(observed windowCalls: [CommunicationCall], audioApps: [CommunicationApp],
+                            callApps: Set<CommunicationApp>) async {
+        let now = Date()
+        let micMuted = SystemMicrophone.shared.isMuted
+        var observed = windowCalls
+        var systemMuted = Set<String>()
+        for index in observed.indices where observed[index].phase == .active
+            && !observed[index].actions.contains(.mute) && !observed[index].actions.contains(.unmute) {
+            observed[index].actions.insert(micMuted ? .unmute : .mute)
+            systemMuted.insert(observed[index].id)
+        }
+        for app in audioApps where !observed.contains(where: { $0.app == app || (app == .faceTime && $0.app == .phone) }) {
+            let id = "audio:\(app.rawValue)"
+            if audioCallTitles[app] == nil, let title = await callBridge.callWindowTitle(app) { audioCallTitles[app] = title }
+            let caller = audioCallTitles[app] ?? "\(app.title) call"
+            var actions: Set<CommunicationCallAction> = [.open, micMuted ? .unmute : .mute]
+            if accessGranted { actions.insert(.end) }
+            observed.append(CommunicationCall(id: id, app: app, caller: caller, phase: .active, connectedAt: nil,
+                                              observedAt: now, actions: actions))
+            systemMuted.insert(id)
+        }
+        for app in audioCallTitles.keys where !audioApps.contains(app) { audioCallTitles.removeValue(forKey: app) }
+        systemMuteCallIDs = systemMuted
+        if observed.isEmpty {
+            detectionSummary = "No call right now"
+        } else {
+            detectionSummary = observed.map { call in
+                "\(call.app.title): \(call.id.hasPrefix("audio:") ? "found from microphone use" : "found in its window")"
+            }.joined(separator: ", ")
+        }
+
         let observedIDs = Set(observed.map(\.id))
         endingCalls = endingCalls.filter { observedIDs.contains($0.key) }
         var next: [CommunicationCall] = []
@@ -191,6 +240,7 @@ final class CommunicationsManager: ObservableObject {
             } else { callLastSeen.removeValue(forKey: previous.id); answeringCalls.removeValue(forKey: previous.id) }
         }
         if calls != next { calls = next; MusicManager.shared.excludeCallPlaybackIfNeeded() }
+        if next.isEmpty { SystemMicrophone.shared.releaseIfMutedByUs() }
     }
 
     func beginReply(id: String) async -> Bool {
@@ -219,14 +269,45 @@ final class CommunicationsManager: ObservableObject {
         notifications.removeAll { $0.id == id }
         if latestNotification?.id == id { latestNotification = nil }
     }
+    /// A text report of what NotchFlow can see of call apps, for bug reports.
+    func callDiagnosticReport() async -> String {
+        var report = await callBridge.diagnosticReport(audio: CallAudioMonitor.processes())
+        report += "\n\nRight now: \(detectionSummary)"
+        report += "\nMicrophone muted: \(SystemMicrophone.shared.isMuted ? "yes" : "no")"
+        return report
+    }
     func clearHistory() { hiddenNotificationIDs.formUnion(notifications.map(\.id)); notifications = []; latestNotification = nil; alertTask?.cancel() }
 
     func performCall(_ action: CommunicationCallAction, id: String) async {
-        guard enabled, accessGranted, let call = calls.first(where: { $0.id == id }), !pendingCallActionIDs.contains(id) else { return }
+        guard enabled, let call = calls.first(where: { $0.id == id }), !pendingCallActionIDs.contains(id) else { return }
         if action == .open { openSource(call.app); return }
         guard call.actions.contains(action) else { return }
         pendingCallActionIDs.insert(id)
         defer { pendingCallActionIDs.remove(id) }
+        // The Mac's microphone, for calls whose own mute button can't be pressed.
+        if (action == .mute || action == .unmute) && systemMuteCallIDs.contains(id) {
+            if SystemMicrophone.shared.setMuted(action == .mute) {
+                lastError = nil
+                if let index = calls.firstIndex(where: { $0.id == id }) {
+                    calls[index].actions.remove(action)
+                    calls[index].actions.insert(action == .mute ? .unmute : .mute)
+                }
+            } else {
+                lastError = "Couldn't change the microphone. Use the mute button in \(call.app.title)."
+            }
+            return
+        }
+        // Calls found from microphone use end through the app's menu.
+        if action == .end && id.hasPrefix("audio:") {
+            if await callBridge.endViaMenu(call.app) {
+                lastError = nil
+                endingCalls[id] = Date().addingTimeInterval(5)
+            } else {
+                lastError = "Couldn't end it from here. Open \(call.app.title) to hang up."
+            }
+            return
+        }
+        guard accessGranted else { lastError = "Allow Accessibility (Settings › Notifications & Calls) to use this button."; return }
         do {
             try await callBridge.perform(action, id: id)
             lastError = nil
@@ -253,7 +334,7 @@ final class CommunicationsManager: ObservableObject {
         else { lastError = "Open \(app.title) to continue. This app could not be found on your Mac." }
     }
     func isCallMediaSource(_ bundleIdentifier: String) -> Bool {
-        guard enabled, accessGranted else { return false }
+        guard enabled else { return false }
         return calls.contains {
             $0.app.bundleIdentifiers.contains(bundleIdentifier)
                 || ([CommunicationApp.faceTime, .phone].contains($0.app) && bundleIdentifier.lowercased().hasPrefix("com.apple.facetime"))

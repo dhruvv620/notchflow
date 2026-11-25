@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Calls in the notch, much more reliably**: FaceTime, iPhone calls through your Mac, WhatsApp, Zoom and Teams calls now show in the notch even when NotchFlow can't read the app's call buttons, because a call is also noticed from the app using the microphone and speakers (a voice note or dictation doesn't count). Open the notch for the call card: Mute works for any call (it mutes your Mac's microphone and turns it back on when the call ends), End hangs up through the app's own menu, and Open goes to the app. Call buttons are recognized under more names ("End", "Hang Up", "Leave", "Mute microphone"…), the closed notch shows "Muted" next to the call time, and Settings › Notifications & Calls shows what's detected right now, with Copy Report for when a call doesn't show.
 
 ### Changed
 

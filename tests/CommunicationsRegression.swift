@@ -35,6 +35,40 @@ struct CommunicationsRegression {
         try check(host?.phase == .active && host?.actions[.end] == nil, "Host-wide destructive action was exposed as ordinary hangup")
         let connecting = CallClassificationPolicy.classify(app: .faceTime, context: "Connecting", controls: [control("End call"), control("Mute")])
         try check(connecting?.phase == .connecting, "Connecting call was shown as confirmed active")
+        // Labels differ between apps and versions.
+        let faceTimeEnd = CallClassificationPolicy.classify(app: .faceTime, context: "FaceTime Alex", controls: [control("End"), control("Video")])
+        try check(faceTimeEnd?.phase == .active && faceTimeEnd?.actions[.end] == 0, "FaceTime's plain End button was not recognized")
+        let whatsAppCall = CallClassificationPolicy.classify(app: .whatsapp, context: "Voice call", controls: [control("End call"), control("Mute microphone")])
+        try check(whatsAppCall?.phase == .active && whatsAppCall?.actions[.mute] == 1, "WhatsApp call controls were not recognized")
+        let hangUp = CallClassificationPolicy.classify(app: .zoom, context: "Meeting", controls: [control("Hang Up"), control("Unmute my audio")])
+        try check(hangUp?.actions[.end] == 0 && hangUp?.actions[.unmute] == 1, "Hang Up and Unmute were not recognized")
+        try check(CallClassificationPolicy.classify(app: .whatsapp, context: "Chats", controls: [control("End")]) == nil,
+                  "An End button outside a call was taken for a call")
+        try check(CallClassificationPolicy.action(for: "End Meeting for All", app: .zoom, callContext: true) == nil,
+                  "Ending the meeting for everyone was offered as a hang-up")
+        let ringing = CallClassificationPolicy.classify(app: .whatsapp, context: "Incoming voice call", controls: [control("Accept"), control("Decline")])
+        try check(ringing?.phase == .incoming, "A ringing WhatsApp call was not recognized")
+
+        // Calls found from microphone use: input and output both running.
+        func process(_ bundle: String, _ name: String, input: Bool = true, output: Bool = true) -> CallAudioPolicy.Process {
+            .init(pid: 1, bundleID: bundle, name: name, input: input, output: output)
+        }
+        let allApps: Set<CommunicationApp> = [.faceTime, .phone, .whatsapp, .teams, .zoom]
+        try check(CallAudioPolicy.callApps(from: [process("", "avconferenced")], allowed: allApps, ownBundleID: "me") == [.faceTime],
+                  "A FaceTime or iPhone call was not found from its audio")
+        try check(CallAudioPolicy.callApps(from: [process("net.whatsapp.WhatsApp", "WhatsApp")], allowed: allApps, ownBundleID: "me") == [.whatsapp],
+                  "A WhatsApp call was not found from its audio")
+        try check(CallAudioPolicy.callApps(from: [process("net.whatsapp.WhatsApp", "WhatsApp", output: false)], allowed: allApps, ownBundleID: "me").isEmpty,
+                  "Recording a voice note was taken for a call")
+        try check(CallAudioPolicy.callApps(from: [process("com.apple.SpeechRecognitionCore", "dictation")], allowed: allApps, ownBundleID: "me").isEmpty,
+                  "Dictation was taken for a call")
+        try check(CallAudioPolicy.callApps(from: [process("us.zoom.xos", "zoom.us")], allowed: [.whatsapp], ownBundleID: "me").isEmpty,
+                  "A call app turned off in Settings was shown")
+        try check(CallAudioPolicy.callApps(from: [process("", "avconferenced")], allowed: [.phone], ownBundleID: "me") == [.faceTime],
+                  "iPhone calls on: their audio process was ignored")
+        try check(CallAudioPolicy.isEndMenuTitle("End Call") && CallAudioPolicy.isEndMenuTitle("Leave Meeting…")
+                  && !CallAudioPolicy.isEndMenuTitle("End Meeting for All") && !CallAudioPolicy.isEndMenuTitle("Endnotes"),
+                  "End-call menu titles not matched correctly")
         print("Communications priority, retention, stale actions and native call policy checks passed")
     }
 }

@@ -18,6 +18,7 @@ struct CommunicationsSettingsView: View {
     @ObservedObject private var fullDiskAccess = FullDiskAccessPermissionStore.shared
     @ObservedObject private var whatsApp = WhatsAppManager.shared
     @State private var confirmErase = false
+    @State private var copiedReport = false
 
     var body: some View {
         Form {
@@ -165,10 +166,27 @@ struct CommunicationsSettingsView: View {
             ForEach([CommunicationApp.faceTime, .phone, .whatsapp, .teams, .zoom]) { app in
                 appToggle(app, selection: $callApps)
             }
+            LabeledContent("Right now") {
+                SettingsStatus(text: manager.detectionSummary,
+                               kind: manager.calls.isEmpty ? .neutral : .ok)
+            }
+            HStack {
+                SettingsRowLabel(title: "A call doesn't show or a button doesn't work?",
+                                 detail: "During the call, copy this report and send it. It has button names only, no messages.")
+                Spacer()
+                Button(copiedReport ? "Copied" : "Copy Report") {
+                    Task {
+                        let report = await manager.callDiagnosticReport()
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(report, forType: .string)
+                        copiedReport = true
+                    }
+                }
+            }
         } header: {
             Text("Calls")
         } footer: {
-            Text("Incoming calls come first in the notch, with answer, mute and end when the app offers them. iPhone calls need to be set up to ring on this Mac.")
+            Text("A call shows in the notch with answer, decline, mute and end. Calls are also noticed from microphone use, so they show even when the app's buttons can't be read; then Mute uses your Mac's microphone and End uses the app's menu. iPhone calls need to be set up to ring on this Mac.")
         }
         .settingsHighlight(id: "communications-Call Island")
     }

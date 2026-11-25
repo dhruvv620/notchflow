@@ -1358,7 +1358,8 @@ struct ContentView: View {
       }
 
     private var visibleCommunicationCall: CommunicationCall? {
-        guard communications.enabled, communications.accessGranted, interactionsEnabled else { return nil }
+        // Calls found from microphone use need no Accessibility.
+        guard communications.enabled, interactionsEnabled else { return nil }
         if Defaults[.communicationRespectFocus] && doNotDisturbManager.isDoNotDisturbActive && communications.priorityCall?.phase == .incoming { return nil }
         // A Pomodoro focus block holds ringing calls unless calls are let through.
         if focusQuiet.holds(.call) && communications.priorityCall?.phase == .incoming { return nil }

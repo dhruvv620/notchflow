@@ -18,38 +18,58 @@ enum CallClassificationPolicy {
         let withoutShortcut = text.components(separatedBy: " (").first ?? text
         return withoutShortcut.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
+    /// What a call control does, from its label. Labels differ between apps and
+    /// versions ("End", "End Call", "Hang Up", "Leave"), so this matches words,
+    /// not exact strings. "End meeting for all" is never a plain hang-up.
+    static func action(for label: String, app: CommunicationApp, callContext: Bool) -> CommunicationCallAction? {
+        let text = normalized(label)
+        guard !text.isEmpty, text.count <= 40 else { return nil }
+        if text.contains("for all") || text.contains("for everyone") { return nil }
+        if ["answer", "answer call", "accept call", "accept audio call", "accept video call", "pick up"].contains(text)
+            || text.hasPrefix("answer ") || text.hasPrefix("accept call") { return .answer }
+        if text == "accept" && (callContext || app == .faceTime || app == .phone || app == .whatsapp) { return .answer }
+        if ["decline", "decline call", "reject", "reject call", "ignore", "ignore call"].contains(text)
+            || text.hasPrefix("decline ") { return .decline }
+        if ["end call", "end", "hang up", "hangup", "leave call", "leave meeting", "end video call", "end audio call",
+            "end voice call"].contains(text) || text.hasPrefix("end call") || text.hasPrefix("hang up") { return .end }
+        if text == "leave" && (app == .teams || app == .zoom || callContext) { return .end }
+        if text.hasPrefix("unmute") || text == "turn microphone on" || text == "turn on microphone" { return .unmute }
+        if text.hasPrefix("mute") || text == "turn microphone off" || text == "turn off microphone"
+            || text == "microphone" || text == "mic" { return .mute }
+        if text.contains("camera") || ["video", "start video", "stop video", "turn video on", "turn video off"].contains(text) {
+            return .toggleVideo
+        }
+        return nil
+    }
+
     static func classify(app: CommunicationApp, context: String, controls: [Control]) -> Match? {
         guard [.faceTime, .phone, .whatsapp, .teams, .zoom].contains(app) else { return nil }
         let context = normalized(context)
-        let callContext = ["incoming call", "video call", "voice call", "audio call", "call in progress", "in a call", "facetime", "meeting"].contains { context.contains($0) }
+        let callContext = ["incoming call", "video call", "voice call", "audio call", "call in progress", "in a call",
+                           "facetime", "meeting", "calling", "ringing"].contains { context.contains($0) }
         var hasMeetingEnd = false
         var matches: [CommunicationCallAction: Int] = [:]
         for (index, control) in controls.enumerated() where control.enabled && control.pressable {
-            for label in control.labels.map(normalized) {
-                let action: CommunicationCallAction?
-                switch label {
-                case "answer", "answer call", "accept call", "accept audio call", "accept video call": action = .answer
-                case "accept" where callContext || app == .faceTime || app == .phone: action = .answer
-                case "decline", "decline call", "reject call": action = .decline
-                case "end call", "hang up", "leave meeting", "leave call": action = .end
-                case "end meeting", "end meeting for all": hasMeetingEnd = true; action = nil
-                case "leave" where (app == .teams || app == .zoom) && callContext: action = .end
-                case "mute", "mute microphone", "mute my microphone", "mute my audio", "mute audio", "turn microphone off": action = .mute
-                case "unmute", "unmute microphone", "unmute my microphone", "unmute my audio", "unmute audio", "turn microphone on": action = .unmute
-                case "turn camera off", "turn camera on", "start video", "stop video": action = .toggleVideo
-                default: action = nil
+            for label in control.labels {
+                let text = normalized(label)
+                if text == "end meeting" || text.hasPrefix("end meeting for") { hasMeetingEnd = true; continue }
+                if let action = action(for: text, app: app, callContext: callContext), matches[action] == nil {
+                    matches[action] = index
                 }
-                if let action, matches[action] == nil { matches[action] = index }
             }
         }
         if matches[.answer] != nil && matches[.decline] != nil,
-           callContext || app == .faceTime || app == .phone {
+           callContext || app == .faceTime || app == .phone || app == .whatsapp {
             return Match(phase: .incoming, actions: matches.filter { [.answer, .decline].contains($0.key) })
         }
         if matches[.end] != nil && (context.contains("connecting") || context.contains("calling") || context.contains("ringing")) {
             return Match(phase: .connecting, actions: [.end: matches[.end]!])
         }
-        if (matches[.end] != nil || hasMeetingEnd) && (matches[.mute] != nil || matches[.unmute] != nil) {
+        let hasMic = matches[.mute] != nil || matches[.unmute] != nil
+        // FaceTime and WhatsApp call windows don't always label their mute button;
+        // an End button in their call window is enough there.
+        let endIsEnough = [.faceTime, .phone, .whatsapp].contains(app) && callContext
+        if (matches[.end] != nil || hasMeetingEnd) && (hasMic || endIsEnough) {
             return Match(phase: .active, actions: matches.filter { ![.answer, .decline].contains($0.key) })
         }
         return nil

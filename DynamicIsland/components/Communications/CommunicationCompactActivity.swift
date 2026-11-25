@@ -25,7 +25,8 @@ struct CommunicationCompactActivity: View {
                     .font(.system(size: 11, weight: .semibold)).lineLimit(1)
                 if let call, call.phase == .active {
                     TimelineView(.periodic(from: .now, by: 1)) { context in
-                        Text(CommunicationsPolicy.durationLabel(call, now: context.date))
+                        Text(CommunicationsPolicy.durationLabel(call, now: context.date)
+                             + (call.actions.contains(.unmute) ? " · Muted" : ""))
                             .font(.system(size: 9)).monospacedDigit().foregroundStyle(.secondary)
                     }
                 } else {
