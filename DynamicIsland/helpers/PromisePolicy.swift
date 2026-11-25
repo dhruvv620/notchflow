@@ -369,7 +369,7 @@ extension PromisePolicy {
         let words = lower.split(whereSeparator: { !($0.isLetter || $0 == "'") }).map(String.init)
         let padded = " " + words.joined(separator: " ") + " "
         guard !words.contains(where: notAYes.contains), !notAYesPhrases.contains(where: { padded.contains(" \($0) ") }) else { return false }
-        // A yes up front, then anything: "Done bhai, ...", "Perfect, ...".
+        // A yes up front, then anything: "Done yaar, ...", "Perfect, ...".
         if let first = lower.split(whereSeparator: { ",.!;:-–".contains($0) }).first, isShortYes(String(first)) { return true }
         return planYesPhrases.contains { padded.contains(" \($0) ") }
     }
